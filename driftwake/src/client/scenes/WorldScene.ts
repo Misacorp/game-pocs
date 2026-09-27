@@ -468,10 +468,25 @@ export class WorldScene extends Phaser.Scene {
     return { itemId: this.pet.itemId, x: this.pet.sprite.x, y: this.pet.sprite.y, chasingDropId: this.pet.chasingDropId };
   }
 
-  /** QA-only: jump straight to a map, bypassing portal adjacency/reqs entirely (never dispatched). */
+  /**
+   * QA-only: jump straight to a map, bypassing portal adjacency/reqs entirely (never dispatched
+   * as a normal changeMap action). Also syncs the authoritative CharacterState.mapId via the
+   * backend's devMutate() when available (LocalBackend) — the reducer's anti-cheat now rejects
+   * killMonster/gather actions whose mapId doesn't match state.mapId, so without this a forced
+   * map jump would silently break kill credit/loot/gathering on the destination map.
+   */
   devForceMap(mapId: string, x?: number, y?: number): void {
-    session.state.mapId = mapId;
-    session.state.position = { x: x ?? -1, y: y ?? -1 };
+    const mutated = (session.backend as any).devMutate?.((s: typeof session.state) => {
+      s.mapId = mapId;
+      if (!s.discoveredMaps.includes(mapId)) s.discoveredMaps.push(mapId);
+      s.position = { x: x ?? -1, y: y ?? -1 };
+    });
+    if (mutated) session.applyState(mutated);
+    else {
+      // No devMutate support (e.g. WsBackend) — fall back to the old client-only mutation.
+      session.state.mapId = mapId;
+      session.state.position = { x: x ?? -1, y: y ?? -1 };
+    }
     this.scene.restart({ mapId, x, y } satisfies WorldSceneData);
   }
 

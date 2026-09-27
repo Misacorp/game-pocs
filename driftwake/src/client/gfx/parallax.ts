@@ -20,9 +20,9 @@ function skyCanvas(theme: ThemeId): HTMLCanvasElement {
   g.addColorStop(0, pal.skyTop); g.addColorStop(0.55, pal.skyMid); g.addColorStop(1, pal.skyBottom);
   ctx.fillStyle = g; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   // glow disc (sun/moon)
-  const gx = VIEW_W * 0.72, gy = VIEW_H * 0.28;
-  const rg = ctx.createRadialGradient(gx, gy, 4, gx, gy, 90);
-  rg.addColorStop(0, withAlpha(pal.glow, 0.9)); rg.addColorStop(1, withAlpha(pal.glow, 0));
+  const gx = VIEW_W * 0.74, gy = VIEW_H * 0.24;
+  const rg = ctx.createRadialGradient(gx, gy, 3, gx, gy, 62);
+  rg.addColorStop(0, withAlpha(pal.glow, 0.75)); rg.addColorStop(0.5, withAlpha(pal.glow, 0.25)); rg.addColorStop(1, withAlpha(pal.glow, 0));
   ctx.fillStyle = rg; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   if (pal.dark) {
     const rnd = seedRandom(theme.length * 51 + 3);
@@ -32,14 +32,22 @@ function skyCanvas(theme: ThemeId): HTMLCanvasElement {
 }
 
 function drawWhale(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, color: string, rnd: () => number): void {
-  const h = w * 0.42;
-  ellipse(ctx, cx, cy, w * 0.5, h * 0.5, color);
-  poly(ctx, [[cx - w * 0.46, cy], [cx - w * 0.7, cy - h * 0.28], [cx - w * 0.5, cy + h * 0.1]], color); // tail fin
-  ellipse(ctx, cx + w * 0.3, cy + h * 0.05, w * 0.14, h * 0.22, color); // head bump
-  for (let i = 0; i < 4; i++) { // tiny town/tree silhouettes on the back
-    const tx = cx - w * 0.28 + i * w * 0.16 + rnd() * 6;
-    const ty = cy - h * 0.42;
-    ctx.fillStyle = color;
+  const h = w * 0.36;
+  // long, gently tapered body (belly-heavy, tapering to the tail)
+  poly(ctx, [
+    [cx + w * 0.42, cy - h * 0.1], [cx + w * 0.24, cy - h * 0.46], [cx - w * 0.1, cy - h * 0.5],
+    [cx - w * 0.42, cy - h * 0.22], [cx - w * 0.58, cy + h * 0.05], [cx - w * 0.42, cy + h * 0.32],
+    [cx - w * 0.05, cy + h * 0.5], [cx + w * 0.28, cy + h * 0.34], [cx + w * 0.42, cy + h * 0.05],
+  ], color);
+  // fluke (tail lobes)
+  poly(ctx, [[cx - w * 0.55, cy + h * 0.1], [cx - w * 0.82, cy - h * 0.16], [cx - w * 0.68, cy + h * 0.14]], color);
+  poly(ctx, [[cx - w * 0.55, cy + h * 0.18], [cx - w * 0.78, cy + h * 0.5], [cx - w * 0.6, cy + h * 0.3]], color);
+  // gentle underside curve highlight
+  ctx.fillStyle = color;
+  ctx.fillRect(cx - w * 0.1, cy + h * 0.4, w * 0.3, h * 0.12);
+  for (let i = 0; i < 4; i++) { // tiny town/tree silhouettes riding on its back
+    const tx = cx - w * 0.2 + i * w * 0.14 + rnd() * 6;
+    const ty = cy - h * 0.48;
     ctx.fillRect(tx, ty - 3 - (i % 2) * 2, 2, 4 + (i % 2) * 2);
   }
 }
@@ -57,10 +65,10 @@ function whaleLayer(theme: ThemeId): HTMLCanvasElement {
   return c;
 }
 
-type Kind = 'cloud' | 'islands' | 'stalactite' | 'kelp' | 'windmillCliff' | 'stormClouds' | 'coralReef' | 'shipRibs' | 'boneArch' | 'veins';
+type Kind = 'harbor' | 'cloud' | 'islands' | 'stalactite' | 'kelp' | 'windmillCliff' | 'stormClouds' | 'coralReef' | 'shipRibs' | 'boneArch' | 'veins';
 
 const MID_KIND: Record<ThemeId, Kind> = {
-  driftmoor: 'cloud', meadow: 'cloud', grotto: 'stalactite', kelpwood: 'kelp', galeoutpost: 'windmillCliff',
+  driftmoor: 'harbor', meadow: 'cloud', grotto: 'stalactite', kelpwood: 'kelp', galeoutpost: 'windmillCliff',
   stormspire: 'stormClouds', lanternreef: 'coralReef', galleon: 'shipRibs', hollow: 'boneArch', heart: 'veins',
 };
 

@@ -264,7 +264,7 @@ const FINREACH_QUESTS: QuestDef[] = [
       { type: 'visit', mapId: 'tangle_heart' },
       { type: 'kill', monsterId: 'kelp_spider', count: 5 },
     ],
-    rewards: { xp: qxp(13, 0.25), gold: qgold(13), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }] },
+    rewards: { xp: qxp(13, 0.25), gold: qgold(13), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }], chooseOne: [{ itemId: 'eq_sword_amberlit' }, { itemId: 'eq_staff_amberlit' }, { itemId: 'eq_bow_amberlit' }, { itemId: 'eq_dagger_amberlit' }] },
   },
   {
     id: 'sq_finreach_eel_hunt',
@@ -300,7 +300,7 @@ const FINREACH_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'kelp_spider', count: 10 },
       { type: 'collect', itemId: 'mat_spider_silk', count: 6 },
     ],
-    rewards: { xp: qxp(16), gold: qgold(16), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }] },
+    rewards: { xp: qxp(16), gold: qgold(16), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }], chooseOne: [{ itemId: 'eq_sword_amberlit' }, { itemId: 'eq_bow_amberlit' }, { itemId: 'eq_wand_amberlit' }, { itemId: 'eq_knives_amberlit' }] },
   },
   {
     id: 'sq_finreach_tangle_bloom',
@@ -441,7 +441,7 @@ const STORMBREAK_QUESTS: QuestDef[] = [
       { type: 'collect', itemId: 'mat_golem_core', count: 8 },
       { type: 'visit', mapId: 'thunderhead_peaks' },
     ],
-    rewards: { xp: qxp(22, 0.25), gold: qgold(22), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+    rewards: { xp: qxp(22, 0.25), gold: qgold(22), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }], chooseOne: [{ itemId: 'eq_sword_stormsteel' }, { itemId: 'eq_staff_stormsteel' }, { itemId: 'eq_bow_stormsteel' }, { itemId: 'eq_amulet_thundercore' }] },
   },
   {
     id: 'sq_stormbreak_ferry_feathers',
@@ -459,7 +459,7 @@ const STORMBREAK_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'stormhawk', count: 8 },
       { type: 'collect', itemId: 'mat_storm_feather', count: 8 },
     ],
-    rewards: { xp: qxp(19), gold: qgold(19), items: [{ itemId: 'use_return_scroll', qty: 2 }] },
+    rewards: { xp: qxp(19), gold: qgold(19), items: [{ itemId: 'use_return_scroll', qty: 2 }], chooseOne: [{ itemId: 'eq_axe_amberlit' }, { itemId: 'eq_staff_stormsteel' }, { itemId: 'eq_gun_amberlit' }, { itemId: 'eq_amulet_stormplume' }] },
   },
 ];
 
@@ -502,7 +502,7 @@ const LANTERNREEF_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'glimmerfish', count: 10 },
       { type: 'collect', itemId: 'mat_glimmer_scale', count: 6 },
     ],
-    rewards: { xp: qxp(25), gold: qgold(25), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }] },
+    rewards: { xp: qxp(25), gold: qgold(25), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }], chooseOne: [{ itemId: 'eq_axe_galewrought' }, { itemId: 'eq_wand_galewrought' }, { itemId: 'eq_gun_galewrought' }, { itemId: 'eq_dagger_galewrought' }] },
   },
   {
     id: 'sq_lanternreef_ghost_letter',
@@ -565,6 +565,7 @@ const LANTERNREEF_QUESTS: QuestDef[] = [
       gold: qgold(28),
       items: [{ itemId: 'use_hp_potion_l', qty: 2 }],
       title: 'Friend of the Lamplighter',
+      chooseOne: [{ itemId: 'eq_sword_galewrought' }, { itemId: 'eq_staff_galewrought' }, { itemId: 'eq_bow_galewrought' }, { itemId: 'eq_amulet_glimmerscale' }],
     },
   },
   {
@@ -624,7 +625,7 @@ const LANTERNREEF_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'coral_golem', count: 5 },
       { type: 'collect', itemId: 'mat_coral_chunk', count: 6 },
     ],
-    rewards: { xp: qxp(29), gold: qgold(29), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+    rewards: { xp: qxp(29), gold: qgold(29), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }], chooseOne: [{ itemId: 'eq_sword_coralbright' }, { itemId: 'eq_wand_coralbright' }, { itemId: 'eq_gun_coralbright' }, { itemId: 'eq_knives_coralbright' }] },
   },
 ];
 
@@ -653,6 +654,7 @@ const HOLLOW_QUESTS: QuestDef[] = [
       xp: qxp(30),
       gold: qgold(30),
       items: [{ itemId: 'use_hp_potion_xl', qty: 1 }, { itemId: 'mat_enhance_stone_1', qty: 2 }],
+      chooseOne: [{ itemId: 'eq_axe_coralbright' }, { itemId: 'eq_staff_coralbright' }, { itemId: 'eq_bow_coralbright' }, { itemId: 'eq_amulet_glimmerscale' }],
     },
   },
   {
@@ -738,6 +740,7 @@ const HOLLOW_QUESTS: QuestDef[] = [
       xp: qxp(35, 0.25),
       gold: qgold(35),
       items: [{ itemId: 'mat_enhance_stone_3', qty: 1 }, { itemId: 'use_hp_potion_xl', qty: 2 }],
+      chooseOne: [{ itemId: 'eq_sword_voidforged' }, { itemId: 'eq_staff_voidforged' }, { itemId: 'eq_gun_voidforged' }, { itemId: 'eq_amulet_bloomthorn' }],
     },
   },
 ];

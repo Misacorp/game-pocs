@@ -49,21 +49,21 @@ function charge(id: string, opts: Partial<MonsterAttack> & { damageMult: number;
 
 const DRIFTMOOR_MONSTERS: MonsterDef[] = [
   {
-    id: 'puffmoss', name: 'Puffmoss', level: 1, hp: 32, attack: 11, defense: 1, xp: 9, gold: [2, 4],
+    id: 'puffmoss', name: 'Puffmoss', level: 1, hp: 32, attack: 7, defense: 1, xp: 9, gold: [2, 4],
     speed: 35, behavior: 'hopper', aggressive: false,
     drops: drops([mat('mat_puffmoss_fluff', 0.45), mat('mat_snail_shell', 0.15)], 'use_hp_potion_s', 'use_mp_potion_s'),
     sprite: { base: 'slime', palette: { primary: '#8fe27a', secondary: '#5fae52', eye: '#1e2b1a' }, scale: 1 },
     knockbackResist: 0, respawnMs: 6500,
   },
   {
-    id: 'shellsnail', name: 'Shellsnail', level: 2, hp: 61, attack: 14, defense: 2, xp: 15, gold: [4, 8],
+    id: 'shellsnail', name: 'Shellsnail', level: 2, hp: 61, attack: 9, defense: 2, xp: 15, gold: [4, 8],
     speed: 28, behavior: 'walker', aggressive: false,
     drops: drops([mat('mat_snail_shell', 0.45), mat('mat_puffmoss_fluff', 0.15)], 'use_hp_potion_s', 'use_mp_potion_s'),
     sprite: { base: 'snail', palette: { primary: '#d9b48a', secondary: '#a97c50', eye: '#2a1c10' }, scale: 1 },
     knockbackResist: 0.2, respawnMs: 6500,
   },
   {
-    id: 'sproutling', name: 'Sproutling', level: 3, hp: 97, attack: 18, defense: 4, xp: 22, gold: [6, 12],
+    id: 'sproutling', name: 'Sproutling', level: 3, hp: 97, attack: 12, defense: 4, xp: 22, gold: [6, 12],
     speed: 32, behavior: 'walker', aggressive: false,
     drops: drops([mat('mat_sprout_cap', 0.45), mat('mat_dewbug_wing', 0.15)], 'use_hp_potion_s', 'use_mp_potion_s',
       { extra: [mat('qi_blighted_spore', 0.25)] }),
@@ -71,7 +71,7 @@ const DRIFTMOOR_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.15, respawnMs: 7000,
   },
   {
-    id: 'dewbug', name: 'Dewbug', level: 4, hp: 140, attack: 21, defense: 5, xp: 30, gold: [8, 16],
+    id: 'dewbug', name: 'Dewbug', level: 4, hp: 140, attack: 16, defense: 5, xp: 30, gold: [8, 16],
     speed: 38, behavior: 'walker', aggressive: false,
     drops: drops([mat('mat_dewbug_wing', 0.45), mat('mat_sprout_cap', 0.15)], 'use_hp_potion_s', 'use_mp_potion_s',
       { extra: [mat('qi_blighted_spore', 0.25)] }),
@@ -79,7 +79,7 @@ const DRIFTMOOR_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.2, respawnMs: 7000,
   },
   {
-    id: 'mossback_boar', name: 'Mossback Boar', level: 6, hp: 245, attack: 27, defense: 7, xp: 49, gold: [12, 24],
+    id: 'mossback_boar', name: 'Mossback Boar', level: 6, hp: 245, attack: 23, defense: 7, xp: 49, gold: [12, 24],
     speed: 45, behavior: 'charger', aggressive: false,
     attacks: [charge('boar_charge', { damageMult: 1.3, cooldownMs: 5000, range: 300, telegraphMs: 600 })],
     drops: drops([mat('mat_boar_hide', 0.4), mat('mat_boar_meat', 0.4)], 'use_hp_potion_s', 'use_mp_potion_s'),

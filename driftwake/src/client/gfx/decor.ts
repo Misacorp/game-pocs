@@ -13,18 +13,41 @@ function organicColor(theme: ThemeId): { primary: string; secondary: string; acc
   return { primary: pal.groundAccent, secondary: shade(pal.groundAccent, -0.25), accent: pal.glow };
 }
 
+// World-pixel sizes. Buildings and other town/landmark props are sized to actually read as
+// buildings next to a ~32x40 character; small clutter (crates, signs, flowers...) stays tiny.
 const SIZE: Partial<Record<DecorKind, [number, number]>> = {
-  house: [40, 40], shop: [40, 36], tent: [30, 26], lamp: [10, 26], lantern: [14, 18], sign: [16, 20],
-  crate: [16, 14], barrel: [14, 16], fence: [24, 14], well: [22, 18], tree: [30, 42], bush: [20, 14],
-  flower: [8, 8], grass: [12, 8], rock: [18, 12], mushroom: [16, 16], kelp: [12, 36], coral: [18, 20],
-  crystal: [12, 18], barnacle: [10, 10], bones: [22, 10], ruin: [26, 30], pillar: [12, 40], statue: [18, 32],
-  windmill: [26, 44], mast: [10, 48], anchor: [16, 20], banner: [14, 24], campfire: [16, 12], vine: [8, 40],
+  house: [110, 110], shop: [120, 100], tent: [70, 60], lamp: [12, 40], lantern: [14, 18], sign: [16, 20],
+  crate: [16, 14], barrel: [14, 16], fence: [24, 14], well: [30, 26], tree: [90, 110], bush: [30, 20],
+  flower: [8, 8], grass: [12, 8], rock: [24, 16], mushroom: [22, 22], kelp: [16, 50], coral: [26, 28],
+  crystal: [16, 24], barnacle: [10, 10], bones: [22, 10], ruin: [50, 60], pillar: [18, 60], statue: [28, 50],
+  windmill: [70, 120], mast: [18, 140], anchor: [16, 20], banner: [14, 24], campfire: [16, 12], vine: [8, 40],
   shell: [12, 10], pod: [10, 12], tendril: [10, 30], chest: [18, 12],
 };
 
 const DRAW: Record<DecorKind, DrawFn> = {
-  house: (ctx, w, h) => { const wood = '#8a6a48'; rrect(ctx, 2, h * 0.32, w - 4, h * 0.68, 2, wood); poly(ctx, [[0, h * 0.34], [w / 2, 0], [w, h * 0.34]], shade(wood, -0.25)); rect(ctx, w * 0.4, h * 0.5, w * 0.2, h * 0.5, shade(wood, -0.35)); circle(ctx, w * 0.2, h * 0.55, 3, '#ffe07a'); },
-  shop: (ctx, w, h) => { const wood = '#a9784a'; rrect(ctx, 2, h * 0.4, w - 4, h * 0.6, 2, wood); rect(ctx, 0, h * 0.32, w, h * 0.14, shade(wood, 0.25)); rect(ctx, w * 0.3, h * 0.55, w * 0.4, h * 0.45, shade(wood, -0.3)); },
+  house: (ctx, w, h) => {
+    const wood = '#8a6a48'; const wall = '#d8c9a8';
+    rrect(ctx, 2, h * 0.32, w - 4, h * 0.68, 3, wall);
+    poly(ctx, [[-2, h * 0.34], [w / 2, 0], [w + 2, h * 0.34]], shade(wood, -0.3));
+    rect(ctx, 0, h * 0.3, w, h * 0.06, wood);
+    // timber framing
+    for (let x = w * 0.15; x < w; x += w * 0.28) rect(ctx, x, h * 0.36, w * 0.04, h * 0.62, wood);
+    rect(ctx, 2, h * 0.6, w - 4, h * 0.04, wood);
+    // door
+    rrect(ctx, w * 0.4, h * 0.66, w * 0.2, h * 0.34, 2, wood);
+    // windows (glowing at dusk)
+    for (const wx of [w * 0.18, w * 0.7]) { rrect(ctx, wx, h * 0.44, w * 0.16, h * 0.16, 1, shade(wood, -0.4)); rrect(ctx, wx + 1.5, h * 0.44 + 1.5, w * 0.16 - 3, h * 0.16 - 3, 1, '#ffe07a'); }
+  },
+  shop: (ctx, w, h) => {
+    const wood = '#a9784a'; const wall = '#e2d3ae';
+    rrect(ctx, 2, h * 0.42, w - 4, h * 0.58, 3, wall);
+    // striped awning
+    const stripes = 6;
+    for (let i = 0; i < stripes; i++) poly(ctx, [[i * (w / stripes), h * 0.3], [(i + 1) * (w / stripes), h * 0.3], [(i + 1) * (w / stripes) - w * 0.03, h * 0.44], [i * (w / stripes) + w * 0.03, h * 0.44]], i % 2 ? wood : shade(wood, 0.2));
+    rect(ctx, 0, h * 0.28, w, h * 0.04, shade(wood, -0.3));
+    rrect(ctx, w * 0.34, h * 0.58, w * 0.32, h * 0.42, 2, shade(wood, -0.35));
+    for (const wx of [w * 0.1, w * 0.76]) { rrect(ctx, wx, h * 0.5, w * 0.14, h * 0.2, 1, shade(wood, -0.4)); rrect(ctx, wx + 1.5, h * 0.5 + 1.5, w * 0.14 - 3, h * 0.2 - 3, 1, '#ffe07a'); }
+  },
   tent: (ctx, w, h) => { poly(ctx, [[2, h], [w / 2, 0], [w - 2, h]], '#c9a15c'); poly(ctx, [[w * 0.4, h], [w / 2, h * 0.4], [w * 0.6, h]], '#8a6a48'); },
   lamp: (ctx, w, h) => { rect(ctx, w / 2 - 1, h * 0.25, 2, h * 0.75, '#4a4038'); circle(ctx, w / 2, h * 0.16, w * 0.32, '#ffdd88'); },
   lantern: (ctx, w, h) => { rect(ctx, w / 2 - 0.5, 0, 1, h * 0.2, '#3a3226'); rrect(ctx, w * 0.2, h * 0.2, w * 0.6, h * 0.6, 2, '#5a4636'); ellipse(ctx, w / 2, h * 0.5, w * 0.22, h * 0.22, '#ffdd88'); },

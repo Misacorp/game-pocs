@@ -115,19 +115,19 @@ function drawHair(ctx: CanvasRenderingContext2D, style: number, cx: number, cy: 
       ellipse(ctx, cx, cy - r * 0.5, r * 1.0, r * 0.55, color);
       for (let i = -2; i <= 2; i++) poly(ctx, [[cx + i * 2.6 - 1.4, cy - r * 0.55], [cx + i * 2.6, cy - r * 1.5], [cx + i * 2.6 + 1.4, cy - r * 0.55]], color);
       break;
-    case 2: // bob
-      circle(ctx, cx, cy - r * 0.05, r * 1.12, color);
-      rect(ctx, cx - r * 1.05, cy - r * 0.1, r * 0.4, r * 1.3, color);
-      rect(ctx, cx + r * 0.65, cy - r * 0.1, r * 0.4, r * 1.3, color);
+    case 2: // bob — top cap + side locks framing the face (never covers it)
+      ellipse(ctx, cx, cy - r * 0.52, r * 1.02, r * 0.5, color);
+      rect(ctx, cx - r * 1.05, cy - r * 0.35, r * 0.4, r * 1.15, color);
+      rect(ctx, cx + r * 0.65, cy - r * 0.35, r * 0.4, r * 1.15, color);
       break;
     case 3: // ponytail
-      circle(ctx, cx, cy - r * 0.15, r * 1.05, color);
+      ellipse(ctx, cx, cy - r * 0.52, r * 0.98, r * 0.48, color);
       poly(ctx, [[cx + r * 0.7, cy - r * 0.3], [cx + r * 2.3, cy + r * 0.4], [cx + r * 1.9, cy + r * 1.6], [cx + r * 0.9, cy + r * 0.6]], dark);
       break;
-    case 4: // long flowing
-      circle(ctx, cx, cy - r * 0.1, r * 1.1, color);
-      rect(ctx, cx - r * 1.15, cy - r * 0.2, r * 0.5, r * 2.2, color);
-      rect(ctx, cx + r * 0.65, cy - r * 0.2, r * 0.5, r * 2.2, color);
+    case 4: // long flowing — top cap + long side strands past the shoulders
+      ellipse(ctx, cx, cy - r * 0.52, r * 1.02, r * 0.5, color);
+      rect(ctx, cx - r * 1.15, cy - r * 0.35, r * 0.5, r * 2.1, color);
+      rect(ctx, cx + r * 0.65, cy - r * 0.35, r * 0.5, r * 2.1, color);
       break;
     case 5: // mohawk
       ellipse(ctx, cx, cy - r * 0.5, r * 0.9, r * 0.4, shade(color, 0.15));

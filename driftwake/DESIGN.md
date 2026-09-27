@@ -328,8 +328,7 @@ Placement guide: tier-1 nodes in meadows/hills/grotto; tier 2 in kelpwood; tier 
    quests ready to turn in (✔), quests offered (!), quests in progress (…), the start node's own `options`,
    role buttons (Shop if `shopId`, Crafting/Learn profession if `profession`), then "Goodbye".
 4. Quest offer → shows `offer` text + objectives + rewards → Accept / Decline. Turn-in → `complete` text,
-   choice cards if `choices` (showing label + description; condition gating not supported on choices — use separate quests
-   for gated endings or put gating in QuestChoice description) and a chooseOne reward picker.
+   choice cards if `choices` (label + description; a choice with `reqs` that fail is shown locked with its `lockedHint`) and a chooseOne reward picker.
 5. Dialogue tree actions: UI-only actions (`openShop`, `openCrafting`, `close`) are handled by UI; all others are sent as
    `{type:'dialogueAction', npcId, action}` and the reducer only executes an action if it literally appears in that NPC's
    dialogue tree (anti-cheat).

@@ -697,6 +697,9 @@ export interface QuestChoice {
   rewards: Reward;
   /** Advance job (job quests) */
   jobAdvance?: AdvancedJobId;
+  /** Choice only selectable if these pass (UI shows it locked with `lockedHint`). */
+  reqs?: Condition[];
+  lockedHint?: string;
 }
 
 export type QuestType = 'main' | 'side' | 'job' | 'faction' | 'profession' | 'daily';

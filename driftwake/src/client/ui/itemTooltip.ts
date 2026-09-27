@@ -91,6 +91,19 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
     nodes.push(el('div', { class: 'dw-tt-sub', style: { marginTop: '4px' } }, `Enhance: ${stars} / ${def.equip.maxStars ?? 10}`));
   }
 
+  if (def.pet) {
+    nodes.push(el('hr'));
+    nodes.push(el('div', { style: { color: '#ff9ac1' } }, `Pet — auto-loots nearby drops (radius ${def.pet.lootRadius}px)`));
+    if (def.pet.stats && Object.keys(def.pet.stats).length) {
+      for (const k in def.pet.stats) {
+        const v = (def.pet.stats as any)[k];
+        if (!v) continue;
+        nodes.push(el('div', { class: 'dw-stat-row', style: { color: '#6fdc6f' } }, el('span', null, statLabel(k as DerivedStatKey)), el('span', null, formatStatValue(k as DerivedStatKey, v, true))));
+      }
+    }
+    nodes.push(el('div', { class: 'dw-tt-desc' }, def.pet.flavor));
+  }
+
   if (def.use) {
     nodes.push(el('hr'));
     const u = def.use;

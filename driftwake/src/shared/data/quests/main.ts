@@ -524,6 +524,6 @@ export const MAIN_QUESTS: QuestDef[] = [
     complete:
       "Maren listens to the whole story without once reaching for her ledger, which might be the highest compliment she's ever paid anyone. \"Well. However this ends up being remembered — I'm glad you were the one standing where you stood. Go on, then. Rest, if you remember how. You've earned it twice over.\"",
     objectives: [{ type: 'talk', npcId: 'npc_maren' }],
-    rewards: { xp: 1500, gold: 500, items: [{ itemId: 'use_elixir_s', qty: 3 }] },
+    rewards: { xp: 1500, gold: 500, items: [{ itemId: 'use_elixir_s', qty: 3 }, { itemId: 'pet_whalecalf', qty: 1 }] },
   },
 ];

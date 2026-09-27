@@ -252,8 +252,13 @@ input.dw-input:focus, select.dw-select:focus { border-color: var(--dw-gold); box
 .dw-bossbar .dw-bar-fill { background: linear-gradient(180deg, #ff8a8a, #8a1414); }
 
 .dw-hint {
-  position:absolute; bottom: 118px; left:50%; transform:translateX(-50%); padding: 5px 12px;
+  position:absolute; bottom: 158px; left:50%; transform:translateX(-50%); padding: 5px 12px;
   font-size: 12.5px; color: var(--dw-gold-bright); pointer-events:none; white-space:nowrap;
+}
+
+.dw-tip {
+  display:flex; align-items:center; gap:6px; max-width: 340px; padding: 9px 12px;
+  pointer-events:auto; animation: dw-toast-in .22s cubic-bezier(.2,1.4,.4,1) both;
 }
 
 /* ---------- Death dialog ---------- */
@@ -342,6 +347,17 @@ input.dw-input:focus, select.dw-select:focus { border-color: var(--dw-gold); box
 .dw-mon-card img { width:40px; height:40px; image-rendering:pixelated; }
 .dw-mon-card .dw-mon-name { font-size:10.5px; margin-top:2px; }
 .dw-mon-card .dw-mon-kills { font-size:9.5px; color: var(--dw-text-dim); }
+
+.dw-ach-list { display:flex; flex-direction:column; gap:6px; max-height: 420px; overflow-y:auto; }
+.dw-ach-row { display:flex; gap:10px; align-items:flex-start; padding:7px 9px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+.dw-ach-row.dw-ach-locked { opacity:0.55; }
+.dw-ach-row.dw-ach-unlocked { border-color: rgba(232,196,119,0.4); background: rgba(232,196,119,0.06); opacity:1; }
+.dw-ach-icon { width:28px; height:28px; image-rendering:pixelated; flex-shrink:0; margin-top:1px; }
+.dw-ach-info { flex:1; min-width:0; }
+.dw-ach-name { font-weight:700; font-size:12.5px; color: var(--dw-gold-bright); }
+.dw-ach-desc { font-size:11px; color: var(--dw-text-dim); margin-top:1px; }
+.dw-ach-date { font-size:10px; color: var(--dw-teal); margin-top:3px; }
+.dw-ach-progress { flex:1; }
 
 /* ---------- Settings ---------- */
 .dw-settings-row { display:flex; align-items:center; gap:10px; padding:7px 2px; }

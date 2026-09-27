@@ -10,6 +10,7 @@ export type { CharacterLook, SpriteInfo, PlatformTextures, Parallax, Weather, Vf
 export { registerBaseTextures } from './base';
 export { getCharacterSprite } from './characters';
 export { getMonsterSprite } from './monsters';
+export { getPetSprite } from './pets';
 export { getNpcSprite } from './npcs';
 export { getPlatformTextures } from './tiles';
 export { createParallax } from './parallax';

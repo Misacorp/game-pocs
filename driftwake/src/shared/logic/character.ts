@@ -102,6 +102,8 @@ export function migrateCharacter(c: any): CharacterState {
   c.bestiary = c.bestiary ?? {};
   c.titles = c.titles ?? [];
   c.counters = { kills: 0, deaths: 0, playTimeMs: 0, crafted: 0, gathered: 0, bossKills: 0, goldEarned: 0, ...(c.counters ?? {}) };
+  c.activePet = c.activePet ?? undefined;
+  c.achievements = c.achievements ?? {};
   c.createdAt = c.createdAt ?? Date.now();
   c.updatedAt = c.updatedAt ?? Date.now();
   return c as CharacterState;

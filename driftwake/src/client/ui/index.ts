@@ -12,6 +12,7 @@ import { createHud } from './hud';
 import { createMinimap } from './minimap';
 import { createQuestTracker } from './tracker';
 import { createNotificationLayer } from './notifications';
+import { createTipLayer } from './tips';
 import { createChat } from './chat';
 import { createInventoryWindow } from './windows/inventory';
 import { createCharacterWindow } from './windows/character';
@@ -22,6 +23,7 @@ import { createShopWindow } from './windows/shop';
 import { createProfessionsWindow } from './windows/professions';
 import { createWorldMapWindow } from './windows/worldmap';
 import { createBestiaryWindow } from './windows/bestiary';
+import { createAchievementsWindow } from './windows/achievements';
 import { createSettingsWindow, applyStoredUiScale } from './windows/settings';
 import { createMenuWindow } from './windows/menu';
 import { createHelpWindow } from './windows/help';
@@ -72,13 +74,15 @@ export function showGameUI(session: GameSession): void {
   const tracker = createQuestTracker(session, wm);
   const notif = createNotificationLayer(session);
   const chat = createChat(session);
+  const tips = createTipLayer(session);
 
   gameLayer.appendChild(hud.root);
   gameLayer.appendChild(minimap);
   gameLayer.appendChild(tracker.root);
   gameLayer.appendChild(notif.root);
   gameLayer.appendChild(chat.root);
-  cleanupFns.push(hud.cleanup, tracker.cleanup, notif.cleanup, chat.cleanup, () => wm.dispose());
+  gameLayer.appendChild(tips.root);
+  cleanupFns.push(hud.cleanup, tracker.cleanup, notif.cleanup, chat.cleanup, tips.cleanup, () => wm.dispose());
 
   createInventoryWindow(wm, session);
   createCharacterWindow(wm, session);
@@ -87,6 +91,7 @@ export function showGameUI(session: GameSession): void {
   createProfessionsWindow(wm, session);
   createWorldMapWindow(wm, session);
   createBestiaryWindow(wm, session);
+  createAchievementsWindow(wm, session);
   createShopWindow(wm, session);
   createDialogueWindow(wm, session, (panel) => wm.open(panel));
   const settings = createSettingsWindow(wm, root);

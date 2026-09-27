@@ -112,6 +112,63 @@ describe('killMonster -> xp / level up / loot', () => {
   });
 });
 
+describe('pets', () => {
+  it('summons an owned pet, rejects one not owned, and applies its passive stats while active', () => {
+    const c = newChar();
+    const petId = Object.keys(ITEMS).find((id) => ITEMS[id].pet);
+    if (!petId) return; // graceful skip if content not authored yet
+    // not owned yet -> rejected
+    const rejected = handleAction(c, { type: 'summonPet', itemId: petId }, ctx());
+    expect(rejected.ok).toBe(false);
+
+    const withPet = structuredClone(c);
+    withPet.inventory.use[0] = { uid: 'petuid1', itemId: petId, qty: 1 };
+    const summonRes = handleAction(withPet, { type: 'summonPet', itemId: petId }, ctx());
+    expect(summonRes.ok).toBe(true);
+    expect(summonRes.state.activePet).toBe(petId);
+    expect(summonRes.events.some((e) => e.type === 'petChanged' && e.itemId === petId)).toBe(true);
+
+    const def = ITEMS[petId];
+    if (def.pet?.stats) {
+      const statsWith = computeStats(summonRes.state);
+      const without = { ...summonRes.state, activePet: undefined };
+      const statsWithout = computeStats(without);
+      const key = Object.keys(def.pet.stats)[0] as keyof typeof statsWith;
+      expect(statsWith[key]).toBeGreaterThan(statsWithout[key]);
+    }
+
+    // dismiss
+    const dismissRes = handleAction(summonRes.state, { type: 'summonPet', itemId: null }, ctx());
+    expect(dismissRes.ok).toBe(true);
+    expect(dismissRes.state.activePet).toBeUndefined();
+  });
+});
+
+describe('achievements', () => {
+  it('unlocks a kill-count achievement once the threshold is reached, exactly once', () => {
+    let c = newChar();
+    const map = Object.values(MAPS).find((m) => m.spawns.length > 0);
+    if (!map) return;
+    c.mapId = map.id;
+    const monsterId = map.spawns[0].monsterId;
+    let state = c;
+    let unlockedCount = 0;
+    for (let i = 0; i < 100; i++) {
+      const res = handleAction(state, { type: 'killMonster', monsterId, mapId: map.id, x: 0, y: 0 }, ctx(i + 1));
+      expect(res.ok).toBe(true);
+      state = res.state;
+      unlockedCount += res.events.filter((e) => e.type === 'achievementUnlocked' && e.id === 'ach_kills_100').length;
+    }
+    expect(state.counters.kills).toBe(100);
+    expect(unlockedCount).toBe(1);
+    expect(state.achievements?.['ach_kills_100']).toBeDefined();
+
+    // one more kill must not re-unlock it
+    const again = handleAction(state, { type: 'killMonster', monsterId, mapId: map.id, x: 0, y: 0 }, ctx(999));
+    expect(again.events.some((e) => e.type === 'achievementUnlocked' && e.id === 'ach_kills_100')).toBe(false);
+  });
+});
+
 describe('equip / unequip', () => {
   it('equips an item from inventory and swaps back on unequip', () => {
     const c = newChar();

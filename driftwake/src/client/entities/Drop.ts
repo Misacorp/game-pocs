@@ -77,6 +77,26 @@ export class DropManager {
     this.drops.push(entry);
   }
 
+  /** Nearest active (not yet picked up) drop within `maxDist` of (x,y), or null. For pet auto-loot. */
+  nearestTo(x: number, y: number, maxDist: number): { dropId: string; x: number; y: number } | null {
+    let best: DropEntry | null = null; let bestD = maxDist;
+    for (const d of this.drops) {
+      if (d.pickedUp) continue;
+      const dist = Math.hypot(d.sprite.x - x, d.sprite.y - y);
+      if (dist < bestD) { bestD = dist; best = d; }
+    }
+    return best ? { dropId: best.dropId, x: best.sprite.x, y: best.sprite.y } : null;
+  }
+
+  /** Pet auto-loot reached its target: animate the drop flying to (px,py) same as a normal pickup. */
+  petPickup(dropId: string, px: number, py: number): boolean {
+    const d = this.drops.find((e) => e.dropId === dropId && !e.pickedUp);
+    if (!d) return false;
+    d.pickedUp = true;
+    this.flyToAndRemove(d, px, py);
+    return true;
+  }
+
   /**
    * Called every frame. Returns dropIds that should be dispatched as picked up this frame.
    */

@@ -92,7 +92,7 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
     complete:
       'Pim hangs the tiny shell chime by the door. It clinks, off-key, every time the wind changes. "...I love it, actually. Don\'t tell her I said that."',
     objectives: [{ type: 'collect', itemId: 'mat_snail_shell', count: 5, desc: 'Shells Wren collected' }],
-    rewards: { xp: qxp(4), gold: qgold(4), items: [{ itemId: 'use_return_scroll', qty: 1 }], chooseOne: [{ itemId: 'eq_armor_traveler' }, { itemId: 'eq_boots_traveler' }, { itemId: 'eq_ring_copper_band' }, { itemId: 'eq_amulet_shell_pendant' }] },
+    rewards: { xp: qxp(4), gold: qgold(4), items: [{ itemId: 'use_return_scroll', qty: 1 }, { itemId: 'pet_shellsnail', qty: 1 }], chooseOne: [{ itemId: 'eq_armor_traveler' }, { itemId: 'eq_boots_traveler' }, { itemId: 'eq_ring_copper_band' }, { itemId: 'eq_amulet_shell_pendant' }] },
   },
   {
     id: 'sq_driftmoor_boar_trouble',
@@ -226,7 +226,7 @@ const FINREACH_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'kelp_sprite', count: 8 },
       { type: 'collect', itemId: 'mat_kelp_essence', count: 5 },
     ],
-    rewards: { xp: qxp(10), gold: qgold(10), items: [{ itemId: 'use_mp_potion_m', qty: 2 }] },
+    rewards: { xp: qxp(10), gold: qgold(10), items: [{ itemId: 'use_mp_potion_m', qty: 2 }, { itemId: 'pet_kelpfox', qty: 1 }] },
   },
   {
     id: 'sq_finreach_scholars_specimens',
@@ -459,7 +459,7 @@ const STORMBREAK_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'stormhawk', count: 8 },
       { type: 'collect', itemId: 'mat_storm_feather', count: 8 },
     ],
-    rewards: { xp: qxp(19), gold: qgold(19), items: [{ itemId: 'use_return_scroll', qty: 2 }], chooseOne: [{ itemId: 'eq_axe_amberlit' }, { itemId: 'eq_staff_stormsteel' }, { itemId: 'eq_gun_amberlit' }, { itemId: 'eq_amulet_stormplume' }] },
+    rewards: { xp: qxp(19), gold: qgold(19), items: [{ itemId: 'use_return_scroll', qty: 2 }, { itemId: 'pet_stormkit', qty: 1 }], chooseOne: [{ itemId: 'eq_axe_amberlit' }, { itemId: 'eq_staff_stormsteel' }, { itemId: 'eq_gun_amberlit' }, { itemId: 'eq_amulet_stormplume' }] },
   },
   {
     id: 'sq_stormbreak_thunder_hunt',
@@ -1227,7 +1227,7 @@ const DAILY_QUESTS: QuestDef[] = [
     type: 'daily',
     giver: 'npc_rook_prospector',
     level: 33,
-    reqs: [{ type: 'level', min: 31 }],
+    reqs: [{ type: 'level', min: 31 }, { type: 'profession', professionId: 'foraging', minLevel: 9 }],
     summary: 'Standing task: gather blightthorn from the deep Hollow for Dusty Fen.',
     offer:
       "\"Blightthorn's the strangest thing I've ever asked anyone to pick for me,\" Dusty Fen admits. \"Dangerous ground for it, too. Standing order, if you're brave enough to keep making the trip.\"",

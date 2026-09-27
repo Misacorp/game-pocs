@@ -8,6 +8,7 @@ export function createMenuWindow(wm: WindowManager) {
 
   const list = el('div', { class: 'dw-menu-list' },
     el('button', { class: 'dw-btn', onclick: () => ctrl.close() }, 'Resume'),
+    el('button', { class: 'dw-btn', onclick: () => { ctrl.close(); wm.open('achievements'); } }, 'Achievements'),
     el('button', { class: 'dw-btn', onclick: () => { ctrl.close(); wm.open('settings'); } }, 'Settings'),
     el('button', { class: 'dw-btn', onclick: () => { ctrl.close(); wm.open('help'); } }, 'Help'),
     el('button', { class: 'dw-btn dw-btn-danger', onclick: () => { ctrl.close(); bus.emit('game:quit'); } }, 'Save & Quit to Title'));

@@ -205,6 +205,20 @@ export interface UseData {
   cooldownMs?: number;
 }
 
+/** Maplestory-style companion species the gfx module knows how to draw (see gfx/pets.ts). */
+export type PetSpecies = 'puffling' | 'shellsnail' | 'kelpfox' | 'stormkit' | 'lanternfish' | 'whalecalf';
+
+/** A pet item (category 'use', stack 1) that can be summoned as an active companion. */
+export interface PetData {
+  species: PetSpecies;
+  /** px radius within which the pet will fly out and auto-loot drops for the player. */
+  lootRadius: number;
+  /** Small passive stat bonuses while this pet is active (see computeStats). */
+  stats?: StatMods;
+  /** One-line flavor text shown in the tooltip. */
+  flavor: string;
+}
+
 export interface ItemDef {
   id: string;
   name: string;
@@ -229,6 +243,8 @@ export interface ItemDef {
   enhanceStone?: { tier: number; maxStarsUsable: number };
   /** Salvaging an equip gives these (default computed from level/rarity if omitted) */
   salvage?: { itemId: string; qty: number }[];
+  /** Pet companion (category 'use', stack 1); dispatch summonPet with this item's uid/itemId to activate. */
+  pet?: PetData;
   tags?: string[];
 }
 
@@ -622,6 +638,45 @@ export type Condition =
   | { type: 'reputation'; faction: FactionId; min: number }
   | { type: 'questChoice'; questId: string; choiceId: string };
 
+// ---------------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------------
+
+export type AchievementCategory = 'combat' | 'exploration' | 'professions' | 'quests' | 'collection' | 'economy' | 'social';
+
+/** Cheap, data-driven conditions the reducer checks after every successful action (see logic/achievements.ts). */
+export type AchievementCondition =
+  | { type: 'kills'; count: number }
+  | { type: 'bossKill'; monsterId: string }
+  | { type: 'level'; level: number }
+  | { type: 'exploreRegion'; region: RegionId }
+  | { type: 'exploreAll' }
+  | { type: 'professionLevel'; level: number }
+  | { type: 'crafted'; count: number }
+  | { type: 'gathered'; count: number }
+  | { type: 'enhanceStars'; stars: number }
+  | { type: 'questCompleted'; questId: string }
+  | { type: 'sideQuestCount'; count: number }
+  | { type: 'allSideQuests' }
+  | { type: 'bestiaryCount'; count: number }
+  | { type: 'allBestiary' }
+  | { type: 'goldEarned'; amount: number }
+  | { type: 'petsOwned'; count: number }
+  | { type: 'flag'; flag: string; value?: boolean | number | string };
+
+export interface AchievementDef {
+  id: string;
+  name: string;
+  description: string;
+  category: AchievementCategory;
+  icon: SkillIconSpec | IconSpec;
+  condition: AchievementCondition;
+  /** Granted once, on unlock (titles use the existing titles mechanism). */
+  reward?: Reward;
+  /** Shown as '???' until unlocked (spoiler protection, e.g. story endings). */
+  hidden?: boolean;
+}
+
 export type DialogueAction =
   | { type: 'acceptQuest'; questId: string }
   | { type: 'setFlag'; flag: string; value: boolean | number | string }
@@ -807,6 +862,10 @@ export interface CharacterState {
   titles: string[];
   activeTitle?: string;
   counters: { kills: number; deaths: number; playTimeMs: number; crafted: number; gathered: number; bossKills: number; goldEarned: number };
+  /** Active companion pet (an owned pet item's itemId), if any. */
+  activePet?: string;
+  /** Unlocked achievement ids -> unlock timestamp. */
+  achievements?: Record<string, number>;
   createdAt: number;
   updatedAt: number;
 }

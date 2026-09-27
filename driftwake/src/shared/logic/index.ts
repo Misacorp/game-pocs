@@ -12,3 +12,5 @@ export * from './reducer';
 export * from './items';
 export * from './crafting';
 export * from './skills';
+export * from './rewards';
+export * from './achievements';

@@ -12,6 +12,7 @@
 import type { Condition, MapDef, PlatformDef } from '../src/shared/types';
 import {
   ITEMS, MONSTERS, SKILLS, JOBS, MAPS, NPCS, QUESTS, DIALOGUES, RECIPES, PROFESSIONS, GATHER_NODES, SHOPS, SETS,
+  ACHIEVEMENTS,
 } from '../src/shared/data';
 import { suggestedMonsterXp, suggestedMonsterHp } from '../src/shared/constants';
 
@@ -60,6 +61,11 @@ for (const item of Object.values(ITEMS)) {
   if (item.classReq) for (const c of item.classReq) if (!JOBS[c]) err('items', `${where}: classReq references unknown class '${c}'`);
   if (item.equip?.setId && !SETS[item.equip.setId]) err('items', `${where}: setId references unknown set '${item.equip.setId}'`);
   if (item.salvage) for (const s of item.salvage) if (!ITEMS[s.itemId]) err('items', `${where}: salvage references unknown item '${s.itemId}'`);
+  if (item.pet) {
+    if (item.category !== 'use') err('items', `${where}: pet item must have category 'use'`);
+    if (item.stack !== 1) err('items', `${where}: pet item must have stack 1`);
+    if (item.pet.lootRadius <= 0) err('items', `${where}: pet lootRadius must be positive`);
+  }
 }
 
 for (const set of Object.values(SETS)) {
@@ -285,6 +291,33 @@ for (const q of Object.values(QUESTS)) {
 }
 
 // ---------------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------------
+
+for (const a of Object.values(ACHIEVEMENTS)) {
+  const where = `achievement '${a.id}'`;
+  const cond = a.condition;
+  switch (cond.type) {
+    case 'bossKill':
+      if (!MONSTERS[cond.monsterId]) err('achievements', `${where}: bossKill condition references unknown monster '${cond.monsterId}'`);
+      else if (!MONSTERS[cond.monsterId].isBoss) warn('achievements', `${where}: bossKill condition references '${cond.monsterId}', which is not flagged isBoss`);
+      break;
+    case 'exploreRegion':
+      if (!Object.values(MAPS).some((m) => m.region === cond.region)) err('achievements', `${where}: exploreRegion condition references region '${cond.region}' with no maps`);
+      break;
+    case 'questCompleted':
+      if (!QUESTS[cond.questId]) err('achievements', `${where}: questCompleted condition references unknown quest '${cond.questId}'`);
+      break;
+    default:
+      break;
+  }
+  if (a.reward) {
+    for (const it of a.reward.items ?? []) if (!ITEMS[it.itemId]) err('achievements', `${where}: reward references unknown item '${it.itemId}'`);
+    for (const rid of a.reward.recipes ?? []) if (!RECIPES[rid]) err('achievements', `${where}: reward references unknown recipe '${rid}'`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------------
 
@@ -317,6 +350,7 @@ console.log(`  professions:  ${Object.keys(PROFESSIONS).length}`);
 console.log(`  gatherNodes:  ${Object.keys(GATHER_NODES).length}`);
 console.log(`  shops:        ${Object.keys(SHOPS).length}`);
 console.log(`  sets:         ${Object.keys(SETS).length}`);
+console.log(`  achievements: ${Object.keys(ACHIEVEMENTS).length}`);
 
 printGroup('ERRORS', errors);
 printGroup('WARNINGS', warnings);

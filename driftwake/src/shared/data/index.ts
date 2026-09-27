@@ -4,10 +4,11 @@
  */
 import type {
   ItemDef, MonsterDef, SkillDef, JobDef, MapDef, NpcDef, QuestDef, DialogueDef,
-  RecipeDef, ProfessionDef, GatherNodeDef, ShopDef,
+  RecipeDef, ProfessionDef, GatherNodeDef, ShopDef, AchievementDef,
 } from '../types';
 
 import { ITEM_LIST } from './items';
+import { ACHIEVEMENT_LIST } from './achievements';
 import { MONSTER_LIST } from './monsters';
 import { SKILL_LIST } from './skills';
 import { JOB_LIST } from './classes';
@@ -43,9 +44,10 @@ export const PROFESSIONS = index<ProfessionDef>(PROFESSION_LIST, 'profession');
 export const GATHER_NODES = index<GatherNodeDef>(GATHER_NODE_LIST, 'gatherNode');
 export const SHOPS = index<ShopDef>(SHOP_LIST, 'shop');
 export const SETS = index<SetDef>(SET_LIST, 'set');
+export const ACHIEVEMENTS = index<AchievementDef>(ACHIEVEMENT_LIST, 'achievement');
 
 export type { SetDef };
 export {
   ITEM_LIST, MONSTER_LIST, SKILL_LIST, JOB_LIST, MAP_LIST, NPC_LIST, QUEST_LIST, DIALOGUE_LIST,
-  RECIPE_LIST, PROFESSION_LIST, GATHER_NODE_LIST, SHOP_LIST, SET_LIST,
+  RECIPE_LIST, PROFESSION_LIST, GATHER_NODE_LIST, SHOP_LIST, SET_LIST, ACHIEVEMENT_LIST,
 };

@@ -5,7 +5,7 @@
 import { el, fmtNum } from './dom';
 import { bus } from '../events';
 import type { GameSession } from '../session';
-import { ITEMS } from '@shared/data';
+import { ITEMS, ACHIEVEMENTS } from '@shared/data';
 import { RARITY_COLORS } from '@shared/constants';
 import { safeItemIcon, goldIconUrl, xpIconUrl } from './icons';
 import { audio } from '../audio';
@@ -132,6 +132,13 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
       case 'reputation': if (ev.amount) pushFeed(`${capitalize(ev.faction)} reputation ${ev.amount > 0 ? '+' : ''}${ev.amount}`, 'good'); break;
       case 'mapChanged': bus.emit('ui:banner', { title: capitalize(ev.mapId.replace(/_/g, ' ')), kind: 'map' }); break;
       case 'bossDefeated': pushFeed('Boss defeated!', 'good'); break;
+      case 'achievementUnlocked': {
+        const def = ACHIEVEMENTS[ev.id];
+        audio.playSfx('questComplete');
+        bus.emit('ui:banner', { title: 'Achievement Unlocked!', subtitle: def?.name ?? ev.id, kind: 'quest' });
+        pushFeed(`Achievement: ${def?.name ?? ev.id}`, 'good');
+        break;
+      }
       case 'notify': pushFeed(ev.text, ev.kind === 'error' ? 'error' : ev.kind === 'good' ? 'good' : ev.kind === 'warn' ? 'warn' : ev.kind === 'quest' ? 'quest' : ev.kind === 'loot' ? 'loot' : ''); break;
       case 'died': bus.emit('ui:death', { xpLost: ev.xpLost }); audio.playSfx('death'); break;
     }

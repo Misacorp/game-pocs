@@ -18,6 +18,7 @@ import { Player, type PlayerInputState } from '../entities/Player';
 import { NpcEntity } from '../entities/Npc';
 import type { MonsterEntity } from '../entities/Monster';
 import { DropManager } from '../entities/Drop';
+import { Pet } from '../entities/Pet';
 import { ProjectileManager } from '../entities/Projectile';
 import { DamageTextPool } from '../combat/DamageText';
 import { BuffManager } from '../combat/Buffs';
@@ -52,6 +53,7 @@ export class WorldScene extends Phaser.Scene {
   private gatherMgr!: GatherManager;
   private portalMgr!: PortalManager;
   private drops!: DropManager;
+  private pet?: Pet;
   private projectiles!: ProjectileManager;
   private damageText!: DamageTextPool;
   private buffs!: BuffManager;
@@ -149,10 +151,11 @@ export class WorldScene extends Phaser.Scene {
 
     this.input2 = new InputController();
     this.recomputePassives();
+    this.syncPet();
 
     this.busOffs.push(
       bus.on('game', (ev) => this.onGameEvent(ev)),
-      bus.on('state', () => { this.player.syncLook(); this.recomputePassives(); this.refreshNpcMarkers(); }),
+      bus.on('state', () => { this.player.syncLook(); this.recomputePassives(); this.refreshNpcMarkers(); this.syncPet(); }),
       bus.on('player:respawn', () => session.dispatch({ type: 'respawn' })),
       bus.on('hotbar:activate', ({ index }) => this.tryActivateHotbar(index, false)),
     );
@@ -211,6 +214,7 @@ export class WorldScene extends Phaser.Scene {
 
     const pickups = this.drops.update(dt, this.player.x, this.player.y, this.input2.isDown('interact'));
     for (const id of pickups) session.dispatch({ type: 'pickup', dropId: id });
+    this.updatePet(dt);
 
     for (const n of this.npcs) {
       n.update(now);
@@ -304,7 +308,7 @@ export class WorldScene extends Phaser.Scene {
 
   // ---- panels / interaction -----------------------------------------------
 
-  private static readonly PANEL_KEYS = ['inventory', 'character', 'skills', 'quests', 'professions', 'map', 'bestiary', 'help'] as const;
+  private static readonly PANEL_KEYS = ['inventory', 'character', 'skills', 'quests', 'professions', 'map', 'bestiary', 'help', 'achievements'] as const;
 
   private handlePanelKeys(): void {
     for (const k of WorldScene.PANEL_KEYS) if (this.input2.justPressed(k)) bus.emit('ui:toggle', { panel: k });
@@ -337,6 +341,31 @@ export class WorldScene extends Phaser.Scene {
     if (npc && (zPressed || upPressed)) { bus.emit('ui:dialogue', { npcId: npc.id }); return; }
     if (portal && upPressed) { this.portalMgr.use(portal); return; }
     if (node && zPressed) this.gatherMgr.interact(node);
+  }
+
+  // ---- pet -----------------------------------------------------------------
+
+  /** Create/destroy the pet entity to match session.state.activePet (called on create + every 'state' event). */
+  private syncPet(): void {
+    const itemId = session.state.activePet;
+    if (this.pet && this.pet.itemId === itemId) return;
+    this.pet?.destroy();
+    this.pet = undefined;
+    if (!itemId) return;
+    const def = ITEMS[itemId];
+    if (!def?.pet) return;
+    this.pet = new Pet(this, def, this.player.x, this.player.y);
+  }
+
+  private updatePet(dt: number): void {
+    if (!this.pet) return;
+    const reached = this.pet.update(dt, { x: this.player.x, y: this.player.y, facing: this.player.facing });
+    if (reached) {
+      if (this.drops.petPickup(reached, this.pet.sprite.x, this.pet.sprite.y)) session.dispatch({ type: 'pickup', dropId: reached });
+    } else if (!this.pet.chasingDropId) {
+      const found = this.drops.nearestTo(this.player.x, this.player.y, this.pet.lootRadius);
+      if (found) this.pet.chase(found.dropId, found.x, found.y);
+    }
   }
 
   // ---- monster death / loot ---------------------------------------------------
@@ -420,6 +449,12 @@ export class WorldScene extends Phaser.Scene {
     this.spawner.spawnOne(dummy, this.player.x + offsetX, this.player.y, false);
   }
 
+  /** QA-only: inspect the active pet entity (species/position/chase target), or null if none. */
+  devPetInfo(): { itemId: string; x: number; y: number; chasingDropId: string | null } | null {
+    if (!this.pet) return null;
+    return { itemId: this.pet.itemId, x: this.pet.sprite.x, y: this.pet.sprite.y, chasingDropId: this.pet.chasingDropId };
+  }
+
   /** QA-only: jump straight to a map, bypassing portal adjacency/reqs entirely (never dispatched). */
   devForceMap(mapId: string, x?: number, y?: number): void {
     session.state.mapId = mapId;
@@ -451,6 +486,7 @@ export class WorldScene extends Phaser.Scene {
     safely('gatherMgr', () => this.gatherMgr?.destroy());
     safely('portalMgr', () => this.portalMgr?.destroy());
     safely('drops', () => this.drops?.destroy());
+    safely('pet', () => { this.pet?.destroy(); this.pet = undefined; });
     safely('projectiles', () => this.projectiles?.destroy());
     safely('presence', () => this.presence?.destroy());
     safely('player', () => this.player?.destroy());

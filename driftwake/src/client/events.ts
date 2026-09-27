@@ -6,7 +6,7 @@ import type { GameEvent, ChatMessage, NotifyKind } from '@shared/protocol';
 
 export type PanelId =
   | 'inventory' | 'character' | 'skills' | 'quests' | 'professions' | 'map' | 'settings' | 'menu'
-  | 'bestiary' | 'chat' | 'help';
+  | 'bestiary' | 'chat' | 'help' | 'achievements';
 
 export interface ClientEventMap {
   /** Authoritative character state replaced (after any action). */

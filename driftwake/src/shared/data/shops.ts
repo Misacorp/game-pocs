@@ -102,6 +102,7 @@ export const SHOP_LIST: ShopDef[] = [
       { itemId: 'use_return_scroll' },
       { itemId: 'use_stat_reset' },
       { itemId: 'use_skill_reset' },
+      { itemId: 'pet_puffling' },
     ],
   },
   {
@@ -134,6 +135,7 @@ export const SHOP_LIST: ShopDef[] = [
       ...weaponSet('voidforged', 35),
       ...armorSet({ plate: 'coralguard', robe: 'pearlsilk', leather: 'glowhide' }, 30),
       { itemId: 'use_whetstone_4', reqs: lvl(30) },
+      { itemId: 'pet_lanternfish' },
     ],
   },
 ];

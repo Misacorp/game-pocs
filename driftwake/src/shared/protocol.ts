@@ -52,7 +52,9 @@ export type ClientAction =
   | { type: 'unlearnProfession'; professionId: CraftingProfessionId }
   | { type: 'craft'; recipeId: string; qty?: number }
   | { type: 'salvage'; uid: string }
-  | { type: 'enhance'; uid: string; stoneItemId: string };
+  | { type: 'enhance'; uid: string; stoneItemId: string }
+  // pets
+  | { type: 'summonPet'; itemId: string | null };
 
 export type ActionType = ClientAction['type'];
 
@@ -103,7 +105,9 @@ export type GameEvent =
   | { type: 'gathered'; nodeId: string }
   | { type: 'flagSet'; flag: string; value: boolean | number | string }
   | { type: 'openUi'; panel: 'shop' | 'crafting'; id?: string }
-  | { type: 'bossDefeated'; monsterId: string };
+  | { type: 'bossDefeated'; monsterId: string }
+  | { type: 'petChanged'; itemId: string | null }
+  | { type: 'achievementUnlocked'; id: string };
 
 export interface ActionResult {
   ok: boolean;

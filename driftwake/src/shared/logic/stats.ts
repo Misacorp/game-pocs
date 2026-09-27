@@ -1,5 +1,5 @@
 import type { CharacterState, DerivedStats, DerivedStatKey, Scalar, StatMods } from '../types';
-import { JOBS, SKILLS, SETS } from '../data';
+import { JOBS, SKILLS, SETS, ITEMS } from '../data';
 import { BASE_CRIT_RATE, JOB_ADVANCE_LEVEL } from '../constants';
 import { getItemStats } from './items';
 
@@ -80,6 +80,11 @@ export function computeStats(state: CharacterState, now: number = Date.now()): D
 
   for (const buff of state.buffs) {
     if (buff.expiresAt > now) addMods(s, buff.stats);
+  }
+
+  if (state.activePet) {
+    const petDef = ITEMS[state.activePet];
+    if (petDef?.pet?.stats) addMods(s, petDef.pet.stats);
   }
 
   // 3) HP/MP: base + per-level growth (str/int contribute using their FINAL value, i.e. after

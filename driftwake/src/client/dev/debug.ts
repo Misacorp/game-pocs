@@ -17,6 +17,7 @@ interface WorldSceneDevApi {
   devSpawnMonster(monsterId: string, offsetX?: number): void;
   devSpawnDummy(offsetX?: number): void;
   devForceMap(mapId: string, x?: number, y?: number): void;
+  devPetInfo(): { itemId: string; x: number; y: number; chasingDropId: string | null } | null;
 }
 
 export function installDevHandle(game: Phaser.Game): void {
@@ -27,6 +28,8 @@ export function installDevHandle(game: Phaser.Game): void {
     teleport(mapId: string, portalId?: string) { session.dispatch({ type: 'changeMap', mapId, portalId }); },
     /** QA-only: jump straight to any map bypassing portal adjacency/reqs (e.g. to reach a boss map directly). */
     forceMap(mapId: string, x?: number, y?: number) { worldScene()?.devForceMap(mapId, x, y); },
+    /** QA-only: inspect the active pet entity (species/position/chase target), or null if none active. */
+    pet() { return worldScene()?.devPetInfo() ?? null; },
     /** Spawn a monster near the player (does not respawn on death). */
     spawnMonster(monsterId: string, offsetX = 60) { worldScene()?.devSpawnMonster(monsterId, offsetX); },
     /** Spawn a stationary, unkillable training dummy near the player — safe target for testing every skill. */
@@ -90,5 +93,5 @@ export function installDevHandle(game: Phaser.Game): void {
       dw.heal();
     },
   };
-  console.log('[dw] dev handle installed — window.__dw.{teleport,forceMap,spawnMonster,dummy,godmode,state,stats,maps,monsters,jobs,heal,setJob,setLevel,learnAll,fillHotbar,prepJob}');
+  console.log('[dw] dev handle installed — window.__dw.{teleport,forceMap,spawnMonster,dummy,godmode,state,stats,maps,monsters,jobs,heal,setJob,setLevel,learnAll,fillHotbar,prepJob,pet}');
 }

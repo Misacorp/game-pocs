@@ -3,6 +3,7 @@ import { bus } from '../../events';
 import { WindowManager, createWindow } from '../manager';
 import { audio, type Volumes } from '../../audio';
 import { BIND_LABELS, DEFAULT_BINDS, getBinds, setBind, resetBinds, keyLabel } from '../../input/keybinds';
+import { tipsEnabled, setTipsEnabled } from '../tips';
 
 const UI_SCALE_KEY = 'driftwake:uiscale';
 
@@ -28,6 +29,12 @@ export function createSettingsWindow(wm: WindowManager, uiRoot: HTMLElement) {
     const cb = el('input', { type: 'checkbox', checked: audio.getVolumes().muted }) as HTMLInputElement;
     cb.addEventListener('change', () => audio.setVolumes({ muted: cb.checked }));
     return el('div', { class: 'dw-settings-row' }, el('label', null, 'Mute'), cb);
+  }
+
+  function tipsRow(): HTMLElement {
+    const cb = el('input', { type: 'checkbox', checked: tipsEnabled() }) as HTMLInputElement;
+    cb.addEventListener('change', () => setTipsEnabled(cb.checked));
+    return el('div', { class: 'dw-settings-row' }, el('label', null, 'Tutorial Tips'), cb);
   }
 
   function scaleRow(): HTMLElement {
@@ -78,6 +85,8 @@ export function createSettingsWindow(wm: WindowManager, uiRoot: HTMLElement) {
     body.appendChild(volSlider('Music', 'music'));
     body.appendChild(volSlider('SFX', 'sfx'));
     body.appendChild(muteRow());
+    body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Gameplay'));
+    body.appendChild(tipsRow());
     body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Display'));
     body.appendChild(scaleRow());
     body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Keybinds'));

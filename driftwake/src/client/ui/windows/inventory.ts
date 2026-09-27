@@ -72,13 +72,17 @@ export function createInventoryWindow(wm: WindowManager, session: GameSession) {
   function useOrEquip(inst: ItemInstance, def = ITEMS[inst.itemId]) {
     if (!def) return;
     audio.playSfx('uiClick');
-    if (def.equip) session.dispatch({ type: 'equip', uid: inst.uid });
+    if (def.pet) session.dispatch({ type: 'summonPet', itemId: session.state.activePet === inst.itemId ? null : inst.itemId });
+    else if (def.equip) session.dispatch({ type: 'equip', uid: inst.uid });
     else if (def.use) session.dispatch({ type: 'useItem', uid: inst.uid });
   }
 
   function openContextMenu(e: MouseEvent, inst: ItemInstance, def = ITEMS[inst.itemId]) {
     const items: { label: string; onClick: () => void; danger?: boolean }[] = [];
-    if (def?.equip) items.push({ label: 'Equip', onClick: () => session.dispatch({ type: 'equip', uid: inst.uid }) });
+    if (def?.pet) {
+      const active = session.state.activePet === inst.itemId;
+      items.push({ label: active ? 'Dismiss' : 'Summon', onClick: () => session.dispatch({ type: 'summonPet', itemId: active ? null : inst.itemId }) });
+    } else if (def?.equip) items.push({ label: 'Equip', onClick: () => session.dispatch({ type: 'equip', uid: inst.uid }) });
     else if (def?.use) items.push({ label: 'Use', onClick: () => session.dispatch({ type: 'useItem', uid: inst.uid }) });
     if (uiState.openShopId && def?.sellPrice && !def.quest) {
       items.push({ label: `Sell (${def.sellPrice}g)`, onClick: () => session.dispatch({ type: 'sell', uid: inst.uid, qty: inst.qty }) });

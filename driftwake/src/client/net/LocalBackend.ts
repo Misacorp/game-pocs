@@ -7,6 +7,7 @@ import type { ActionResult, ClientAction, CreateCharacterRequest, ChatMessage, P
 import { createCharacter, summarize, migrateCharacter, handleAction, createSession, type SessionState, type ServerContext } from '@shared/logic';
 import { makeUid } from '@shared/rng';
 import type { Backend, BackendEvents } from './Backend';
+import { WorldSimulation } from './simulation';
 
 const STORAGE_PREFIX = 'driftwake:';
 const INDEX_KEY = `${STORAGE_PREFIX}characters`;
@@ -22,6 +23,8 @@ export class LocalBackend implements Backend {
   /** Optional hook so a simulation layer (bots) can observe presence */
   onPresence?: (p: PresenceUpdate) => void;
   onChat?: (msg: ChatMessage) => void;
+  /** Simulated "other players" that make the offline world feel alive (see simulation.ts). */
+  private sim: WorldSimulation | null = null;
 
   async connect(): Promise<void> { /* nothing to do */ }
 
@@ -73,12 +76,21 @@ export class LocalBackend implements Backend {
     if (!c) throw new Error('Character not found');
     this.current = c;
     this.session = createSession();
+    this.sim?.dispose();
+    this.sim = new WorldSimulation(this);
+    this.onPresence = (p) => this.sim?.onMapChanged(p.mapId);
+    this.onChat = (msg) => this.sim?.onPlayerChat(msg);
+    this.sim.start(c.mapId, c.name);
     return structuredClone(c);
   }
 
   async leaveWorld(): Promise<void> {
     if (this.current) this.persist(this.current);
     this.current = null;
+    this.sim?.dispose();
+    this.sim = null;
+    this.onPresence = undefined;
+    this.onChat = undefined;
   }
 
   private ctx(): ServerContext {
@@ -97,6 +109,7 @@ export class LocalBackend implements Backend {
     if (res.ok) {
       this.current = res.state;
       this.schedulePersist();
+      this.sim?.onMapChanged(this.current.mapId);
     }
     return { ok: res.ok, error: res.error, events: res.events, state: structuredClone(this.current) };
   }

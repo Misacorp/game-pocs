@@ -1,0 +1,264 @@
+import { el, fmtNum } from '../dom';
+import { bus } from '../../events';
+import type { GameSession } from '../../session';
+import { WindowManager, createWindow } from '../manager';
+import { confirmDialog } from '../widgets';
+import { safeNpcPortrait, safeItemIcon, goldIconUrl } from '../icons';
+import { NPCS, DIALOGUES, QUESTS, ITEMS } from '@shared/data';
+import { checkConditions, questsOfferedBy, questsReadyAt, questsInProgressAt, questObjectiveProgress } from '@shared/logic';
+import type { DialogueAction, DialogueNode, DialogueDef, QuestDef, Objective } from '@shared/types';
+import { uiState } from '../state';
+import { audio } from '../../audio';
+
+const LOCAL_ACTIONS = new Set(['openShop', 'openCrafting', 'close']);
+
+export function createDialogueWindow(wm: WindowManager, session: GameSession, openWindow: (panel: string) => void) {
+  const portrait = el('img', { class: 'dw-dlg-portrait' });
+  const nameEl = el('div', { class: 'dw-dlg-name' });
+  const titleEl = el('div', { class: 'dw-dlg-title' });
+  const textEl = el('div', { class: 'dw-dlg-text' });
+  const optionsEl = el('div', { class: 'dw-dlg-options' });
+  const top = el('div', { class: 'dw-dlg-top' }, portrait, el('div', { style: { flex: '1' } }, nameEl, titleEl, textEl));
+  const body = el('div', {}, top, optionsEl);
+
+  const ctrl = createWindow(wm, { panel: 'dialogue', title: 'Conversation', width: 560, className: 'dw-dialogue-window' }, body);
+
+  let npcId = '';
+  let typingCancel: (() => void) | null = null;
+
+  function currentDlgId(): string | undefined { return NPCS[npcId]?.dialogue; }
+
+  function typeText(text: string, onDone: () => void) {
+    typingCancel?.();
+    textEl.textContent = '';
+    let i = 0;
+    let done = false;
+    const finish = () => { if (done) return; done = true; textEl.textContent = text; onDone(); };
+    const timer = window.setInterval(() => {
+      i += 2;
+      textEl.textContent = text.slice(0, i);
+      if (i >= text.length) { window.clearInterval(timer); finish(); }
+    }, 14);
+    typingCancel = () => { window.clearInterval(timer); finish(); };
+    textEl.onclick = () => { if (!done) typingCancel?.(); };
+  }
+
+  function runActions(actions: DialogueAction[] | undefined) {
+    if (!actions) return;
+    for (const a of actions) {
+      if (a.type === 'close') { ctrl.close(); continue; }
+      if (a.type === 'openShop') { uiState.openShopId = a.shopId; bus.emit('ui:shop', { shopId: a.shopId, npcId }); openWindow('shop'); continue; }
+      if (a.type === 'openCrafting') {
+        uiState.trainerNpcId = npcId; uiState.trainerProfessionId = a.professionId ?? NPCS[npcId]?.profession ?? null;
+        bus.emit('ui:crafting', { professionId: a.professionId, npcId });
+        openWindow('professions');
+        continue;
+      }
+      session.dispatch({ type: 'dialogueAction', npcId, action: a });
+    }
+  }
+
+  function optionRow(label: string, marker: string | null, markerClass: string, onClick: () => void): HTMLElement {
+    const row = el('div', { class: `dw-dlg-opt ${markerClass}`, onclick: () => { audio.playSfx('uiClick'); onClick(); } });
+    if (marker) row.appendChild(el('span', { class: 'dw-dlg-marker' }, marker));
+    row.appendChild(el('span', null, label));
+    return row;
+  }
+
+  function renderRoot() {
+    const npc = NPCS[npcId];
+    nameEl.textContent = npc?.name ?? '???';
+    titleEl.textContent = npc?.title ?? '';
+    portrait.src = safeNpcPortrait(npc);
+    const dlgId = currentDlgId();
+    const dlg = dlgId ? DIALOGUES[dlgId] : undefined;
+    const startNode = dlg?.nodes[dlg.start];
+    const text = startNode?.text ?? npc?.greeting ?? '...';
+
+    typeText(text, () => buildRootOptions(dlg, startNode));
+  }
+
+  function buildRootOptions(dlg: DialogueDef | undefined, startNode: DialogueNode | undefined) {
+    optionsEl.innerHTML = '';
+    const st = session.state;
+    for (const q of questsReadyAt(st, npcId)) optionsEl.appendChild(optionRow(q.name, '✔', 'dw-marker-ready', () => renderTurnIn(q.id)));
+    for (const q of questsOfferedBy(st, npcId)) optionsEl.appendChild(optionRow(q.name, '!', 'dw-marker-offer', () => renderOffer(q.id)));
+    for (const q of questsInProgressAt(st, npcId)) optionsEl.appendChild(optionRow(q.name, '…', 'dw-marker-progress', () => renderProgress(q.id)));
+    if (startNode?.options) {
+      for (const opt of startNode.options) {
+        if (!checkConditions(st, opt.conditions)) continue;
+        optionsEl.appendChild(optionRow(opt.text, null, '', () => {
+          runActions(opt.actions);
+          if (opt.next) showTreeNode(opt.next); else renderRoot();
+        }));
+      }
+    }
+    const npc = NPCS[npcId];
+    if (npc?.shopId) optionsEl.appendChild(optionRow(`Shop`, '$', '', () => runActions([{ type: 'openShop', shopId: npc.shopId! }])));
+    if (npc?.profession) optionsEl.appendChild(optionRow(`Crafting (${capitalize(npc.profession)})`, '⚒', '', () => runActions([{ type: 'openCrafting', professionId: npc.profession as any }])));
+    optionsEl.appendChild(optionRow('Goodbye', null, 'dw-goodbye', () => ctrl.close()));
+  }
+
+  function showTreeNode(nodeId: string) {
+    const dlgId = currentDlgId();
+    const dlg = dlgId ? DIALOGUES[dlgId] : undefined;
+    const node = dlg?.nodes[nodeId];
+    if (!dlg || !node) { renderRoot(); return; }
+    runActions(node.actions);
+    typeText(node.text, () => {
+      optionsEl.innerHTML = '';
+      const st = session.state;
+      const opts = (node.options ?? []).filter((o) => checkConditions(st, o.conditions));
+      if (opts.length) {
+        for (const opt of opts) {
+          optionsEl.appendChild(optionRow(opt.text, null, '', () => {
+            runActions(opt.actions);
+            if (opt.next) showTreeNode(opt.next); else renderRoot();
+          }));
+        }
+      } else {
+        optionsEl.appendChild(optionRow(node.next ? 'Continue' : 'Goodbye', null, 'dw-goodbye', () => {
+          if (node.next) showTreeNode(node.next); else ctrl.close();
+        }));
+      }
+    });
+  }
+
+  // ---- Quest offer / turn-in / in-progress views ----
+  function renderOffer(questId: string, page = 0) {
+    const def = QUESTS[questId];
+    if (!def) { renderRoot(); return; }
+    nameEl.textContent = NPCS[npcId]?.name ?? '???';
+    titleEl.textContent = def.name;
+    const paragraphs = def.offer.split(/\n\n+/);
+    const isLast = page >= paragraphs.length - 1;
+    typeText(paragraphs[Math.min(page, paragraphs.length - 1)] ?? '', () => {
+      optionsEl.innerHTML = '';
+      if (!isLast) {
+        optionsEl.appendChild(optionRow('Continue ▸', null, '', () => renderOffer(questId, page + 1)));
+        optionsEl.appendChild(optionRow('Back', null, 'dw-goodbye', () => renderRoot()));
+        return;
+      }
+      for (const o of def.objectives) optionsEl.appendChild(el('div', { class: 'dw-dlg-obj' }, `• ${describeObjective(o)}`));
+      optionsEl.appendChild(rewardsRow(def));
+      const actions = el('div', { class: 'dw-dlg-actions' },
+        el('button', { class: 'dw-btn dw-btn-ghost', onclick: () => renderRoot() }, 'Decline'),
+        el('button', { class: 'dw-btn dw-btn-primary', onclick: () => { session.dispatch({ type: 'acceptQuest', questId }); renderRoot(); } }, 'Accept'));
+      optionsEl.appendChild(actions);
+    });
+  }
+
+  function renderProgress(questId: string) {
+    const def = QUESTS[questId];
+    if (!def) { renderRoot(); return; }
+    nameEl.textContent = NPCS[npcId]?.name ?? '???';
+    titleEl.textContent = def.name;
+    typeText(def.progress, () => {
+      optionsEl.innerHTML = '';
+      for (const o of questObjectiveProgress(session.state, questId)) {
+        optionsEl.appendChild(el('div', { class: `dw-dlg-obj ${o.done ? 'dw-done' : ''}` }, `${o.done ? '✓' : '•'} ${o.text} (${o.current}/${o.target})`));
+      }
+      optionsEl.appendChild(optionRow('Back', null, 'dw-goodbye', () => renderRoot()));
+    });
+  }
+
+  function renderTurnIn(questId: string) {
+    const def = QUESTS[questId];
+    if (!def) { renderRoot(); return; }
+    nameEl.textContent = NPCS[npcId]?.name ?? '???';
+    titleEl.textContent = def.name;
+    let choiceId: string | undefined;
+    let chooseIndex: number | undefined;
+
+    typeText(def.complete, () => {
+      optionsEl.innerHTML = '';
+      for (const o of questObjectiveProgress(session.state, questId)) {
+        optionsEl.appendChild(el('div', { class: 'dw-dlg-obj dw-done' }, `✓ ${o.text}`));
+      }
+      optionsEl.appendChild(rewardsRow(def));
+
+      let chooseOneRow: HTMLElement | null = null;
+      if (def.rewards.chooseOne?.length) {
+        chooseOneRow = el('div', { style: { display: 'flex', gap: '8px', margin: '6px 0' } });
+        def.rewards.chooseOne.forEach((it, idx) => {
+          const card = el('div', {
+            class: 'dw-choice-card', style: { flex: '1', textAlign: 'center' },
+            onclick: () => { chooseIndex = idx; refreshChoiceCards(); updateCompleteBtn(); },
+          }, el('img', { src: safeItemIcon(ITEMS[it.itemId]), style: { width: '28px', height: '28px' } }), el('div', { class: 'dw-choice-label', style: { fontSize: '11.5px' } }, ITEMS[it.itemId]?.name ?? it.itemId));
+          chooseOneRow!.appendChild(card);
+        });
+        optionsEl.appendChild(chooseOneRow);
+      }
+
+      let choicesHost: HTMLElement | null = null;
+      if (def.choices?.length) {
+        choicesHost = el('div', {});
+        for (const c of def.choices) {
+          const locked = !checkConditions(session.state, c.reqs);
+          const card = el('div', {
+            class: `dw-choice-card ${locked ? 'dw-locked' : ''}`,
+            onclick: () => { if (locked) return; choiceId = c.id; refreshChoiceCards(); updateCompleteBtn(); },
+          },
+            el('div', { class: 'dw-choice-label' }, c.label),
+            el('div', { class: locked ? 'dw-choice-hint' : 'dw-choice-desc' }, locked ? (c.lockedHint ?? 'A path not yet open to you...') : c.description));
+          choicesHost.appendChild(card);
+        }
+        optionsEl.appendChild(choicesHost);
+      }
+
+      function refreshChoiceCards() {
+        if (choicesHost) Array.from(choicesHost.children).forEach((el2, i) => el2.classList.toggle('dw-selected', def.choices![i].id === choiceId));
+        if (chooseOneRow) Array.from(chooseOneRow.children).forEach((el2, i) => el2.classList.toggle('dw-selected', i === chooseIndex));
+      }
+
+      const completeBtn = el('button', { class: 'dw-btn dw-btn-primary' }, 'Complete');
+      function updateCompleteBtn() {
+        const needsChoice = !!def.choices?.length && !choiceId;
+        const needsChoose = !!def.rewards.chooseOne?.length && chooseIndex === undefined;
+        (completeBtn as HTMLButtonElement).disabled = needsChoice || needsChoose;
+      }
+      completeBtn.addEventListener('click', async () => {
+        if (def.choices?.length) {
+          const chosen = def.choices.find((c) => c.id === choiceId);
+          const ok = await confirmDialog(`Confirm: "${chosen?.label}"?\nThis choice is permanent.`, { okLabel: 'Confirm Choice' });
+          if (!ok) return;
+        }
+        session.dispatch({ type: 'completeQuest', questId, choiceId, chooseIndex });
+        renderRoot();
+      });
+      updateCompleteBtn();
+      optionsEl.appendChild(el('div', { class: 'dw-dlg-actions' }, completeBtn));
+    });
+  }
+
+  function rewardsRow(def: QuestDef): HTMLElement {
+    const row = el('div', { class: 'dw-dlg-reward-row' });
+    if (def.rewards.xp) row.appendChild(el('div', { class: 'dw-dlg-reward' }, `${fmtNum(def.rewards.xp)} XP`));
+    if (def.rewards.gold) row.appendChild(el('div', { class: 'dw-dlg-reward' }, el('img', { src: goldIconUrl(16) }), `${fmtNum(def.rewards.gold)}`));
+    for (const it of def.rewards.items ?? []) row.appendChild(el('div', { class: 'dw-dlg-reward' }, el('img', { src: safeItemIcon(ITEMS[it.itemId]) }), `${ITEMS[it.itemId]?.name ?? it.itemId}${it.qty && it.qty > 1 ? ` x${it.qty}` : ''}`));
+    return row;
+  }
+
+  function describeObjective(o: Objective): string {
+    if (o.desc) return o.desc;
+    switch (o.type) {
+      case 'kill': return `Defeat ${o.count} ${o.monsterId}`;
+      case 'collect': return `Collect ${o.count} ${ITEMS[o.itemId]?.name ?? o.itemId}`;
+      case 'talk': return `Talk to ${NPCS[o.npcId]?.name ?? o.npcId}`;
+      case 'visit': return `Visit ${o.mapId}`;
+      case 'boss': return `Defeat ${o.monsterId}`;
+      default: return o.type;
+    }
+  }
+
+  bus.on('ui:dialogue', ({ npcId: id }) => {
+    npcId = id;
+    session.dispatch({ type: 'talk', npcId: id });
+    ctrl.open();
+    renderRoot();
+  });
+
+  return ctrl;
+}
+
+function capitalize(s: string): string { return s.length ? s[0].toUpperCase() + s.slice(1) : s; }

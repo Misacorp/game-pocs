@@ -1,1189 +1,1111 @@
 /**
- * Generative music with step sequencer.
- * Each MusicId gets its own key, scale, tempo, and patterns.
+ * Generative music: a lookahead step sequencer per Chris Wilson's
+ * "A Tale of Two Clocks" (https://web.dev/articles/audio-scheduling).
+ *
+ * Each MusicId is a small composition: a key/mode, a chord progression (one
+ * roman-numeral chord per bar), and per-voice patterns written as compact
+ * strings (one character per 16th-note step):
+ *   - lead/bass "scale degree" patterns: '.' rest, '-' hold previous note,
+ *     '1'-'9' scale degree (wraps to higher octaves past the scale length),
+ *     'a'-'g' the same degree one octave down, 'A'-'G' one octave up.
+ *   - arp "chord tone" patterns: '.' rest, '-' hold, '0'-'3' chord-tone index
+ *     (0=root, 1=third, 2=fifth, 3=root+octave) of the CURRENT bar's chord.
+ *   - drum patterns: '.' rest, '1'-'3' hit velocity (soft -> accent).
+ *
+ * Every playing track is its own object with its own GainNode feeding into
+ * the shared musicGain bus, so crossfades ramp two independent gains and
+ * never fight over one shared node.
  */
 
 import type { MusicId } from '@shared/types';
 import { getAudioContext } from './context';
-import { playSineWave, playSquareWave, playNoise, playKick } from './instruments';
+import { playLeadVoice, playTriangleWave, playSineWave, playKick, playSnareDrum, playHatDrum } from './instruments';
+import type { Send } from './instruments';
 
-interface SequencerNote {
-  freq: number | null; // null = rest
-  duration: number; // in steps
-  velocity?: number; // 0..1
-}
+// ---------------------------------------------------------------------------
+// Music theory helpers
+// ---------------------------------------------------------------------------
 
-interface SequencerPattern {
-  name: string;
-  steps: SequencerNote[];
-  bpm: number;
-  noteLength: number; // ms per step
-}
+/** Semitone intervals of each mode/scale, ascending from the root. */
+const MODES = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  aeolian: [0, 2, 3, 5, 7, 8, 10],
+  harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+  majorPentatonic: [0, 2, 4, 7, 9],
+  minorPentatonic: [0, 3, 5, 7, 10],
+} as const;
+type ModeName = keyof typeof MODES;
 
-interface MusicConfig {
-  key: number; // Base frequency (Hz)
-  scale: number[]; // Intervals above key in semitones
-  patterns: {
-    lead: SequencerPattern;
-    bass: SequencerPattern;
-    arp: SequencerPattern;
-    kick: SequencerPattern;
-    snare: SequencerPattern;
-    hat: SequencerPattern;
-  };
-  loop: boolean;
-  crossfadeMs?: number;
-}
-
-let currentMusicId: MusicId | null = null;
-let currentOscillators: OscillatorNode[] = [];
-let currentSources: AudioBufferSourceNode[] = [];
-let fadeOutId: number | null = null;
-let fadeOutGain: GainNode | null = null;
-
-/** Convert semitone offset to frequency multiplier */
-function semitoneToFreq(base: number, semitones: number): number {
-  return base * Math.pow(2, semitones / 12);
+/** Convert a MIDI note number to frequency (Hz). */
+function midiToFreq(midi: number): number {
+  return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
 /**
- * Music configurations for each region.
+ * Resolve a 1-indexed scale degree (may be <1 or >scale length; wraps into
+ * further octaves) plus an extra octave shift (in semitones) to a frequency.
  */
-const MUSIC_CONFIGS: Record<MusicId, MusicConfig> = {
+function degreeToFreq(rootMidi: number, scale: readonly number[], degree: number, extraSemis = 0): number {
+  const idx = degree - 1;
+  const len = scale.length;
+  const octaveAdd = Math.floor(idx / len) * 12;
+  const scaleIdx = ((idx % len) + len) % len;
+  const semis = scale[scaleIdx] + octaveAdd + extraSemis;
+  return midiToFreq(rootMidi + semis);
+}
+
+/** Scale-degree index for chord tone `toneIdx` (0=root,1=third,2=fifth,3=root+8ve) stacked on `rootDegree`. */
+function chordToneDegree(rootDegree: number, toneIdx: number, scaleLen: number): number {
+  if (toneIdx >= 3) return rootDegree + scaleLen;
+  return rootDegree + toneIdx * 2;
+}
+
+// Standard roman numerals plus a couple of "borrowed neighbor chord" tokens
+// (bII, bIV) used for eerie progressions; unrecognized tokens fall back to
+// the tonic (degree 1) rather than silently producing `undefined`.
+const ROMAN: Record<string, number> = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, bii: 2, biv: 4 };
+/** Parse a progression like 'I V vi IV I V vi IV' into one scale degree per bar. */
+function parseProgression(prog: string): number[] {
+  return prog
+    .trim()
+    .split(/\s+/)
+    .map((tok) => ROMAN[tok.toLowerCase()] ?? 1);
+}
+
+// ---------------------------------------------------------------------------
+// Pattern parsing
+// ---------------------------------------------------------------------------
+
+interface NoteEvent {
+  /** Step index (within the full loop) this note starts on. */
+  step: number;
+  /** Duration in 16th-note steps (>=1), including any held '-' steps. */
+  steps: number;
+  /** Scale-degree token, or null for chord-tone patterns. */
+  degree: number | null;
+  /** Extra octave shift in semitones, for scale-degree tokens. */
+  extraSemis: number;
+  /** Chord-tone index (0-3), or null for scale-degree patterns. */
+  toneIdx: number | null;
+  velocity: number;
+}
+
+function parseDegreeChar(ch: string): { degree: number; extraSemis: number } | null {
+  if (ch >= '1' && ch <= '9') return { degree: Number(ch), extraSemis: 0 };
+  if (ch >= 'a' && ch <= 'g') return { degree: ch.charCodeAt(0) - 96, extraSemis: -12 };
+  if (ch >= 'A' && ch <= 'G') return { degree: ch.charCodeAt(0) - 64, extraSemis: 12 };
+  return null;
+}
+
+function parseToneChar(ch: string): { toneIdx: number } | null {
+  if (ch >= '0' && ch <= '3') return { toneIdx: Number(ch) };
+  return null;
+}
+
+/** Build note events for a melodic (scale-degree) pattern string. */
+function buildDegreeEvents(pattern: string): NoteEvent[] {
+  const events: NoteEvent[] = [];
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    const parsed = parseDegreeChar(ch);
+    if (!parsed) {
+      i++;
+      continue;
+    }
+    let steps = 1;
+    let j = i + 1;
+    while (j < pattern.length && pattern[j] === '-') {
+      steps++;
+      j++;
+    }
+    events.push({ step: i, steps, degree: parsed.degree, extraSemis: parsed.extraSemis, toneIdx: null, velocity: 1 });
+    i = j;
+  }
+  return events;
+}
+
+/** Build note events for a chord-tone (arp/bass) pattern string. */
+function buildToneEvents(pattern: string): NoteEvent[] {
+  const events: NoteEvent[] = [];
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    const parsed = parseToneChar(ch);
+    if (!parsed) {
+      i++;
+      continue;
+    }
+    let steps = 1;
+    let j = i + 1;
+    while (j < pattern.length && pattern[j] === '-') {
+      steps++;
+      j++;
+    }
+    events.push({ step: i, steps, degree: null, extraSemis: 0, toneIdx: parsed.toneIdx, velocity: 1 });
+    i = j;
+  }
+  return events;
+}
+
+/** Build note events for a drum pattern string ('.' rest, '1'-'3' velocity). */
+function buildDrumEvents(pattern: string): NoteEvent[] {
+  const events: NoteEvent[] = [];
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch >= '1' && ch <= '3') {
+      events.push({ step: i, steps: 1, degree: null, extraSemis: 0, toneIdx: null, velocity: Number(ch) / 3 });
+    }
+  }
+  return events;
+}
+
+/** Index events by step for O(1) lookup during scheduling. */
+function indexByStep(events: NoteEvent[]): Map<number, NoteEvent> {
+  const map = new Map<number, NoteEvent>();
+  for (const ev of events) map.set(ev.step, ev);
+  return map;
+}
+
+/** Splice a replacement bar (stepsPerBar chars) into `pattern` at `barIndex`, for loop variation. */
+function withVariantBar(pattern: string, barIndex: number, stepsPerBar: number, replacement?: string): string {
+  if (!replacement) return pattern;
+  const start = barIndex * stepsPerBar;
+  if (start + stepsPerBar > pattern.length) return pattern;
+  return pattern.slice(0, start) + replacement + pattern.slice(start + stepsPerBar);
+}
+
+// Dev-only sanity check (never throws): warns if a hand-authored pattern's
+// length doesn't line up with the declared bar count.
+function checkPatternLength(trackId: string, voice: string, pattern: string, stepsPerBar: number, bars: number): void {
+  if (pattern.length !== stepsPerBar * bars) {
+    console.warn(
+      `[music] ${trackId}.${voice} pattern length ${pattern.length} != ${stepsPerBar}*${bars} (${stepsPerBar * bars})`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Track definitions
+// ---------------------------------------------------------------------------
+
+interface SectionPatterns {
+  lead: string;
+  bass: string;
+  arp: string;
+  kick: string;
+  snare: string;
+  hat: string;
+}
+
+interface VariantBars {
+  lead?: string;
+  bass?: string;
+  arp?: string;
+  kick?: string;
+  snare?: string;
+  hat?: string;
+}
+
+interface TrackDef {
+  bpm: number;
+  rootMidi: number;
+  mode: ModeName;
+  /** One roman numeral per bar, covering the whole A+B loop (wraps if shorter). */
+  progression: string;
+  sections: { a: SectionPatterns; barsA: number; b: SectionPatterns; barsB: number };
+  stepsPerBar?: number; // default 16 (4/4); 12 for a 3/4 waltz feel
+  leadWave: 'square' | 'triangle';
+  bassWave: 'sine' | 'triangle';
+  leadFilterHz: number;
+  useDelay?: boolean;
+  /** Small variation applied to the LAST bar of the loop on every other repeat. */
+  variation?: VariantBars;
+  gainTrim?: number; // per-track loudness balance, default 1
+}
+
+function bars(...b: string[]): string {
+  return b.join('');
+}
+
+export const TRACKS: Record<MusicId, TrackDef> = {
+  // --- Title: wistful, grand, lydian lift -----------------------------------
   title: {
-    key: 220, // A3
-    scale: [0, 2, 4, 5, 7, 9, 11], // A major scale
-    patterns: {
-      lead: {
-        name: 'Wistful title melody',
-        steps: [
-          { freq: 0, duration: 2 }, // Rest
-          { freq: 4, duration: 1 }, // E (0+4 semitones)
-          { freq: 7, duration: 1 }, // B
-          { freq: 9, duration: 2 }, // C#
-          { freq: 7, duration: 1 }, // B
-          { freq: 4, duration: 2 }, // E
-        ],
-        bpm: 100,
-        noteLength: 150,
+    bpm: 84,
+    rootMidi: 57, // A3
+    mode: 'lydian',
+    progression: 'I V vi IV I V IV IV',
+    stepsPerBar: 16,
+    leadWave: 'triangle',
+    bassWave: 'triangle',
+    leadFilterHz: 2400,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '....5...4...3...',
+          '2.......1.......',
+          '....5...4...6...',
+          '5...............'
+        ),
+        bass: bars('0...2...0...2...', '0...2...0...2...', '0...2...0...2...', '0.......0.......'),
+        arp: bars('0.2.1.2.', '0.2.1.2.').repeat(4),
+        kick: bars('1...............', '1.......1.......', '1...............', '1.......1.......'),
+        snare: bars('........2.......', '........2.......', '........2.......', '........2.......'),
+        hat: bars('..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.'),
       },
-      bass: {
-        name: 'Title bass',
-        steps: [
-          { freq: -12, duration: 4 }, // Root lower octave
-          { freq: -10, duration: 2 }, // Next note
-          { freq: -12, duration: 4 },
-          { freq: -5, duration: 2 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      arp: {
-        name: 'Title pad',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 4, duration: 1 },
-          { freq: 7, duration: 2 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      kick: {
-        name: 'Title kick',
-        steps: [
-          { freq: 1, duration: 2 }, // Dummy value, not used by kick
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      snare: {
-        name: 'Title snare',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      hat: {
-        name: 'Title hat',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-        ],
-        bpm: 100,
-        noteLength: 150,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '....7...6...5...',
+          '4.......3.......',
+          '....7...9...7...',
+          '6...5...4.......'
+        ),
+        bass: bars('4...6...4...6...', '4...6...4...6...', '2...4...2...4...', '0.......0.......'),
+        arp: bars('1.3.2.3.', '1.3.2.3.', '0.2.1.2.', '0.2.1.2.'),
+        kick: bars('1.......1.......', '1...............', '1.......1.......', '1...1...1.......'),
+        snare: bars('........2.......', '........2.......', '........2.......', '........3.......'),
+        hat: bars('..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.', '..1.1.1...1...1.'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '6...5...4...3...2...............', kick: '1...1...1.......1...1...1......' },
+    gainTrim: 1,
   },
 
+  // --- Town: cozy, bouncy, major ---------------------------------------------
   town: {
-    key: 262, // C4 (cozy)
-    scale: [0, 2, 4, 5, 7, 9, 11], // C major
-    patterns: {
-      lead: {
-        name: 'Town bouncy melody',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 4, duration: 1 },
-          { freq: 7, duration: 2 },
-          { freq: 5, duration: 1 },
-          { freq: 4, duration: 2 },
-          { freq: 2, duration: 1 },
-        ],
-        bpm: 120,
-        noteLength: 125,
+    bpm: 112,
+    rootMidi: 60, // C4
+    mode: 'major',
+    progression: 'I IV V I vi IV V I',
+    stepsPerBar: 16,
+    leadWave: 'square',
+    bassWave: 'triangle',
+    leadFilterHz: 2800,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1.3.5...4.3.....',
+          '2.......1.......',
+          '1.3.5...6.5.....',
+          '4.3.2...1.......'
+        ),
+        bass: bars('0.2.0.2.0.2.0.2.', '3.5.3.5.3.5.3.5.', '4.6.4.6.4.6.4.6.', '0.2.0.2.0.2.0.2.'),
+        arp: bars('0123', '0123', '0123', '0123').repeat(4),
+        kick: bars('1...1...1...1...', '1...1...1...1...', '1...1...1...1...', '1...1...1...1...'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2.......3...'),
+        hat: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.'),
       },
-      bass: {
-        name: 'Town bass',
-        steps: [
-          { freq: -12, duration: 4 },
-          { freq: -8, duration: 2 },
-          { freq: -12, duration: 2 },
-          { freq: -3, duration: 2 },
-        ],
-        bpm: 120,
-        noteLength: 125,
-      },
-      arp: {
-        name: 'Town arp',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 4, duration: 1 },
-          { freq: 7, duration: 1 },
-          { freq: 4, duration: 1 },
-        ],
-        bpm: 120,
-        noteLength: 125,
-      },
-      kick: {
-        name: 'Town kick',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 120,
-        noteLength: 125,
-      },
-      snare: {
-        name: 'Town snare',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-        ],
-        bpm: 120,
-        noteLength: 125,
-      },
-      hat: {
-        name: 'Town hat',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 120,
-        noteLength: 125,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '5.6.7...6.5.....',
+          '4.3.2...1.......',
+          '5.6.7...9.......',
+          '7.6.5.4.3.2.1...'
+        ),
+        bass: bars('0.2.0.2.0.2.0.2.', '5.7.5.7.5.7.5.7.', '3.5.3.5.3.5.3.5.', '4.6.4.6.0.2.0...'),
+        arp: bars('0123', '2103', '0123', '3210').repeat(4),
+        kick: bars('1...1...1...1...', '1...1...1...1...', '1...1...1...1...', '1.1.1...1...1...'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2...2...3...'),
+        hat: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1111111111111111'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '5.6.7.9.7.6.5.4.3.2.1...........', hat: '1111111111111111' },
   },
 
+  // --- Meadow: pastoral, light, major pentatonic -----------------------------
   meadow: {
-    key: 220, // A3 (pastoral)
-    scale: [0, 2, 4, 5, 7, 9, 11], // A major
-    patterns: {
-      lead: {
-        name: 'Meadow light melody',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 2, duration: 1 },
-          { freq: 4, duration: 2 },
-          { freq: 5, duration: 1 },
-          { freq: 7, duration: 3 },
-        ],
-        bpm: 90,
-        noteLength: 167,
+    bpm: 100,
+    rootMidi: 57, // A3
+    mode: 'majorPentatonic',
+    progression: 'I V IV I I V IV I',
+    stepsPerBar: 16,
+    leadWave: 'triangle',
+    bassWave: 'sine',
+    leadFilterHz: 2600,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1...2...3.......',
+          '....2...1.......',
+          '1...2...3...4...',
+          '3...........1...'
+        ),
+        bass: bars('0.......0.......', '4.......4.......', '3.......3.......', '0.......0.......'),
+        arp: bars('0.2.0.2.', '0.2.0.2.', '0.2.0.2.', '0.2.0.2.'),
+        kick: bars('1.......2.......', '1.......2.......', '1.......2.......', '1.......2.......'),
+        snare: bars('........2.......', '........2.......', '........2.......', '........2.......'),
+        hat: bars('..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.'),
       },
-      bass: {
-        name: 'Meadow bass',
-        steps: [
-          { freq: -12, duration: 4 },
-          { freq: -8, duration: 4 },
-          { freq: -7, duration: 4 },
-          { freq: -5, duration: 4 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      arp: {
-        name: 'Meadow arp',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 4, duration: 2 },
-          { freq: 7, duration: 2 },
-          { freq: 5, duration: 2 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      kick: {
-        name: 'Meadow kick',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 6 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      snare: {
-        name: 'Meadow snare',
-        steps: [
-          { freq: 0, duration: 4 },
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      hat: {
-        name: 'Meadow hat',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 90,
-        noteLength: 167,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '4...3...2.......',
+          '3.......4.......',
+          '5...4...3...2...',
+          '1...............'
+        ),
+        bass: bars('2.......2.......', '0.......0.......', '4.......4.......', '0.......0.......'),
+        arp: bars('1.3.1.3.', '0.2.0.2.', '1.3.2.3.', '0.2.0.2.'),
+        kick: bars('1.......2.......', '1.......2.......', '1.......2.......', '1...2...1.......'),
+        snare: bars('........2.......', '........2.......', '........2.......', '........3.......'),
+        hat: bars('..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.', '..1.1.1...1...1.'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '5...4...3...2...1...............' },
   },
 
+  // --- Cave: sparse, echoey minor pentatonic, feedback delay -----------------
   cave: {
-    key: 196, // G3 (sparse, minor-ish)
-    scale: [0, 3, 5, 7, 10], // G minor pentatonic
-    patterns: {
-      lead: {
-        name: 'Cave sparse melody',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 5, duration: 2 },
-          { freq: 0, duration: 4 },
-          { freq: 7, duration: 2 },
-          { freq: 5, duration: 2 },
-          { freq: 3, duration: 4 },
-        ],
-        bpm: 80,
-        noteLength: 188,
+    bpm: 76,
+    rootMidi: 55, // G3
+    mode: 'minorPentatonic',
+    progression: 'i iv v i i iv v i',
+    stepsPerBar: 16,
+    leadWave: 'triangle',
+    bassWave: 'sine',
+    leadFilterHz: 1700,
+    useDelay: true,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1...............',
+          '....4...........',
+          '................',
+          '3.......1.......'
+        ),
+        bass: bars('0.......0.......', '0.......0.......', '3.......3.......', '0.......0.......'),
+        arp: bars('........', '0.......', '........', '2.......'),
+        kick: bars('1.......0.......', '0.......0.......', '1.......0.......', '0.......0.......'),
+        snare: bars('........0.......', '0.......0.......', '........1.......', '0.......0.......'),
+        hat: bars('....1.......1...', '................', '....1.......1...', '................'),
       },
-      bass: {
-        name: 'Cave bass',
-        steps: [
-          { freq: -12, duration: 8 },
-          { freq: -8, duration: 4 },
-          { freq: -12, duration: 4 },
-        ],
-        bpm: 80,
-        noteLength: 188,
-      },
-      arp: {
-        name: 'Cave arp',
-        steps: [
-          { freq: 0, duration: 3 },
-          { freq: 5, duration: 3 },
-          { freq: 0, duration: 2 },
-          { freq: -5, duration: 2 },
-        ],
-        bpm: 80,
-        noteLength: 188,
-      },
-      kick: {
-        name: 'Cave kick',
-        steps: [
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 4 },
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 4 },
-        ],
-        bpm: 80,
-        noteLength: 188,
-      },
-      snare: {
-        name: 'Cave snare',
-        steps: [
-          { freq: 0, duration: 4 },
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 4 },
-          { freq: 1, duration: 4 },
-        ],
-        bpm: 80,
-        noteLength: 188,
-      },
-      hat: {
-        name: 'Cave hat',
-        steps: [
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 4 },
-        ],
-        bpm: 80,
-        noteLength: 188,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '5...............',
+          '....3...........',
+          '....1...........',
+          '................'
+        ),
+        bass: bars('4.......4.......', '0.......0.......', '3.......3.......', '0...............'),
+        arp: bars('1.......', '........', '0.......', '........'),
+        kick: bars('1.......0.......', '0.......1.......', '0.......0.......', '1.......0.......'),
+        snare: bars('........0.......', '........1.......', '0.......0.......', '........0.......'),
+        hat: bars('....1.......1...', '................', '....1...1.......', '................'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '5...............4...............' },
+    gainTrim: 1.05,
   },
 
+  // --- Kelp: flowing, mysterious dorian --------------------------------------
   kelp: {
-    key: 246.94, // B3 (flowing, mysterious)
-    scale: [0, 2, 3, 5, 7, 8, 11], // B Dorian mode
-    patterns: {
-      lead: {
-        name: 'Kelp flowing melody',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 3, duration: 1 },
-          { freq: 5, duration: 2 },
-          { freq: 3, duration: 1 },
-          { freq: 0, duration: 3 },
-          { freq: 8, duration: 1 },
-        ],
-        bpm: 100,
-        noteLength: 150,
+    bpm: 92,
+    rootMidi: 59, // B3
+    mode: 'dorian',
+    progression: 'i IV i v i IV v i',
+    stepsPerBar: 16,
+    leadWave: 'triangle',
+    bassWave: 'sine',
+    leadFilterHz: 2200,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1...3...5.......',
+          '3.......1.......',
+          '1...3...5...6...',
+          '5...3...........'
+        ),
+        bass: bars('0...2...0...2...', '3...5...3...5...', '0...2...0...2...', '4...2...0.......'),
+        arp: bars('0.2.1.2.', '0.2.1.2.', '0.2.1.2.', '0.2.1.2.'),
+        kick: bars('1.......1.......', '1.......1.......', '1.......1.......', '1.......1.......'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2.......2...'),
+        hat: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.'),
       },
-      bass: {
-        name: 'Kelp bass',
-        steps: [
-          { freq: -12, duration: 4 },
-          { freq: -10, duration: 2 },
-          { freq: -12, duration: 2 },
-          { freq: -5, duration: 4 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      arp: {
-        name: 'Kelp arp',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 8, duration: 2 },
-          { freq: 3, duration: 2 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      kick: {
-        name: 'Kelp kick',
-        steps: [
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 3 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 4 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      snare: {
-        name: 'Kelp snare',
-        steps: [
-          { freq: 0, duration: 3 },
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 4 },
-        ],
-        bpm: 100,
-        noteLength: 150,
-      },
-      hat: {
-        name: 'Kelp hat',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 100,
-        noteLength: 150,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '6...5...3.......',
+          '5.......6.......',
+          '8...6...5...3...',
+          '1...............'
+        ),
+        bass: bars('3...5...3...5...', '0...2...0...2...', '4...2...4...2...', '0...2...0.......'),
+        arp: bars('1.3.2.3.', '0.2.1.2.', '2.4.3.4.', '0.2.1.2.'),
+        kick: bars('1.......1.......', '1.......1.......', '1.......1.......', '1...1...1.......'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2...2...3...'),
+        hat: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1111'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '8...6...5...3...1...............' },
   },
 
+  // --- Outpost: breezy, adventurous mixolydian -------------------------------
   outpost: {
-    key: 293.66, // D4 (breezy, adventurous)
-    scale: [0, 2, 4, 5, 7, 9, 11], // D major
-    patterns: {
-      lead: {
-        name: 'Outpost adventurous melody',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 2, duration: 1 },
-          { freq: 4, duration: 2 },
-          { freq: 5, duration: 1 },
-          { freq: 7, duration: 2 },
-          { freq: 9, duration: 1 },
-        ],
-        bpm: 110,
-        noteLength: 136,
+    bpm: 120,
+    rootMidi: 62, // D4
+    mode: 'mixolydian',
+    progression: 'I IV I v IV I v I',
+    stepsPerBar: 16,
+    leadWave: 'square',
+    bassWave: 'triangle',
+    leadFilterHz: 3000,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1.3.5.......4.3.',
+          '2.......1.......',
+          '1.3.5.......6.5.',
+          '4.......3.2.1...'
+        ),
+        bass: bars('0.2.0.2.0.2.0.2.', '3.5.3.5.3.5.3.5.', '0.2.0.2.0.2.0.2.', '4.6.4.6.0.2.0.2.'),
+        arp: bars('0213', '0213', '0213', '0213').repeat(4),
+        kick: bars('1...1.1.1...1...', '1...1.1.1...1...', '1...1.1.1...1...', '1...1.1.1...1...'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2.......3...'),
+        hat: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.'),
       },
-      bass: {
-        name: 'Outpost bass',
-        steps: [
-          { freq: -12, duration: 3 },
-          { freq: -9, duration: 2 },
-          { freq: -12, duration: 3 },
-          { freq: -5, duration: 2 },
-        ],
-        bpm: 110,
-        noteLength: 136,
-      },
-      arp: {
-        name: 'Outpost arp',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 4, duration: 1 },
-          { freq: 7, duration: 2 },
-        ],
-        bpm: 110,
-        noteLength: 136,
-      },
-      kick: {
-        name: 'Outpost kick',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 110,
-        noteLength: 136,
-      },
-      snare: {
-        name: 'Outpost snare',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 2 },
-        ],
-        bpm: 110,
-        noteLength: 136,
-      },
-      hat: {
-        name: 'Outpost hat',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-        ],
-        bpm: 110,
-        noteLength: 136,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '5.6.7.......6.5.',
+          '4.......3.2.....',
+          '5.6.8.......7.6.',
+          '5.4.3.2.1.......'
+        ),
+        bass: bars('0.2.0.2.0.2.0.2.', '4.6.4.6.4.6.4.6.', '3.5.3.5.3.5.3.5.', '0.2.0.2.0.2.0.2.'),
+        arp: bars('1203', '2103', '0213', '3210').repeat(4),
+        kick: bars('1...1.1.1...1...', '1...1.1.1...1...', '1...1.1.1...1...', '1.1.1.1.1...1...'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2.2.....3...'),
+        hat: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1111111111111111'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '8.6.5.6.5.4.3.2.1...............', hat: '1111111111111111' },
   },
 
+  // --- Storm: driving, tense, natural minor -----------------------------------
   storm: {
-    key: 185, // F#3 (driving, tense)
-    scale: [0, 3, 5, 7, 10], // F# minor pentatonic
-    patterns: {
-      lead: {
-        name: 'Storm driving melody',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 7, duration: 1 },
-          { freq: 10, duration: 1 },
-          { freq: 7, duration: 1 },
-          { freq: 5, duration: 2 },
-        ],
-        bpm: 130,
-        noteLength: 115,
+    bpm: 138,
+    rootMidi: 54, // F#3
+    mode: 'aeolian',
+    progression: 'i VI VII i i VI VII v',
+    stepsPerBar: 16,
+    leadWave: 'square',
+    bassWave: 'triangle',
+    leadFilterHz: 2500,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1.1.3.1.5.3.1...',
+          '1.1.3.1.6.5.....',
+          '1.1.3.1.5.3.1...',
+          '4.3.2.1.........'
+        ),
+        bass: bars('0.0.0.0.0.0.0.0.', '5.5.5.5.5.5.5.5.', '6.6.6.6.6.6.6.6.', '0.0.0.0.4.4.4.4.'),
+        arp: bars('0202', '0202', '1313', '0202').repeat(4),
+        kick: bars('1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1...1.1.1...'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2.......3...'),
+        hat: bars('1111111111111111', '1111111111111111', '1111111111111111', '1111111111111111'),
       },
-      bass: {
-        name: 'Storm bass',
-        steps: [
-          { freq: -12, duration: 2 },
-          { freq: -8, duration: 2 },
-          { freq: -12, duration: 2 },
-          { freq: -7, duration: 2 },
-        ],
-        bpm: 130,
-        noteLength: 115,
-      },
-      arp: {
-        name: 'Storm arp',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 10, duration: 2 },
-        ],
-        bpm: 130,
-        noteLength: 115,
-      },
-      kick: {
-        name: 'Storm kick',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 130,
-        noteLength: 115,
-      },
-      snare: {
-        name: 'Storm snare',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 1 },
-        ],
-        bpm: 130,
-        noteLength: 115,
-      },
-      hat: {
-        name: 'Storm hat',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 1, duration: 1 },
-        ],
-        bpm: 130,
-        noteLength: 115,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '5.5.6.5.8.6.5...',
+          '5.5.6.5.9.8.....',
+          '5.5.6.5.8.6.5...',
+          '4.3.2.1.........'
+        ),
+        bass: bars('4.4.4.4.4.4.4.4.', '0.0.0.0.0.0.0.0.', '5.5.5.5.5.5.5.5.', '0.0.0.0.0.0.0.0.'),
+        arp: bars('2424', '0202', '1313', '0202').repeat(4),
+        kick: bars('1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1.1.1.1.1...'),
+        snare: bars('....2.......2...', '....2.......2...', '....2.......2...', '....2.2.....3...'),
+        hat: bars('1111111111111111', '1111111111111111', '1111111111111111', '1111111111111111'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '8.6.5.6.5.3.1.3.1...............', kick: '1.1.1.1.1.1.1.1.1.1.1...1.1.1...' },
   },
 
+  // --- Reef: dreamy, shimmering, lots of arp + delay --------------------------
   reef: {
-    key: 220, // A3 (dreamy, shimmering, slow)
-    scale: [0, 2, 4, 5, 7, 9, 11], // A major
-    patterns: {
-      lead: {
-        name: 'Reef dreamy melody',
-        steps: [
-          { freq: 0, duration: 3 },
-          { freq: 4, duration: 2 },
-          { freq: 7, duration: 3 },
-          { freq: 5, duration: 4 },
-          { freq: 4, duration: 2 },
-          { freq: 2, duration: 2 },
-        ],
-        bpm: 60,
-        noteLength: 250,
+    bpm: 70,
+    rootMidi: 57, // A3
+    mode: 'major',
+    progression: 'I iii vi IV I iii ii V',
+    stepsPerBar: 16,
+    leadWave: 'triangle',
+    bassWave: 'sine',
+    leadFilterHz: 2000,
+    useDelay: true,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '................',
+          '5.......4.......',
+          '................',
+          '3.......2.......'
+        ),
+        bass: bars('0.......0.......', '4.......4.......', '5.......5.......', '3.......3.......'),
+        arp: bars('0.1.2.3.', '2.1.0.1.', '0.1.2.3.', '2.1.0.1.'),
+        kick: bars('1...............', '................', '1...............', '................'),
+        snare: bars('........0.......', '........1.......', '........0.......', '........1.......'),
+        hat: bars('..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.'),
       },
-      bass: {
-        name: 'Reef bass',
-        steps: [
-          { freq: -12, duration: 6 },
-          { freq: -8, duration: 4 },
-          { freq: -12, duration: 6 },
-        ],
-        bpm: 60,
-        noteLength: 250,
-      },
-      arp: {
-        name: 'Reef arp',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 4, duration: 2 },
-          { freq: 7, duration: 2 },
-          { freq: 5, duration: 2 },
-        ],
-        bpm: 60,
-        noteLength: 250,
-      },
-      kick: {
-        name: 'Reef kick',
-        steps: [
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 8 },
-          { freq: 1, duration: 4 },
-          { freq: 0, duration: 4 },
-        ],
-        bpm: 60,
-        noteLength: 250,
-      },
-      snare: {
-        name: 'Reef snare',
-        steps: [
-          { freq: 0, duration: 6 },
-          { freq: 1, duration: 6 },
-          { freq: 0, duration: 4 },
-          { freq: 1, duration: 2 },
-        ],
-        bpm: 60,
-        noteLength: 250,
-      },
-      hat: {
-        name: 'Reef hat',
-        steps: [
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 60,
-        noteLength: 250,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '................',
+          '6.......5.......',
+          '................',
+          '4...3...2.......'
+        ),
+        bass: bars('1.......1.......', '5.......5.......', '2.......2.......', '4.......4.......'),
+        arp: bars('1.2.3.4.', '0.1.2.3.', '1.2.3.4.', '0.1.2.3.'),
+        kick: bars('1...............', '................', '1...............', '1.......1.......'),
+        snare: bars('........0.......', '........1.......', '........0.......', '........1.......'),
+        hat: bars('..1...1...1...1.', '..1...1...1...1.', '..1...1...1...1.', '..1.1.1...1...1.'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '8.......6.......5.......3.......' },
+    gainTrim: 1.1,
   },
 
+  // --- Galleon: eerie 3/4 waltz, harmonic minor -------------------------------
   galleon: {
-    key: 164.81, // E3 (eerie waltz, 3/4 time)
-    scale: [0, 3, 5, 7, 10], // E minor pentatonic
-    patterns: {
-      lead: {
-        name: 'Galleon eerie melody',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 5, duration: 1 },
-          { freq: 7, duration: 2 },
-          { freq: 10, duration: 1 },
-          { freq: 7, duration: 1 },
-          { freq: 5, duration: 1 },
-        ],
-        bpm: 90,
-        noteLength: 167,
+    bpm: 96,
+    rootMidi: 52, // E3
+    mode: 'harmonicMinor',
+    progression: 'i iv V i i VI V i',
+    stepsPerBar: 12,
+    leadWave: 'triangle',
+    bassWave: 'triangle',
+    leadFilterHz: 2100,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars('1.......5...', '3.......1...', '1.......5...', '4.......3...'),
+        bass: bars('0.......0...', '3.......3...', '4.......4...', '0.......0...'),
+        arp: bars('0.1.2.', '0.1.2.', '0.1.2.', '0.1.2.'),
+        kick: bars('1.......0...', '1.......0...', '1.......0...', '1.......0...'),
+        snare: bars('....2...0...', '....2...0...', '....2...0...', '....2...0...'),
+        hat: bars('..1...1...1.', '..1...1...1.', '..1...1...1.', '..1...1...1.'),
       },
-      bass: {
-        name: 'Galleon bass',
-        steps: [
-          { freq: -12, duration: 3 },
-          { freq: -8, duration: 3 },
-          { freq: -12, duration: 3 },
-          { freq: -5, duration: 3 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      arp: {
-        name: 'Galleon arp',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 5, duration: 1 },
-          { freq: 7, duration: 2 },
-          { freq: 3, duration: 1 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      kick: {
-        name: 'Galleon kick',
-        steps: [
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 3 },
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 3 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      snare: {
-        name: 'Galleon snare',
-        steps: [
-          { freq: 0, duration: 3 },
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 3 },
-          { freq: 1, duration: 3 },
-        ],
-        bpm: 90,
-        noteLength: 167,
-      },
-      hat: {
-        name: 'Galleon hat',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 90,
-        noteLength: 167,
+      barsB: 4,
+      b: {
+        lead: bars('6.......5...', '4.......3...', '6.......8...', '7.......5...'),
+        bass: bars('3.......3...', '0.......0...', '5.......5...', '4.......4...'),
+        arp: bars('1.2.3.', '0.1.2.', '2.3.4.', '1.2.3.'),
+        kick: bars('1.......0...', '1.......0...', '1.......0...', '1...0...1...'),
+        snare: bars('....2...0...', '....2...0...', '....2...0...', '....2...3...'),
+        hat: bars('..1...1...1.', '..1...1...1.', '..1...1...1.', '..1.1.1...1.'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '8.......5...3...' },
   },
 
+  // --- Hollow: dark ambient pulse, heartbeat kick, phrygian -------------------
   hollow: {
-    key: 110, // A2 (dark ambient, heartbeat pulse)
-    scale: [0, 3, 5, 7, 10], // A minor pentatonic
-    patterns: {
-      lead: {
-        name: 'Hollow dark ambient',
-        steps: [
-          { freq: 0, duration: 4 },
-          { freq: -5, duration: 4 },
-          { freq: 0, duration: 4 },
-          { freq: 3, duration: 4 },
-        ],
-        bpm: 50,
-        noteLength: 300,
+    bpm: 60,
+    rootMidi: 45, // A2
+    mode: 'phrygian',
+    progression: 'i bII i v i bII i v',
+    stepsPerBar: 16,
+    leadWave: 'triangle',
+    bassWave: 'sine',
+    leadFilterHz: 1100,
+    useDelay: true,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '................',
+          '1...............',
+          '................',
+          '................'
+        ),
+        bass: bars('0...............', '0...............', '0...............', '0...............'),
+        arp: bars('........', '0.......', '........', '........'),
+        kick: bars('3.2.............', '3.2.............', '3.2.............', '3.2.............'),
+        snare: bars('................', '................', '................', '................'),
+        hat: bars('................', '........1.......', '................', '........1.......'),
       },
-      bass: {
-        name: 'Hollow bass',
-        steps: [
-          { freq: -12, duration: 8 },
-          { freq: -10, duration: 4 },
-          { freq: -12, duration: 4 },
-        ],
-        bpm: 50,
-        noteLength: 300,
-      },
-      arp: {
-        name: 'Hollow arp',
-        steps: [
-          { freq: 0, duration: 4 },
-          { freq: -7, duration: 4 },
-          { freq: -5, duration: 2 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 50,
-        noteLength: 300,
-      },
-      kick: {
-        name: 'Hollow heartbeat kick',
-        steps: [
-          { freq: 1, duration: 3 },
-          { freq: 0, duration: 3 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 8 },
-        ],
-        bpm: 50,
-        noteLength: 300,
-      },
-      snare: {
-        name: 'Hollow snare',
-        steps: [
-          { freq: 0, duration: 8 },
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 6 },
-          { freq: 1, duration: 2 },
-        ],
-        bpm: 50,
-        noteLength: 300,
-      },
-      hat: {
-        name: 'Hollow hat',
-        steps: [
-          { freq: 1, duration: 2 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 50,
-        noteLength: 300,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '................',
+          '3...............',
+          '................',
+          '2...............'
+        ),
+        bass: bars('1...............', '1...............', '4...............', '0...............'),
+        arp: bars('1.......', '........', '2.......', '........'),
+        kick: bars('3.2.............', '3.2.............', '3.2.............', '3.2.2...........'),
+        snare: bars('................', '................', '................', '................'),
+        hat: bars('................', '........1.......', '................', '........1.......'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { kick: '3.2.3...........' },
+    gainTrim: 1.1,
   },
 
+  // --- Boss: fast, intense, minor ---------------------------------------------
   boss: {
-    key: 392, // G4 (fast, intense)
-    scale: [0, 2, 3, 5, 7, 8, 10], // G minor scale
-    patterns: {
-      lead: {
-        name: 'Boss intense lead',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 3, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 8, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 3, duration: 1 },
-        ],
-        bpm: 150,
-        noteLength: 100,
+    bpm: 150,
+    rootMidi: 67, // G4
+    mode: 'aeolian',
+    progression: 'i VII VI VII i VII VI v',
+    stepsPerBar: 16,
+    leadWave: 'square',
+    bassWave: 'triangle',
+    leadFilterHz: 3000,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1.3.5.3.1.3.5...',
+          '7.5.3.1.........',
+          '6.8.6.5.3.......',
+          '1.3.5.1.........'
+        ),
+        bass: bars('0.0.0.0.0.0.0.0.', '7.7.7.7.7.7.7.7.', '5.5.5.5.5.5.5.5.', '7.7.7.7.7.7.7.7.'),
+        arp: bars('0213', '0213', '0213', '0213').repeat(4),
+        kick: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.'),
+        snare: bars('..2...2...2...2.', '..2...2...2...2.', '..2...2...2...2.', '..2...2...2...3.'),
+        hat: bars('1111111111111111', '1111111111111111', '1111111111111111', '1111111111111111'),
       },
-      bass: {
-        name: 'Boss bass',
-        steps: [
-          { freq: -12, duration: 2 },
-          { freq: -8, duration: 2 },
-          { freq: -12, duration: 2 },
-          { freq: -5, duration: 2 },
-        ],
-        bpm: 150,
-        noteLength: 100,
-      },
-      arp: {
-        name: 'Boss arp',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 8, duration: 1 },
-          { freq: 3, duration: 1 },
-        ],
-        bpm: 150,
-        noteLength: 100,
-      },
-      kick: {
-        name: 'Boss kick',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 150,
-        noteLength: 100,
-      },
-      snare: {
-        name: 'Boss snare',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-          { freq: 1, duration: 1 },
-        ],
-        bpm: 150,
-        noteLength: 100,
-      },
-      hat: {
-        name: 'Boss hat',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 150,
-        noteLength: 100,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '8.6.5.6.8.6.5...',
+          '3.5.3.1.........',
+          '6.8.9.8.6.......',
+          '5.3.1.5.........'
+        ),
+        bass: bars('5.5.5.5.5.5.5.5.', '0.0.0.0.0.0.0.0.', '6.6.6.6.6.6.6.6.', '7.7.7.7.0.0.0.0.'),
+        arp: bars('2103', '0213', '1324', '0213').repeat(4),
+        kick: bars('1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1.1.1.1.1.1.1.1.', '1111111111111111'),
+        snare: bars('..2...2...2...2.', '..2...2...2...2.', '..2...2...2...2.', '..2.2.2...2...3.'),
+        hat: bars('1111111111111111', '1111111111111111', '1111111111111111', '1111111111111111'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: { lead: '9.8.6.5.3.1.3.5.8.6.5.3.1.......', kick: '1111111111111111111111111111111'.slice(0, 16) },
   },
 
+  // --- Final boss: epic, harmonic minor, big bass -----------------------------
   finalboss: {
-    key: 220, // A3 (epic, intense)
-    scale: [0, 2, 3, 5, 7, 8, 11], // A natural minor
-    patterns: {
-      lead: {
-        name: 'Final boss epic lead',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 3, duration: 1 },
-          { freq: 5, duration: 2 },
-          { freq: 8, duration: 1 },
-          { freq: 11, duration: 2 },
-          { freq: 8, duration: 1 },
-        ],
-        bpm: 140,
-        noteLength: 107,
+    bpm: 144,
+    rootMidi: 57, // A3
+    mode: 'harmonicMinor',
+    progression: 'i VI VII i iv VI VII v',
+    stepsPerBar: 16,
+    leadWave: 'square',
+    bassWave: 'triangle',
+    leadFilterHz: 2800,
+    sections: {
+      barsA: 4,
+      a: {
+        lead: bars(
+          '1.3.5.8.5.3.1...',
+          '6.8.6.5.3.......',
+          '7.9.7.5.3.......',
+          '1.3.5.8.........'
+        ),
+        bass: bars('0.0.0.0.0.0.0.0.', '5.5.5.5.5.5.5.5.', '6.6.6.6.6.6.6.6.', '0.0.0.0.0.0.0.0.'),
+        arp: bars('0213', '0213', '1324', '0213').repeat(4),
+        kick: bars('1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1...1.1.1...'),
+        snare: bars('..2...2...2...2.', '..2...2...2...2.', '..2...2...2...2.', '..2...2...2...3.'),
+        hat: bars('1111111111111111', '1111111111111111', '1111111111111111', '1111111111111111'),
       },
-      bass: {
-        name: 'Final boss bass',
-        steps: [
-          { freq: -12, duration: 3 },
-          { freq: -8, duration: 2 },
-          { freq: -12, duration: 3 },
-          { freq: -5, duration: 2 },
-        ],
-        bpm: 140,
-        noteLength: 107,
-      },
-      arp: {
-        name: 'Final boss arp',
-        steps: [
-          { freq: 0, duration: 1 },
-          { freq: 5, duration: 1 },
-          { freq: 8, duration: 2 },
-        ],
-        bpm: 140,
-        noteLength: 107,
-      },
-      kick: {
-        name: 'Final boss kick',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 2 },
-        ],
-        bpm: 140,
-        noteLength: 107,
-      },
-      snare: {
-        name: 'Final boss snare',
-        steps: [
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 2 },
-          { freq: 1, duration: 1 },
-        ],
-        bpm: 140,
-        noteLength: 107,
-      },
-      hat: {
-        name: 'Final boss hat',
-        steps: [
-          { freq: 1, duration: 1 },
-          { freq: 0, duration: 1 },
-        ],
-        bpm: 140,
-        noteLength: 107,
+      barsB: 4,
+      b: {
+        lead: bars(
+          '8.6.5.3.5.6.8...',
+          '9.8.6.5.3.......',
+          '1.3.5.8.9.8.6...',
+          '5.3.1.5.........'
+        ),
+        bass: bars('3.3.3.3.3.3.3.3.', '0.0.0.0.0.0.0.0.', '4.4.4.4.4.4.4.4.', '0.0.0.0.5.5.5.5.'),
+        arp: bars('2103', '0213', '2436', '0213').repeat(4),
+        kick: bars('1.1.1...1.1.1...', '1.1.1...1.1.1...', '1.1.1...1.1.1...', '1111111111111111'),
+        snare: bars('..2...2...2...2.', '..2...2...2...2.', '..2...2...2...2.', '..2.2.2...2...3.'),
+        hat: bars('1111111111111111', '1111111111111111', '1111111111111111', '1111111111111111'),
       },
     },
-    loop: true,
-    crossfadeMs: 1500,
+    variation: {
+      lead: '9.8.6.5.3.1.3.5.6.8.9.8.6.5.3...',
+      bass: '0.0.0.0.0.0.0.0.5.5.5.5.5.5.5.5.',
+    },
+    gainTrim: 1.05,
   },
 };
 
+// ---------------------------------------------------------------------------
+// Shared feedback delay send (used by tracks with useDelay)
+// ---------------------------------------------------------------------------
+
+let delayBusInput: GainNode | null = null;
+function getDelayBus(ctx: AudioContext, destination: AudioNode): GainNode {
+  if (delayBusInput) return delayBusInput;
+  const input = ctx.createGain();
+  input.gain.value = 1;
+  const delay = ctx.createDelay(1.2);
+  delay.delayTime.value = 0.34;
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.36;
+  const lowpass = ctx.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = 2200;
+  const wet = ctx.createGain();
+  wet.gain.value = 0.5;
+
+  input.connect(delay);
+  delay.connect(lowpass);
+  lowpass.connect(feedback);
+  feedback.connect(delay); // feedback loop
+  lowpass.connect(wet);
+  wet.connect(destination);
+
+  delayBusInput = input;
+  return input;
+}
+
+// ---------------------------------------------------------------------------
+// Playing-song state & scheduler
+// ---------------------------------------------------------------------------
+
+interface VoiceEvents {
+  base: Map<number, NoteEvent>;
+  alt: Map<number, NoteEvent>;
+}
+
+interface Song {
+  id: MusicId;
+  gain: GainNode;
+  def: TrackDef;
+  scale: readonly number[];
+  chords: number[]; // one scale degree per bar, whole loop
+  stepsPerBar: number;
+  totalSteps: number;
+  stepDur: number; // seconds per 16th step
+  nextStepTime: number;
+  stepIndex: number; // absolute step counter (not wrapped)
+  loopCount: number;
+  timerId: number | null;
+  stopping: boolean;
+  events: { lead: VoiceEvents; bass: VoiceEvents; arp: VoiceEvents; kick: VoiceEvents; snare: VoiceEvents; hat: VoiceEvents };
+  send?: Send;
+}
+
+let currentSong: Song | null = null;
+let pendingSongs: Song[] = []; // fading-out songs still finishing their release
+let currentMusicId: MusicId | null = null;
+
+const SCHEDULE_INTERVAL_MS = 25;
+const LOOKAHEAD_SEC = 0.12;
+const CROSSFADE_SEC = 1.5;
+const MUSIC_TRACK_TRIM = 0.35; // music master relative to sfx, per spec
+
+function buildSong(id: MusicId, def: TrackDef, ctx: AudioContext, musicGain: GainNode): Song {
+  const scale = MODES[def.mode];
+  const stepsPerBar = def.stepsPerBar ?? 16;
+  const barsA = def.sections.barsA;
+  const barsB = def.sections.barsB;
+  const totalBars = barsA + barsB;
+  const totalSteps = totalBars * stepsPerBar;
+
+  const full: SectionPatterns = {
+    lead: def.sections.a.lead + def.sections.b.lead,
+    bass: def.sections.a.bass + def.sections.b.bass,
+    arp: def.sections.a.arp + def.sections.b.arp,
+    kick: def.sections.a.kick + def.sections.b.kick,
+    snare: def.sections.a.snare + def.sections.b.snare,
+    hat: def.sections.a.hat + def.sections.b.hat,
+  };
+
+  (['lead', 'bass', 'arp', 'kick', 'snare', 'hat'] as const).forEach((v) => {
+    checkPatternLength(id, v, full[v], stepsPerBar, totalBars);
+  });
+
+  const lastBar = totalBars - 1;
+  const variantFull: SectionPatterns = {
+    lead: withVariantBar(full.lead, lastBar, stepsPerBar, def.variation?.lead),
+    bass: withVariantBar(full.bass, lastBar, stepsPerBar, def.variation?.bass),
+    arp: withVariantBar(full.arp, lastBar, stepsPerBar, def.variation?.arp),
+    kick: withVariantBar(full.kick, lastBar, stepsPerBar, def.variation?.kick),
+    snare: withVariantBar(full.snare, lastBar, stepsPerBar, def.variation?.snare),
+    hat: withVariantBar(full.hat, lastBar, stepsPerBar, def.variation?.hat),
+  };
+
+  const events = {
+    lead: { base: indexByStep(buildDegreeEvents(full.lead)), alt: indexByStep(buildDegreeEvents(variantFull.lead)) },
+    bass: { base: indexByStep(buildToneEvents(full.bass)), alt: indexByStep(buildToneEvents(variantFull.bass)) },
+    arp: { base: indexByStep(buildToneEvents(full.arp)), alt: indexByStep(buildToneEvents(variantFull.arp)) },
+    kick: { base: indexByStep(buildDrumEvents(full.kick)), alt: indexByStep(buildDrumEvents(variantFull.kick)) },
+    snare: { base: indexByStep(buildDrumEvents(full.snare)), alt: indexByStep(buildDrumEvents(variantFull.snare)) },
+    hat: { base: indexByStep(buildDrumEvents(full.hat)), alt: indexByStep(buildDrumEvents(variantFull.hat)) },
+  };
+
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  gain.connect(musicGain);
+
+  const send: Send | undefined = def.useDelay ? { node: getDelayBus(ctx, musicGain), amount: 0.28 } : undefined;
+
+  const chords = parseProgression(def.progression);
+
+  return {
+    id,
+    gain,
+    def,
+    scale,
+    chords,
+    stepsPerBar,
+    totalSteps,
+    stepDur: 60 / def.bpm / 4,
+    nextStepTime: ctx.currentTime + 0.05,
+    stepIndex: 0,
+    loopCount: 0,
+    timerId: null,
+    stopping: false,
+    events,
+    send,
+  };
+}
+
+function triggerLead(song: Song, ev: NoteEvent, time: number, ctx: AudioContext): void {
+  if (ev.degree === null) return;
+  const freq = degreeToFreq(song.def.rootMidi, song.scale, ev.degree, ev.extraSemis);
+  const dur = ev.steps * song.stepDur;
+  const trim = (song.def.gainTrim ?? 1) * MUSIC_TRACK_TRIM;
+  playLeadVoice(freq, Math.max(dur - 0.02, 0.06), {
+    wave: song.def.leadWave,
+    filterFreq: song.def.leadFilterHz,
+    attack: 0.008,
+    release: Math.min(0.14, dur * 0.35),
+    maxGain: 0.32 * trim,
+    destination: song.gain,
+    send: song.send,
+    time,
+  });
+}
+
+function triggerBass(song: Song, ev: NoteEvent, chordDegree: number, time: number, ctx: AudioContext): void {
+  if (ev.toneIdx === null) return;
+  const degree = chordToneDegree(chordDegree, Math.min(ev.toneIdx, 2), song.scale.length);
+  const freq = degreeToFreq(song.def.rootMidi, song.scale, degree, -24);
+  const dur = ev.steps * song.stepDur;
+  const trim = (song.def.gainTrim ?? 1) * MUSIC_TRACK_TRIM;
+  if (song.def.bassWave === 'sine') {
+    playSineWave(freq, Math.max(dur - 0.015, 0.08), {
+      attack: 0.012,
+      decay: 0.06,
+      sustain: 0.55,
+      release: Math.min(0.18, dur * 0.4),
+      maxGain: 0.4 * trim,
+      destination: song.gain,
+      time,
+    });
+  } else {
+    playTriangleWave(freq, Math.max(dur - 0.015, 0.08), {
+      attack: 0.01,
+      decay: 0.05,
+      sustain: 0.5,
+      release: Math.min(0.16, dur * 0.4),
+      maxGain: 0.36 * trim,
+      destination: song.gain,
+      time,
+    });
+  }
+}
+
+function triggerArp(song: Song, ev: NoteEvent, chordDegree: number, time: number, ctx: AudioContext): void {
+  if (ev.toneIdx === null) return;
+  const degree = chordToneDegree(chordDegree, ev.toneIdx, song.scale.length);
+  const freq = degreeToFreq(song.def.rootMidi, song.scale, degree, 0);
+  const dur = ev.steps * song.stepDur;
+  const trim = (song.def.gainTrim ?? 1) * MUSIC_TRACK_TRIM;
+  playSineWave(freq, Math.max(dur - 0.01, 0.05), {
+    attack: 0.006,
+    decay: 0.05,
+    sustain: 0.3,
+    release: Math.min(0.12, dur * 0.5),
+    maxGain: 0.16 * trim,
+    destination: song.gain,
+    send: song.send,
+    time,
+  });
+}
+
+function triggerKick(song: Song, ev: NoteEvent, time: number): void {
+  const trim = (song.def.gainTrim ?? 1) * MUSIC_TRACK_TRIM;
+  const isHeartbeat = song.def.mode === 'phrygian' && song.def.bpm <= 65;
+  playKick(isHeartbeat ? 0.35 : 0.18, {
+    pitch: isHeartbeat ? 65 : 95,
+    endPitch: isHeartbeat ? 25 : 32,
+    maxGain: (isHeartbeat ? 0.55 : 0.4) * ev.velocity * trim,
+    destination: song.gain,
+    time,
+  });
+}
+
+function triggerSnare(song: Song, ev: NoteEvent, time: number): void {
+  const trim = (song.def.gainTrim ?? 1) * MUSIC_TRACK_TRIM;
+  playSnareDrum(0.14, { maxGain: 0.32 * ev.velocity * trim, destination: song.gain, send: song.send, time });
+}
+
+function triggerHat(song: Song, ev: NoteEvent, time: number): void {
+  const trim = (song.def.gainTrim ?? 1) * MUSIC_TRACK_TRIM;
+  playHatDrum(0.045, { maxGain: 0.16 * ev.velocity * trim, destination: song.gain, time });
+}
+
+function scheduleStep(song: Song, ctx: AudioContext): void {
+  const step = song.stepIndex % song.totalSteps;
+  const bar = Math.floor(step / song.stepsPerBar);
+  const barsTotal = song.totalSteps / song.stepsPerBar;
+  const chordDegree = song.chords[bar % song.chords.length] ?? 1;
+  const useAlt = song.loopCount % 2 === 1 && bar === barsTotal - 1;
+  const time = song.nextStepTime;
+
+  const leadEv = (useAlt ? song.events.lead.alt : song.events.lead.base).get(step);
+  if (leadEv) triggerLead(song, leadEv, time, ctx);
+
+  const bassEv = (useAlt ? song.events.bass.alt : song.events.bass.base).get(step);
+  if (bassEv) triggerBass(song, bassEv, chordDegree, time, ctx);
+
+  const arpEv = (useAlt ? song.events.arp.alt : song.events.arp.base).get(step);
+  if (arpEv) triggerArp(song, arpEv, chordDegree, time, ctx);
+
+  const kickEv = (useAlt ? song.events.kick.alt : song.events.kick.base).get(step);
+  if (kickEv) triggerKick(song, kickEv, time);
+
+  const snareEv = (useAlt ? song.events.snare.alt : song.events.snare.base).get(step);
+  if (snareEv) triggerSnare(song, snareEv, time);
+
+  const hatEv = (useAlt ? song.events.hat.alt : song.events.hat.base).get(step);
+  if (hatEv) triggerHat(song, hatEv, time);
+
+  song.stepIndex++;
+  if (song.stepIndex % song.totalSteps === 0) song.loopCount++;
+  song.nextStepTime += song.stepDur;
+}
+
+function startScheduler(song: Song, ctx: AudioContext): void {
+  const tick = () => {
+    if (song.stopping) return;
+    while (song.nextStepTime < ctx.currentTime + LOOKAHEAD_SEC) {
+      scheduleStep(song, ctx);
+    }
+  };
+  song.timerId = window.setInterval(tick, SCHEDULE_INTERVAL_MS);
+  tick();
+}
+
+function stopSong(song: Song): void {
+  song.stopping = true;
+  if (song.timerId !== null) {
+    clearInterval(song.timerId);
+    song.timerId = null;
+  }
+}
+
+function fadeAndRemove(song: Song, ctx: AudioContext, durationSec: number, thenDisconnect: boolean): void {
+  const now = ctx.currentTime;
+  song.gain.gain.cancelScheduledValues(now);
+  song.gain.gain.setValueAtTime(song.gain.gain.value, now);
+  song.gain.gain.linearRampToValueAtTime(0, now + durationSec);
+  window.setTimeout(
+    () => {
+      stopSong(song);
+      if (thenDisconnect) {
+        try {
+          song.gain.disconnect();
+        } catch {
+          // already disconnected
+        }
+      }
+      pendingSongs = pendingSongs.filter((s) => s !== song);
+    },
+    durationSec * 1000 + 50
+  );
+}
+
 /**
- * Start playing music for a region.
- * Crossfades if a track is already playing.
+ * Start playing music for a region, crossfading with whatever is currently
+ * playing. No-op if the same track is already the current (or fading-in) one.
  */
 export function playMusicTrack(id: MusicId): void {
-  if (currentMusicId === id) return; // Already playing
+  if (currentMusicId === id) return;
 
-  const config = MUSIC_CONFIGS[id];
-  if (!config) {
+  const { ctx, musicGain } = getAudioContext();
+  if (!ctx || !musicGain) return;
+
+  const def = TRACKS[id];
+  if (!def) {
     console.warn(`Unknown music track: ${id}`);
     return;
   }
 
-  // Fade out current track
-  if (fadeOutId !== null) {
-    clearInterval(fadeOutId);
+  // Move the outgoing current song to the fade-out list; it keeps scheduling
+  // (so it doesn't cut off mid-phrase) until its own gain ramp finishes, then
+  // stops and disconnects independently of the new track's gain node.
+  if (currentSong) {
+    const outgoing = currentSong;
+    fadeAndRemove(outgoing, ctx, CROSSFADE_SEC, true);
+    pendingSongs.push(outgoing);
   }
-  if (currentOscillators.length > 0 || currentSources.length > 0) {
-    fadeOutCurrentTrack(config.crossfadeMs ?? 1500);
-    // Start new track after brief overlap
-    setTimeout(() => {
-      startMusicSequencer(id, config);
-    }, 100);
-  } else {
-    startMusicSequencer(id, config);
-  }
-}
-
-function fadeOutCurrentTrack(durationMs: number): void {
-  const { musicGain } = getAudioContext();
-  if (!musicGain) return;
-
-  const startGain = musicGain.gain.value;
-  const startTime = Date.now();
-
-  fadeOutId = window.setInterval(() => {
-    const elapsed = Date.now() - startTime;
-    const progress = Math.min(1, elapsed / durationMs);
-    musicGain.gain.value = startGain * (1 - progress);
-
-    if (progress >= 1) {
-      clearInterval(fadeOutId!);
-      fadeOutId = null;
-      stopAllMusicNodes();
+  // Also cancel any older still-fading songs beyond a small cap, to bound CPU use.
+  while (pendingSongs.length > 2) {
+    const stale = pendingSongs.shift();
+    if (stale) {
+      stopSong(stale);
+      try {
+        stale.gain.disconnect();
+      } catch {
+        // already disconnected
+      }
     }
-  }, 10);
-}
-
-function stopAllMusicNodes(): void {
-  try {
-    currentOscillators.forEach((osc) => {
-      try {
-        osc.stop();
-        osc.disconnect();
-      } catch {
-        // Already stopped
-      }
-    });
-    currentOscillators = [];
-
-    currentSources.forEach((src) => {
-      try {
-        src.stop();
-        src.disconnect();
-      } catch {
-        // Already stopped
-      }
-    });
-    currentSources = [];
-  } catch {
-    // Cleanup errors are non-critical
   }
-}
 
-function startMusicSequencer(id: MusicId, config: MusicConfig): void {
-  const { ctx, musicGain } = getAudioContext();
-  if (!ctx || !musicGain) return;
-
+  const song = buildSong(id, def, ctx, musicGain);
+  currentSong = song;
   currentMusicId = id;
-  musicGain.gain.value = 0;
-  musicGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.5);
 
-  // Run a simple step sequencer with ~25ms scheduling lookahead
-  const patterns = config.patterns;
-  let stepIndex = { lead: 0, bass: 0, arp: 0, kick: 0, snare: 0, hat: 0 };
+  const now = ctx.currentTime;
+  song.gain.gain.setValueAtTime(0, now);
+  song.gain.gain.linearRampToValueAtTime(1, now + CROSSFADE_SEC);
 
-  const scheduleNotes = () => {
-    const now = ctx.currentTime;
-    const lookaheadMs = 100;
-    const lookahead = lookaheadMs / 1000;
-
-    // Schedule notes from each pattern
-    schedulePatternSteps('lead', patterns.lead, stepIndex.lead, now, lookahead, config.key, config.scale, musicGain);
-    schedulePatternSteps('bass', patterns.bass, stepIndex.bass, now, lookahead, config.key, config.scale, musicGain);
-    schedulePatternSteps('arp', patterns.arp, stepIndex.arp, now, lookahead, config.key, config.scale, musicGain);
-    scheduleDrumSteps('kick', patterns.kick, stepIndex.kick, now, lookahead, musicGain);
-    scheduleDrumSteps('snare', patterns.snare, stepIndex.snare, now, lookahead, musicGain);
-    scheduleDrumSteps('hat', patterns.hat, stepIndex.hat, now, lookahead, musicGain);
-
-    // Advance indices
-    stepIndex.lead = (stepIndex.lead + 1) % patterns.lead.steps.length;
-    stepIndex.bass = (stepIndex.bass + 1) % patterns.bass.steps.length;
-    stepIndex.arp = (stepIndex.arp + 1) % patterns.arp.steps.length;
-    stepIndex.kick = (stepIndex.kick + 1) % patterns.kick.steps.length;
-    stepIndex.snare = (stepIndex.snare + 1) % patterns.snare.steps.length;
-    stepIndex.hat = (stepIndex.hat + 1) % patterns.hat.steps.length;
-  };
-
-  const schedulerInterval = window.setInterval(() => {
-    if (currentMusicId !== id) {
-      clearInterval(schedulerInterval);
-      return;
-    }
-    scheduleNotes();
-  }, 25);
-}
-
-function schedulePatternSteps(
-  name: string,
-  pattern: SequencerPattern,
-  stepIndex: number,
-  now: number,
-  lookahead: number,
-  baseFreq: number,
-  scale: number[],
-  destination: GainNode
-): void {
-  const { ctx } = getAudioContext();
-  if (!ctx) return;
-
-  const note = pattern.steps[stepIndex];
-  if (!note || note.freq === null) return; // Rest
-
-  const scheduleTime = now + lookahead;
-  const noteStartTime = scheduleTime;
-  const noteDurationMs = (note.duration * pattern.noteLength) / 1000;
-
-  // Map scale index to frequency
-  const scaleIdx = Math.floor(note.freq);
-  const semitones = scale[scaleIdx % scale.length] + Math.floor(note.freq / scale.length) * 12;
-  const freq = semitoneToFreq(baseFreq, semitones);
-
-  const velocity = note.velocity ?? 0.5;
-
-  switch (name) {
-    case 'lead':
-      playSquareWave(freq, noteDurationMs, {
-        attack: 0.02,
-        decay: 0.05,
-        sustain: 0.6,
-        release: 0.1,
-        maxGain: 0.15 * velocity,
-        filterFreq: 4000,
-        destination,
-      });
-      break;
-    case 'bass':
-      playSineWave(freq, noteDurationMs, {
-        attack: 0.03,
-        decay: 0.08,
-        sustain: 0.5,
-        release: 0.15,
-        maxGain: 0.2 * velocity,
-        destination,
-      });
-      break;
-    case 'arp':
-      playSineWave(freq, noteDurationMs, {
-        attack: 0.01,
-        decay: 0.1,
-        sustain: 0.3,
-        release: 0.2,
-        maxGain: 0.12 * velocity,
-        destination,
-      });
-      break;
-  }
-}
-
-function scheduleDrumSteps(
-  name: string,
-  pattern: SequencerPattern,
-  stepIndex: number,
-  now: number,
-  lookahead: number,
-  destination: GainNode
-): void {
-  const { ctx } = getAudioContext();
-  if (!ctx) return;
-
-  const note = pattern.steps[stepIndex];
-  if (!note || note.freq === 0) return; // Rest (freq 0 for drums = rest)
-
-  const scheduleTime = now + lookahead;
-  const noteDurationMs = (note.duration * pattern.noteLength) / 1000;
-
-  switch (name) {
-    case 'kick':
-      playKick(noteDurationMs, { maxGain: 0.15, destination });
-      break;
-    case 'snare':
-      playNoise(noteDurationMs, {
-        attack: 0.01,
-        decay: noteDurationMs * 0.5,
-        sustain: 0.3,
-        release: noteDurationMs * 0.2,
-        maxGain: 0.1,
-        filterFreq: 6000,
-        filterType: 'highpass',
-        destination,
-      });
-      break;
-    case 'hat':
-      playNoise(noteDurationMs * 0.3, {
-        attack: 0.005,
-        release: noteDurationMs * 0.25,
-        maxGain: 0.08,
-        filterFreq: 8000,
-        filterType: 'highpass',
-        destination,
-      });
-      break;
-  }
+  startScheduler(song, ctx);
 }
 
 /**
- * Fade out and stop music.
+ * Fade out and stop all music.
  */
 export function stopMusicTrack(durationMs: number = 1000): void {
-  fadeOutCurrentTrack(durationMs);
+  const { ctx } = getAudioContext();
+  if (!ctx) return;
+  const durationSec = Math.max(durationMs / 1000, 0.05);
+
+  if (currentSong) {
+    fadeAndRemove(currentSong, ctx, durationSec, true);
+    pendingSongs.push(currentSong);
+    currentSong = null;
+  }
   currentMusicId = null;
+
+  for (const song of pendingSongs) {
+    // Already fading songs: leave their own fade-out alone, just let them finish.
+    void song;
+  }
 }

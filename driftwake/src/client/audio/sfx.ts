@@ -10,22 +10,22 @@ import { playSineWave, playSquareWave, playNoise, playFreqSweep, playKick, playG
 /** Rate limit identical SFX within this time window (ms) */
 const SFX_RATE_LIMIT_MS = 30;
 
-/** Max concurrent voices of the same sound */
+/** Max concurrent voices of the same sound within a 1s window */
 const MAX_CONCURRENT_VOICES = 12;
 
-/** Track recent SFX plays for rate limiting */
-interface SfxVoice {
-  id: SfxId;
-  timestamp: number;
-}
+/** Timestamp (audio-clock ms) of the most recent play per SfxId, for rate limiting. */
+const lastPlayMs = new Map<SfxId, number>();
 
-const recentVoices: SfxVoice[] = [];
+/** Timestamps (audio-clock ms) of recent plays per SfxId, for the concurrent-voice cap. */
+const recentPlaysById = new Map<SfxId, number[]>();
 
-/** Cleanup old voice tracking */
-function pruneVoiceHistory(now: number): void {
-  while (recentVoices.length > 0 && recentVoices[0].timestamp < now - 1000) {
-    recentVoices.shift();
-  }
+/** Drop timestamps older than the 1s tracking window. */
+function pruneAndGet(id: SfxId, now: number): number[] {
+  const arr = recentPlaysById.get(id);
+  if (!arr || arr.length === 0) return [];
+  const pruned = arr.filter((t) => t >= now - 1000);
+  if (pruned.length !== arr.length) recentPlaysById.set(id, pruned);
+  return pruned;
 }
 
 /**
@@ -36,15 +36,14 @@ function shouldPlaySfx(id: SfxId): boolean {
   if (!ctx) return false;
 
   const now = ctx.currentTime * 1000; // Convert to ms
-  pruneVoiceHistory(now);
 
   // Check if we're exceeding max concurrent voices
-  const sameIdCount = recentVoices.filter((v) => v.id === id).length;
-  if (sameIdCount >= MAX_CONCURRENT_VOICES) return false;
+  const recent = pruneAndGet(id, now);
+  if (recent.length >= MAX_CONCURRENT_VOICES) return false;
 
-  // Check if last play was too recent (rate limit)
-  const lastPlay = recentVoices.find((v) => v.id === id);
-  if (lastPlay && now - lastPlay.timestamp < SFX_RATE_LIMIT_MS) {
+  // Check if the *last* play (not some arbitrary older one) was too recent
+  const last = lastPlayMs.get(id);
+  if (last !== undefined && now - last < SFX_RATE_LIMIT_MS) {
     return false;
   }
 
@@ -55,8 +54,10 @@ function recordVoicePlay(id: SfxId): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime * 1000;
-  recentVoices.push({ id, timestamp: now });
-  pruneVoiceHistory(now);
+  lastPlayMs.set(id, now);
+  const recent = pruneAndGet(id, now);
+  recent.push(now);
+  recentPlaysById.set(id, recent);
 }
 
 /** Add random pitch variation (±0..maxCents) */
@@ -229,8 +230,8 @@ function playSfxSwing(volume: number, pitchShift: number, dest: AudioNode): void
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Filtered noise sweep with small pitch variation
-  const freqStart = varyPitch(8000, 30);
-  playFreqSweep(freqStart, 4000, 0.15, {
+  const freqStart = varyPitch(8000, 30) * pitchShift;
+  playFreqSweep(freqStart, 4000 * pitchShift, 0.15, {
     waveType: 'square',
     maxGain: 0.2 * volume,
     destination: dest,
@@ -241,17 +242,17 @@ function playSfxHit(volume: number, pitchShift: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Short punchy thump + click
-  playKick(0.08, { pitch: varyPitch(200, 30), maxGain: 0.25 * volume, destination: dest });
+  playKick(0.08, { pitch: varyPitch(200, 30) * pitchShift, maxGain: 0.25 * volume, destination: dest });
   // Click on top
-  playNoise(0.05, { attack: 0, release: 0.02, maxGain: 0.15 * volume, destination: dest });
+  playNoise(0.05, { attack: 0.003, release: 0.02, maxGain: 0.15 * volume, destination: dest });
 }
 
 function playSfxCrit(volume: number, pitchShift: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Brighter layered hit
-  playKick(0.1, { pitch: varyPitch(300, 20), maxGain: 0.3 * volume, destination: dest });
-  playSineWave(varyPitch(800, 30), 0.15, {
+  playKick(0.1, { pitch: varyPitch(300, 20) * pitchShift, maxGain: 0.3 * volume, destination: dest });
+  playSineWave(varyPitch(800, 30) * pitchShift, 0.15, {
     attack: 0.005,
     release: 0.05,
     maxGain: 0.2 * volume,
@@ -330,19 +331,19 @@ function playSfxExplosion(volume: number, dest: AudioNode): void {
 function playSfxLightning(volume: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
-  // Crackle: fast noise bursts
+  // Crackle: fast noise bursts, scheduled on the audio clock (not setTimeout,
+  // which drifts against ctx.currentTime and can fire after the context is gone).
+  const now = ctx.currentTime;
   for (let i = 0; i < 4; i++) {
-    const delay = i * 0.05;
-    setTimeout(() => {
-      playNoise(0.08, {
-        attack: 0.01,
-        release: 0.03,
-        maxGain: 0.2 * volume * (1 - i * 0.15),
-        filterFreq: 6000 + i * 1000,
-        filterType: 'highpass',
-        destination: dest,
-      });
-    }, delay * 1000);
+    playNoise(0.08, {
+      attack: 0.01,
+      release: 0.03,
+      maxGain: 0.2 * volume * (1 - i * 0.15),
+      filterFreq: 6000 + i * 1000,
+      filterType: 'highpass',
+      destination: dest,
+      time: now + i * 0.05,
+    });
   }
 }
 
@@ -479,16 +480,15 @@ function playSfxDeath(volume: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Sad descending arpeggio-ish
-  for (let i = 0; i < 3; i++) {
-    const delay = i * 0.12;
-    const freq = [400, 300, 150][i];
-    setTimeout(() => {
-      playFreqSweep(freq, freq * 0.5, 0.2, {
-        waveType: 'sine',
-        maxGain: 0.15 * volume * (1 - i * 0.25),
-        destination: dest,
-      });
-    }, delay * 1000);
+  const now = ctx.currentTime;
+  const freqs = [400, 300, 150];
+  for (let i = 0; i < freqs.length; i++) {
+    playFreqSweep(freqs[i], freqs[i] * 0.5, 0.2, {
+      waveType: 'sine',
+      maxGain: 0.15 * volume * (1 - i * 0.25),
+      destination: dest,
+      time: now + i * 0.12,
+    });
   }
 }
 
@@ -496,19 +496,18 @@ function playSfxLevelUp(volume: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Triumphant arpeggio fanfare (~1.2s)
+  const now = ctx.currentTime;
   const freqs = [440, 550, 660, 880]; // C-E-G-C2
   for (let i = 0; i < freqs.length; i++) {
-    const delay = i * 0.15;
-    setTimeout(() => {
-      playSineWave(freqs[i], 0.3, {
-        attack: 0.05,
-        decay: 0.1,
-        sustain: 0.3,
-        release: 0.1,
-        maxGain: 0.2 * volume,
-        destination: dest,
-      });
-    }, delay * 1000);
+    playSineWave(freqs[i], 0.3, {
+      attack: 0.05,
+      decay: 0.1,
+      sustain: 0.3,
+      release: 0.1,
+      maxGain: 0.2 * volume,
+      destination: dest,
+      time: now + i * 0.15,
+    });
   }
 }
 
@@ -536,16 +535,15 @@ function playSfxCoin(volume: number, dest: AudioNode): void {
     maxGain: 0.18 * volume,
     destination: dest,
   });
-  setTimeout(() => {
-    playSineWave(800, 0.12, {
-      attack: 0.01,
-      decay: 0.1,
-      sustain: 0,
-      release: 0.01,
-      maxGain: 0.15 * volume,
-      destination: dest,
-    });
-  }, 60);
+  playSineWave(800, 0.12, {
+    attack: 0.01,
+    decay: 0.1,
+    sustain: 0,
+    release: 0.01,
+    maxGain: 0.15 * volume,
+    destination: dest,
+    time: ctx.currentTime + 0.06,
+  });
 }
 
 function playSfxPotion(volume: number, dest: AudioNode): void {
@@ -605,18 +603,18 @@ function playSfxQuestComplete(volume: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Fanfare
+  const now = ctx.currentTime;
   const freqs = [660, 880];
   for (let i = 0; i < freqs.length; i++) {
-    setTimeout(() => {
-      playSineWave(freqs[i], 0.25, {
-        attack: 0.05,
-        decay: 0.1,
-        sustain: 0.2,
-        release: 0.1,
-        maxGain: 0.18 * volume,
-        destination: dest,
-      });
-    }, i * 100);
+    playSineWave(freqs[i], 0.25, {
+      attack: 0.05,
+      decay: 0.1,
+      sustain: 0.2,
+      release: 0.1,
+      maxGain: 0.18 * volume,
+      destination: dest,
+      time: now + i * 0.1,
+    });
   }
 }
 
@@ -790,19 +788,18 @@ function playSfxJobAdvance(volume: number, dest: AudioNode): void {
   const { ctx } = getAudioContext();
   if (!ctx) return;
   // Big fanfare
+  const now = ctx.currentTime;
   const freqs = [440, 550, 660, 880, 1100];
   for (let i = 0; i < freqs.length; i++) {
-    const delay = i * 0.12;
-    setTimeout(() => {
-      playSineWave(freqs[i], 0.35, {
-        attack: 0.05,
-        decay: 0.15,
-        sustain: 0.2,
-        release: 0.1,
-        maxGain: 0.18 * volume,
-        destination: dest,
-      });
-    }, delay * 1000);
+    playSineWave(freqs[i], 0.35, {
+      attack: 0.05,
+      decay: 0.15,
+      sustain: 0.2,
+      release: 0.1,
+      maxGain: 0.18 * volume,
+      destination: dest,
+      time: now + i * 0.12,
+    });
   }
 }
 

@@ -40,6 +40,37 @@ export function confirmDialog(text: string, opts?: { okLabel?: string; danger?: 
   });
 }
 
+let openMenu: HTMLElement | null = null;
+function closeContextMenu() { openMenu?.remove(); openMenu = null; }
+window.addEventListener('mousedown', closeContextMenu);
+window.addEventListener('blur', closeContextMenu);
+
+export function showContextMenu(x: number, y: number, items: { label: string; onClick: () => void; danger?: boolean; disabled?: boolean }[]): void {
+  closeContextMenu();
+  if (!items.length) return;
+  const menu = el('div', {
+    class: 'dw-panel',
+    style: { position: 'fixed', left: `${x}px`, top: `${y}px`, zIndex: '10001', padding: '4px', display: 'flex', flexDirection: 'column', minWidth: '140px', pointerEvents: 'auto' },
+  });
+  for (const it of items) {
+    menu.appendChild(el('div', {
+      style: {
+        padding: '6px 10px', fontSize: '12px', cursor: it.disabled ? 'not-allowed' : 'pointer',
+        opacity: it.disabled ? '0.4' : '1', borderRadius: '4px', color: it.danger ? '#ff9a9a' : undefined,
+      },
+      onmouseenter: (e: MouseEvent) => { if (!it.disabled) (e.target as HTMLElement).style.background = 'rgba(232,196,119,0.15)'; },
+      onmouseleave: (e: MouseEvent) => { (e.target as HTMLElement).style.background = ''; },
+      onclick: (e: MouseEvent) => { e.stopPropagation(); if (it.disabled) return; closeContextMenu(); it.onClick(); },
+    }, it.label));
+  }
+  document.body.appendChild(menu);
+  openMenu = menu;
+  // clamp on screen
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 4}px`;
+  if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 4}px`;
+}
+
 export function progressBar(pct: number, className = ''): HTMLElement {
   return el('div', { class: `dw-prof-bar ${className}` }, el('div', { style: { width: `${Math.round(Math.max(0, Math.min(1, pct)) * 100)}%` } }));
 }

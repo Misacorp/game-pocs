@@ -1,0 +1,95 @@
+import { el, fmtNum, clamp } from '../dom';
+import { bus } from '../../events';
+import type { GameSession } from '../../session';
+import { WindowManager, createWindow } from '../manager';
+import { makeTabs } from '../widgets';
+import { attachTooltip } from '../tooltip';
+import { buildItemTooltip } from '../itemTooltip';
+import { safeItemIcon, goldIconUrl } from '../icons';
+import { ITEMS, SHOPS } from '@shared/data';
+import { checkConditions } from '@shared/logic';
+import { uiState } from '../state';
+import type { ItemInstance } from '@shared/types';
+
+export function createShopWindow(wm: WindowManager, session: GameSession) {
+  let shopId: string | null = null;
+  let mode: 'buy' | 'sell' = 'buy';
+  const qtyState = new Map<string, number>();
+
+  const goldEl = el('div', { style: { fontWeight: '700', color: '#ffd24a', display: 'flex', alignItems: 'center', gap: '5px' } }, el('img', { src: goldIconUrl(16) }), '0');
+  const tabsHost = el('div');
+  const grid = el('div', { class: 'dw-grid', style: { marginTop: '10px' } });
+  const body = el('div', { class: 'dw-body' }, goldEl, tabsHost, grid);
+  const invPos = wm.get('inventory')?.root;
+  const ctrl = createWindow(wm, {
+    panel: 'shop', title: 'Shop', width: 340,
+    defaultPos: invPos ? { x: invPos.offsetLeft + 330, y: invPos.offsetTop } : undefined,
+    onClose: () => { uiState.openShopId = null; },
+  }, body);
+
+  const tabs = makeTabs([{ id: 'buy', label: 'Buy' }, { id: 'sell', label: 'Sell' }], (id) => { mode = id as any; render(); });
+  tabsHost.appendChild(tabs.root);
+
+  function render() {
+    goldEl.lastChild!.textContent = ` ${fmtNum(session.state.gold)}`;
+    grid.innerHTML = '';
+    if (mode === 'buy') renderBuy(); else renderSell();
+  }
+
+  function renderBuy() {
+    const shop = shopId ? SHOPS[shopId] : undefined;
+    if (!shop) { grid.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Shop unavailable.')); return; }
+    for (const entry of shop.items) {
+      if (!checkConditions(session.state, entry.reqs)) continue;
+      const def = ITEMS[entry.itemId];
+      const price = entry.price ?? def?.buyPrice ?? 0;
+      const card = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' } });
+      const iconSlot = el('div', { class: 'dw-slot' }, el('img', { src: safeItemIcon(def) }));
+      attachTooltip(iconSlot, () => def ? [`${def.name}`] : ['??? Item']);
+      card.appendChild(iconSlot);
+      card.appendChild(el('div', { style: { flex: '1' } }, el('div', null, def?.name ?? entry.itemId), el('div', { style: { fontSize: '11px', color: '#ffd24a' } }, `${fmtNum(price)}g`)));
+      const stackable = (def?.stack ?? 1) > 1;
+      const qtyKey = entry.itemId;
+      if (!qtyState.has(qtyKey)) qtyState.set(qtyKey, 1);
+      if (stackable) {
+        const qtyInput = el('input', { class: 'dw-input', type: 'number', min: '1', value: String(qtyState.get(qtyKey)), style: { width: '46px' } }) as HTMLInputElement;
+        qtyInput.addEventListener('change', () => qtyState.set(qtyKey, Math.max(1, parseInt(qtyInput.value) || 1)));
+        card.appendChild(qtyInput);
+      }
+      card.appendChild(el('button', {
+        class: 'dw-btn dw-btn-sm', disabled: session.state.gold < price,
+        onclick: () => session.dispatch({ type: 'buy', shopId: shopId!, itemId: entry.itemId, qty: stackable ? (qtyState.get(qtyKey) ?? 1) : 1 }),
+      }, 'Buy'));
+      grid.appendChild(card);
+    }
+  }
+
+  function renderSell() {
+    const all: ItemInstance[] = [];
+    for (const tab of Object.values(session.state.inventory)) for (const inst of tab) if (inst && !ITEMS[inst.itemId]?.quest) all.push(inst);
+    if (!all.length) { grid.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Nothing to sell.')); return; }
+    for (const inst of all) {
+      const def = ITEMS[inst.itemId];
+      const card = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' } });
+      const iconSlot = el('div', { class: 'dw-slot' }, el('img', { src: safeItemIcon(def) }), inst.qty > 1 ? el('div', { class: 'dw-count' }, String(inst.qty)) : null);
+      attachTooltip(iconSlot, () => buildItemTooltip(session.state, inst));
+      card.appendChild(iconSlot);
+      card.appendChild(el('div', { style: { flex: '1' } }, el('div', null, def?.name ?? inst.itemId), el('div', { style: { fontSize: '11px', color: '#ffd24a' } }, `${fmtNum(def?.sellPrice ?? 0)}g ea`)));
+      card.appendChild(el('button', { class: 'dw-btn dw-btn-sm', onclick: () => session.dispatch({ type: 'sell', uid: inst.uid, qty: inst.qty }) }, 'Sell'));
+      grid.appendChild(card);
+    }
+  }
+
+  ctrl.root.addEventListener('dragover', (e) => e.preventDefault());
+  ctrl.root.addEventListener('drop', () => { mode = 'sell'; tabs.select('sell'); render(); });
+
+  bus.on('ui:shop', ({ shopId: id }) => {
+    shopId = id;
+    uiState.openShopId = id;
+    mode = 'buy'; tabs.select('buy');
+    ctrl.open();
+    render();
+  });
+  bus.on('state', render);
+  return ctrl;
+}

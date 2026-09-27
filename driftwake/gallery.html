@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Driftwake — gfx gallery</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #10131c; color: #dfe6f0; font: 12px/1.4 monospace; }
+      #tabs { display: flex; gap: 4px; padding: 8px; background: #0a0c14; position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
+      #tabs button { background: #232838; color: #dfe6f0; border: 1px solid #3a4258; padding: 6px 10px; cursor: pointer; font: inherit; }
+      #tabs button.active { background: #4a5aa0; }
+      #themebar { display: flex; gap: 4px; padding: 6px 8px; background: #0a0c14; flex-wrap: wrap; }
+      #themebar button { background: #1c2030; color: #cfd6de; border: 1px solid #333c50; padding: 4px 8px; cursor: pointer; font: inherit; }
+      #themebar button.active { background: #6a5ac9; }
+      #game { image-rendering: pixelated; }
+      #game canvas { image-rendering: pixelated; display: block; }
+      .section { padding: 10px; }
+      h2 { margin: 14px 0 6px; font-size: 13px; color: #9fb2ff; }
+      .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+      .cell { background: #181c28; border: 1px solid #2a3040; padding: 6px; text-align: center; width: 84px; }
+      .cell img { image-rendering: pixelated; width: 48px; height: 48px; background: #262b3a; }
+      .cell div.lbl { font-size: 9px; color: #9aa4bb; margin-top: 3px; word-break: break-word; }
+    </style>
+  </head>
+  <body>
+    <div id="tabs">
+      <button data-tab="characters" class="active">Characters</button>
+      <button data-tab="monsters">Monsters</button>
+      <button data-tab="npcs">NPCs</button>
+      <button data-tab="world">World (tiles/parallax/decor/weather)</button>
+      <button data-tab="vfx">VFX / gather / portal / drops</button>
+      <button data-tab="icons">Icons</button>
+    </div>
+    <div id="themebar"></div>
+    <div id="game"></div>
+    <div id="icons-root" class="section" style="display:none"></div>
+    <script type="module" src="/src/client/gfx/gallery.ts"></script>
+  </body>
+</html>

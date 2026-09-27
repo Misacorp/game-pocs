@@ -79,6 +79,16 @@ function midLayer(theme: ThemeId): HTMLCanvasElement {
   const rnd = seedRandom(theme.length * 71 + 5);
   const col = withAlpha(pal.midSilhouette, 0.8);
   switch (kind) {
+    case 'harbor':
+      for (let i = 0; i < 3; i++) { const cx = rnd() * w, cy = 20 + rnd() * 40, r = 16 + rnd() * 18; ellipse(ctx, cx, cy, r, r * 0.45, withAlpha(pal.midSilhouette, 0.5)); }
+      for (let i = 0; i < 5; i++) {
+        const bx = i * (w / 5) + rnd() * 30,by = h * 0.62;
+        poly(ctx, [[bx - 22, by], [bx + 26, by], [bx + 18, by + 14], [bx - 14, by + 14]], col); // hull
+        line(ctx, bx, by, bx, by - 30 - rnd() * 14, 2, col); // mast
+        poly(ctx, [[bx, by - 28], [bx + 16, by - 20], [bx, by - 8]], col); // sail
+        poly(ctx, [[bx, by - 24], [bx - 12, by - 14], [bx, by - 6]], withAlpha(pal.midSilhouette, 0.6)); // jib
+      }
+      break;
     case 'cloud':
       for (let i = 0; i < 6; i++) { const cx = rnd() * w, cy = 30 + rnd() * 60, r = 20 + rnd() * 24; ellipse(ctx, cx, cy, r, r * 0.5, col); ellipse(ctx, cx + r * 0.5, cy + r * 0.15, r * 0.6, r * 0.4, col); ellipse(ctx, cx - r * 0.5, cy + r * 0.15, r * 0.6, r * 0.4, col); }
       break;

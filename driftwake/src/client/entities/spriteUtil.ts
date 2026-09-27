@@ -25,3 +25,20 @@ export function invulnAlpha(now: number, untilMs: number, periodMs = 90): number
   if (now >= untilMs) return 1;
   return Math.floor((untilMs - now) / periodMs) % 2 === 0 ? 0.35 : 0.9;
 }
+
+/**
+ * Small, crisp world-space label. Font sizes here are in WORLD px — the camera runs at 2x zoom,
+ * so keep these small (7-9px) and let `resolution` keep the glyphs sharp once magnified, instead
+ * of sizing for the final on-screen look (which doubles everything and blurs it).
+ */
+export function makeCrispLabel(
+  scene: Phaser.Scene, x: number, y: number, text: string,
+  style: Phaser.Types.GameObjects.Text.TextStyle = {}, resolution = 3,
+): Phaser.GameObjects.Text {
+  const t = scene.add.text(x, y, text, {
+    fontFamily: 'monospace', fontSize: '8px', color: '#ffe9b8', align: 'center', stroke: '#000', strokeThickness: 2,
+    ...style,
+  });
+  t.setResolution(resolution);
+  return t;
+}

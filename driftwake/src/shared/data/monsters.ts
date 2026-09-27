@@ -40,7 +40,7 @@ function proj(id: string, opts: Partial<MonsterAttack> & { damageMult: number; c
 }
 
 function charge(id: string, opts: Partial<MonsterAttack> & { damageMult: number; cooldownMs: number; range: number; telegraphMs: number }): MonsterAttack {
-  return { id, kind: 'charge', vfx: 'dash', color: '#ffcf6b', ...opts };
+  return { id, kind: 'charge', vfx: 'wind', color: '#ffcf6b', ...opts };
 }
 
 // ---------------------------------------------------------------------------

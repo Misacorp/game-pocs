@@ -66,6 +66,16 @@ export const ACHIEVEMENT_LIST: AchievementDef[] = [
     category: 'combat', icon: { shape: 'heart', colors: ['#ff2f4f'] },
     condition: { type: 'bossKill', monsterId: 'blight_heart' }, reward: { gold: 800, title: 'Heart-Render' },
   },
+  {
+    id: 'ach_reach_vesper', name: 'The Second Whale', description: 'Reach Vesper\'s Landing, on the back of the Leviathan Vesper.',
+    category: 'exploration', icon: { shape: 'orb', colors: ['#8ae0ff'] },
+    condition: { type: 'questCompleted', questId: 'mq_21_second_whale' }, reward: { gold: 200 },
+  },
+  {
+    id: 'ach_boss_vesper_heartsong', name: 'The Old Wound Sings', description: 'Defeat the Vesper Heartsong.',
+    category: 'combat', icon: { shape: 'heart', colors: ['#8ae0ff'] },
+    condition: { type: 'bossKill', monsterId: 'vesper_heartsong' }, reward: { gold: 1200, title: 'Heartsong-Render' },
+  },
 
   // ---------------------------------------------------------------- Exploration
   {
@@ -94,7 +104,7 @@ export const ACHIEVEMENT_LIST: AchievementDef[] = [
     condition: { type: 'exploreRegion', region: 'hollow' }, reward: { gold: 150 },
   },
   {
-    id: 'ach_explore_all', name: 'Cartographer of Oma', description: 'Discover all 18 maps on the whale\'s back.',
+    id: 'ach_explore_all', name: 'Cartographer of Oma', description: 'Discover all 22 maps on the backs of both whales.',
     category: 'exploration', icon: { shape: 'star', colors: ['#ffe066'] },
     condition: { type: 'exploreAll' }, reward: { gold: 300, title: 'Cartographer' },
   },

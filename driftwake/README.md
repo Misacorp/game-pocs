@@ -48,7 +48,8 @@ Play online against the server: `npm run server`, then open `http://localhost:51
 
 A headless bot (`scripts/simulate-playthrough.ts`) plays the whole story through the real game rules for every
 class. An efficient player finishes the main story (all three endings are reachable) at **level ~36 in ~80
-minutes**; side, faction, profession and daily content add several more hours. Global XP speed is one knob:
+minutes**, and the post-game Act VI ("The Drift Beyond", levels 36–40, superboss) in ~15 more; side, faction,
+profession and daily content add several more hours. Global XP speed is one knob:
 `XP_CURVE.globalRate` in `src/shared/constants.ts`.
 
 ## What's in the game
@@ -59,10 +60,10 @@ minutes**; side, faction, profession and daily content add several more hours. G
   Job advancement at level 15 through a class trial quest at Gale Outpost.
 - **Combat** — Maplestory-style mob fighting (hotkey skills, MP, knockback, damage numbers, loot fountains)
   with action spice: i-frame dashes, status effects (burn, freeze, bleed, mark…), hit-stop, and
-  **5 bosses** with telegraphed attack patterns and phases.
-- **18 maps across 5 regions** — Driftmoor harbor town, Mossback Meadows & Hills, Barnacle Grotto,
+  **6 bosses** with telegraphed attack patterns and phases.
+- **22 maps across 6 regions** — Driftmoor harbor town, Mossback Meadows & Hills, Barnacle Grotto,
   the floating Kelpwood, Gale Outpost & the Stormbreak Spires, the bioluminescent Lanternreef and a
-  sunken ghost galleon, and finally the inside of the whale itself.
+  sunken ghost galleon, the inside of the whale itself — and, post-game, a second, older Skywhale.
 - **108 quests** — a 5-act main story with faction politics (Harpooners vs Tidekeepers), job quests,
   faction quests, 43 side quests, 10 daily bounties and 17 profession quests. Big choices set flags that later
   content reacts to; a secret "true ending" unlocks only if you made the merciful choices along the way.

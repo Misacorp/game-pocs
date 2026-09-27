@@ -6,7 +6,7 @@
  */
 import Phaser from 'phaser';
 import type { ThemeId } from '@shared/types';
-import { makeCanvas, ctx2d, rect, circle, ellipse, poly, line, shade, withAlpha, seedRandom, registerCanvasTexture } from './canvasKit';
+import { makeCanvas, ctx2d, rect, circle, ellipse, poly, line, shade, mix, withAlpha, seedRandom, registerCanvasTexture } from './canvasKit';
 import { THEMES } from './palette';
 import type { Parallax } from './spec';
 
@@ -27,6 +27,23 @@ function skyCanvas(theme: ThemeId): HTMLCanvasElement {
   if (pal.dark) {
     const rnd = seedRandom(theme.length * 51 + 3);
     for (let i = 0; i < 70; i++) { const x = rnd() * VIEW_W, y = rnd() * VIEW_H * 0.7; ctx.fillStyle = withAlpha('#ffffff', 0.15 + rnd() * 0.4); ctx.fillRect(x, y, 1, 1); }
+  }
+  return c;
+}
+
+/** Farthest scrolling layer: soft, hazy cloud-bank silhouettes barely tinted off the sky color and
+ *  drifting almost imperceptibly slowly — the atmospheric-perspective cue that makes the whale/mid
+ *  layers in front of it read as closer. */
+function hazeLayer(theme: ThemeId): HTMLCanvasElement {
+  const pal = THEMES[theme];
+  const w = 900, h = 180;
+  const c = makeCanvas(w, h); const ctx = ctx2d(c);
+  const rnd = seedRandom(theme.length * 19 + 3);
+  const col = withAlpha(mix(pal.skyMid, pal.glow, 0.2), pal.dark ? 0.14 : 0.17);
+  for (let i = 0; i < 5; i++) {
+    const cx = rnd() * w, cy = 20 + rnd() * 90, r = 70 + rnd() * 70;
+    ellipse(ctx, cx, cy, r, r * 0.32, col);
+    ellipse(ctx, cx + r * 0.5, cy + 6, r * 0.6, r * 0.24, col);
   }
   return c;
 }
@@ -65,10 +82,10 @@ function whaleLayer(theme: ThemeId): HTMLCanvasElement {
   return c;
 }
 
-type Kind = 'harbor' | 'cloud' | 'islands' | 'stalactite' | 'kelp' | 'windmillCliff' | 'stormClouds' | 'coralReef' | 'shipRibs' | 'boneArch' | 'veins';
+type Kind = 'harbor' | 'mossHills' | 'islands' | 'stalactite' | 'kelp' | 'windmillCliff' | 'stormClouds' | 'coralReef' | 'shipRibs' | 'boneArch' | 'veins';
 
 const MID_KIND: Record<ThemeId, Kind> = {
-  driftmoor: 'harbor', meadow: 'cloud', grotto: 'stalactite', kelpwood: 'kelp', galeoutpost: 'windmillCliff',
+  driftmoor: 'harbor', meadow: 'mossHills', grotto: 'stalactite', kelpwood: 'kelp', galeoutpost: 'windmillCliff',
   stormspire: 'stormClouds', lanternreef: 'coralReef', galleon: 'shipRibs', hollow: 'boneArch', heart: 'veins',
 };
 
@@ -88,9 +105,21 @@ function midLayer(theme: ThemeId): HTMLCanvasElement {
         poly(ctx, [[bx, by - 28], [bx + 16, by - 20], [bx, by - 8]], col); // sail
         poly(ctx, [[bx, by - 24], [bx - 12, by - 14], [bx, by - 6]], withAlpha(pal.midSilhouette, 0.6)); // jib
       }
+      { // a distant lighthouse standing on its own outcrop at the harbor's edge, banded tower + lantern glow
+        const lx = w * 0.88, groundY = h * 0.7;
+        poly(ctx, [[lx - 16, groundY], [lx + 16, groundY], [lx + 8, groundY - 20], [lx - 8, groundY - 20]], withAlpha(pal.midSilhouette, 0.55)); // rock base
+        poly(ctx, [[lx - 5, groundY - 20], [lx + 5, groundY - 20], [lx + 8, groundY - 90], [lx - 8, groundY - 90]], col); // tower
+        for (let b = 0; b < 3; b++) rect(ctx, lx - 8 + b * 0.6, groundY - 34 - b * 22, 16 - b * 1.2, 3, withAlpha(pal.midSilhouette, 0.55)); // bands
+        rect(ctx, lx - 9, groundY - 98, 18, 10, col); // lantern room
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; circle(ctx, lx, groundY - 93, 9, pal.glow); ctx.restore();
+      }
       break;
-    case 'cloud':
-      for (let i = 0; i < 6; i++) { const cx = rnd() * w, cy = 30 + rnd() * 60, r = 20 + rnd() * 24; ellipse(ctx, cx, cy, r, r * 0.5, col); ellipse(ctx, cx + r * 0.5, cy + r * 0.15, r * 0.6, r * 0.4, col); ellipse(ctx, cx - r * 0.5, cy + r * 0.15, r * 0.6, r * 0.4, col); }
+    case 'mossHills': // rolling moss hills on the whale's back, ridged with barnacle knobs along the crest
+      for (let i = 0; i < 4; i++) {
+        const cx = i * (w / 3.6) + rnd() * 30, cy = h * 0.62 + (i % 2) * 10, r = 90 + rnd() * 40;
+        ellipse(ctx, cx, cy, r, r * 0.4, col);
+        for (let k = 0; k < 5; k++) circle(ctx, cx - r * 0.6 + k * r * 0.3, cy - r * 0.34 + Math.sin(k) * 3, 4 + (k % 3), withAlpha(pal.midSilhouette, 0.55)); // barnacle ridge
+      }
       break;
     case 'islands':
       for (let i = 0; i < 4; i++) { const cx = i * 200 + rnd() * 60, cy = 60 + rnd() * 40; poly(ctx, [[cx - 40, cy], [cx + 40, cy], [cx + 20, cy + 26], [cx - 20, cy + 26]], col); }
@@ -138,6 +167,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
   const pal = THEMES[theme];
 
   const skyKey = `bg_${theme}_sky`; registerCanvasTexture(scene, skyKey, skyCanvas(theme));
+  const hazeKey = `bg_${theme}_haze`; registerCanvasTexture(scene, hazeKey, hazeLayer(theme));
   const whaleKey = `bg_${theme}_whale`; registerCanvasTexture(scene, whaleKey, whaleLayer(theme));
   const midKey = `bg_${theme}_mid`; registerCanvasTexture(scene, midKey, midLayer(theme));
   const nearKey = `bg_${theme}_near`; registerCanvasTexture(scene, nearKey, nearLayer(theme));
@@ -149,6 +179,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
   // recomputing from the camera each frame keeps this correct for whatever origin/zoom/scroll
   // the engine's camera ends up using, and keeps full coverage at any camera position.
   const sky = scene.add.image(0, 0, skyKey).setOrigin(0).setDepth(-100);
+  const haze = scene.add.tileSprite(0, 0, 10, 10, hazeKey).setOrigin(0).setDepth(-95);
   const whale = scene.add.tileSprite(0, 0, 10, 10, whaleKey).setOrigin(0).setDepth(-90);
   const mid = scene.add.tileSprite(0, 0, 10, 10, midKey).setOrigin(0).setDepth(-80).setAlpha(0.9);
   const near = scene.add.tileSprite(0, 0, 10, 10, nearKey).setOrigin(0).setDepth(-70).setAlpha(0.95);
@@ -167,6 +198,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
     // TileSprite tiling is computed from its own width/height (setSize), not displaySize —
     // using setDisplaySize alone would leave the tiling viewport at its tiny placeholder size
     // and stretch a sliver of the texture across the whole screen instead of tiling it.
+    haze.setPosition(tl.x, tl.y).setSize(w, h * 0.5);
     whale.setPosition(tl.x, tl.y + h * 0.05).setSize(w, h * 0.55);
     mid.setPosition(tl.x, tl.y + h * 0.1).setSize(w, h * 0.6);
     near.setPosition(tl.x, tl.y + h * 0.72).setSize(w, h * 0.3);
@@ -181,6 +213,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
     update(cam: Phaser.Cameras.Scene2D.Camera) {
       layout(cam);
       t = (performance.now() - start) / 1000;
+      haze.tilePositionX = cam.scrollX * 0.015 + t * 0.4; // nearly static — the farthest depth cue
       whale.tilePositionX = cam.scrollX * 0.04 + t * 1.6;
       whale.tilePositionY = Math.sin(t * 0.15) * 3;
       mid.tilePositionX = cam.scrollX * 0.16 + t * 0.6;
@@ -195,7 +228,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
       }
     },
     destroy() {
-      sky.destroy(); whale.destroy(); mid.destroy(); near.destroy(); lightning?.destroy();
+      sky.destroy(); haze.destroy(); whale.destroy(); mid.destroy(); near.destroy(); lightning?.destroy();
     },
   };
 }

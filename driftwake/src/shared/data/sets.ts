@@ -41,6 +41,12 @@ export const SET_LIST: SetDef[] = [
     pieces: ['eq_armor_blightplate', 'eq_amulet_blightheart_core'],
     bonuses: [{ count: 2, stats: { damagePct: 0.05, maxHp: 60 } }],
   },
+  {
+    id: 'set_vesperheartsong',
+    name: "The Heartsong's Choir",
+    pieces: ['eq_helmet_vesperscale', 'eq_ring_choirsinger'],
+    bonuses: [{ count: 2, stats: { damagePct: 0.06, bossDamagePct: 0.04 } }],
+  },
 
   // --- Crafted sets (Smithing, tier-20 Reinforced armor) ---
   {

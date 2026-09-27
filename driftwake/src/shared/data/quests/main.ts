@@ -526,4 +526,197 @@ export const MAIN_QUESTS: QuestDef[] = [
     objectives: [{ type: 'talk', npcId: 'npc_maren' }],
     rewards: { xp: 1500, gold: 500, items: [{ itemId: 'use_elixir_s', qty: 3 }, { itemId: 'pet_whalecalf', qty: 1 }] },
   },
+
+  // ---------------------------------------------------------------- Act VI — The Drift Beyond
+  {
+    id: 'mq_21_second_whale',
+    name: 'The Second Whale',
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_maren',
+    turnIn: 'npc_archivist_lume',
+    level: 36,
+    reqs: [{ type: 'quest', questId: 'mq_20_epilogue', state: 'completed' }],
+    summary: "A second Skywhale has surfaced from the clouds. Ask Tamsin to fly you out to her.",
+    offer:
+      "Maren is already at the rail when you find her, spyglass raised, knuckles white around it. \"You're going to want to see this. The shockwave from... whatever you did up in Oma's heart — it woke something. Or called it. There's a second whale out there. Bigger than Oma. Older, if the shipwrights are to be believed.\"\n\n\"Tamsin's already fueling the ferry. Go. Whatever's surfacing out there, I have a feeling it's not done with us yet — or we're not done with it.\"",
+    progress: 'Somewhere past the horizon, a second Skywhale drifts, vast and unmoving, waiting to be found.',
+    complete:
+      "The Archivist watches you step off Tamsin's gondola with an expression somewhere between relief and disbelief. \"Living feet, on the Vesper's own back. It has been a very long time since anyone stood here who wasn't already dead. Welcome, small one. There is a great deal to explain.\"",
+    objectives: [
+      { type: 'talk', npcId: 'npc_ferry_tamsin', desc: 'Ask Tamsin about the second whale.' },
+      { type: 'talk', npcId: 'npc_archivist_lume', desc: "Find whoever's in charge at Vesper's Landing." },
+      { type: 'collect', itemId: 'qi_vesper_signal', count: 1, desc: "Bring Tamsin's signal flare to whoever's in charge out here." },
+    ],
+    onAccept: [{ type: 'giveItem', itemId: 'qi_vesper_signal', qty: 1 }],
+    rewards: { xp: 9547, gold: 700, items: [{ itemId: 'use_hp_potion_xl', qty: 2 }] },
+  },
+  {
+    id: 'mq_22_two_more_currents',
+    name: 'Two More Currents',
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_archivist_lume',
+    level: 36,
+    reqs: [{ type: 'quest', questId: 'mq_21_second_whale', state: 'completed' }],
+    summary: 'Hear out Harlan Vane and Cantor Rell, who both came to see the Vesper — and choose whose plan you trust.',
+    offer:
+      "\"You're not the only ones drawn here,\" the Archivist says, not quite hiding her wariness. \"A Harpooner prospector arrived within the week — Vane, he calls himself — already talking about what the Vesper might be worth. And a Tidekeeper cantor came not long after, more interested in what the Vesper might be feeling.\"\n\n\"Talk to them both. I would rather you decide who to trust with open eyes than closed ones. This is not the first time this choice has mattered, is it.\"",
+    progress: "Vane surveys the ruins like a ledger. Cantor Rell listens to them like a hymn. Neither is wrong, exactly.",
+    complete:
+      "The Archivist studies you for a long moment after you speak. \"So. A current chosen again. I confess I hoped this one might be easier the second time. It rarely is.\"",
+    objectives: [
+      { type: 'talk', npcId: 'npc_vane' },
+      { type: 'talk', npcId: 'npc_cantor_rell' },
+    ],
+    rewards: { xp: 10184, gold: 750 },
+    choices: [
+      {
+        id: 'trust_vane',
+        label: 'Trust Vane',
+        description:
+          "Vane's plan is blunt: survey the Vesper for anything worth salvaging before someone less careful does it first. It is the Harpooners' instinct all over again — but Vane, at least, seems to mean the 'careful' part.",
+        rewards: { items: [{ itemId: 'eq_ring_vane_favor' }], reputation: { harpooners: 200 }, flags: { vesper_ally: 'vane' } },
+      },
+      {
+        id: 'trust_cantor',
+        label: 'Trust Cantor Rell',
+        description:
+          "Cantor Rell's plan is patience: listen to the Vesper before assuming anything about her at all. It asks more of your nerves than Vane's plan does, and rather less of the Vesper herself.",
+        rewards: { items: [{ itemId: 'eq_amulet_cantor_favor' }], reputation: { tidekeepers: 200 }, flags: { vesper_ally: 'cantor' } },
+      },
+    ],
+  },
+  {
+    id: 'mq_23_starfall_descent',
+    name: 'Starfall Descent',
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_archivist_lume',
+    level: 37,
+    reqs: [{ type: 'quest', questId: 'mq_22_two_more_currents', state: 'completed' }, { type: 'level', min: 36 }],
+    summary: 'Descend into the Starfall Ruins and clear the star jellies and nebula wisps guarding the old observatory.',
+    offer:
+      "\"Beneath the landing lies the rest of my city,\" the Archivist says, something wistful creeping into her voice. \"Starfall Ruins, we called it — an observatory built to chart a whale we never expected to actually meet. It's not empty. Things that used to be starlight have learned to bite.\"\n\n\"Clear a path, if you can. And bring back star shards where you find them — I want to know how much of the old light still remembers itself.\"",
+    progress: 'The ruins glitter faintly even in the dark, starlight caught in stone that should have gone dead centuries ago.',
+    complete:
+      "The Archivist turns a star shard over in her translucent hands, and for a moment it lights her from within. \"Still bright. Good. That means the rest of the city might still be reachable — and reachable means answerable.\"",
+    objectives: [
+      { type: 'visit', mapId: 'starfall_ruins' },
+      { type: 'kill', monsterId: 'star_jelly', count: 8 },
+      { type: 'kill', monsterId: 'nebula_wisp', count: 6 },
+      { type: 'collect', itemId: 'mat_star_shard', count: 6 },
+    ],
+    rewards: { xp: 11759, gold: 850, items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+  },
+  {
+    id: 'mq_24_the_drowned_choir',
+    name: 'The Drowned Choir',
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_archivist_lume',
+    level: 38,
+    reqs: [{ type: 'quest', questId: 'mq_23_starfall_descent', state: 'completed' }, { type: 'level', min: 37 }],
+    summary: 'Hunt the void rays haunting the drowned observatory and recover whatever pages of my ledger they still carry.',
+    offer:
+      "\"Void rays,\" the Archivist says, distaste plain in her voice. \"Things that swim in the gaps between clouds, where no light should be able to reach at all. They've been circling the deepest archive vaults for longer than I've been paying attention. I suspect they're carrying pieces of my own ledger — scattered when the city drowned.\"\n\n\"Thin them out. Recover anything they're carrying. I would very much like my own handwriting back.\"",
+    progress: 'The void rays drift through the dark like tears in the world, each one trailing faint scraps of old parchment.',
+    complete:
+      "The Archivist presses the recovered ledger pages to what might, once, have been a chest. \"My own words, after all this time. Thank you. Now — now we climb, small one. The spire is close, and it remembers more than I do.\"",
+    objectives: [
+      { type: 'kill', monsterId: 'void_ray', count: 8 },
+      { type: 'collect', itemId: 'qi_archivist_ledger', count: 3 },
+    ],
+    rewards: { xp: 13458, gold: 950, items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+  },
+  {
+    id: 'mq_25_singers_spire',
+    name: "The Singer's Spire",
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_archivist_lume',
+    turnIn: 'npc_archivist_lume',
+    level: 39,
+    reqs: [{ type: 'quest', questId: 'mq_24_the_drowned_choir', state: 'completed' }, { type: 'level', min: 38 }],
+    summary: "Climb Singer's Spire and gather choir fragments from the constructs my kin left watching.",
+    offer:
+      "\"The spire itself still stands,\" the Archivist says, gazing up through the ruin's broken roof at something you can't quite see yet. \"We built constructs to watch it in our absence — singer constructs, echo knights. They are still watching. They no longer remember why.\"\n\n\"Climb it. Gather what fragments of song you can from the constructs you defeat — enough of them, together, should sound like a sentence instead of a note. I need that sentence before we go any further down.\"",
+    progress: "Singer's Spire hums with old, half-forgotten purpose, every construct still faithfully at its post.",
+    complete:
+      "The Archivist arranges the choir fragments into something that almost, finally, resolves into words. \"There. I can nearly hear what we built this place to say. One more step, and I think we'll have the whole of it.\"",
+    objectives: [
+      { type: 'visit', mapId: 'singers_spire' },
+      { type: 'kill', monsterId: 'singer_construct', count: 7 },
+      { type: 'kill', monsterId: 'echo_knight', count: 7 },
+      { type: 'collect', itemId: 'qi_choir_fragment', count: 6 },
+    ],
+    rewards: { xp: 15659, gold: 1100, items: [{ itemId: 'mat_enhance_stone_3', qty: 1 }] },
+  },
+  {
+    id: 'mq_26_the_calling',
+    name: 'The Calling',
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_archivist_lume',
+    level: 40,
+    reqs: [{ type: 'quest', questId: 'mq_25_singers_spire', state: 'completed' }, { type: 'level', min: 39 }],
+    summary: "Clear the comet beetles guarding the descent, then bring Vane and Cantor Rell to the spire before the way to the Vesper's core opens.",
+    offer:
+      "\"The choir's sentence, translated as best I can, is simple: 'something is hurting, and it is listening for an answer,'\" the Archivist says. \"Before we go down and give her one, I want your allies — whichever you chose — standing here with us. This ending should not belong to only one of us.\"\n\n\"Clear the comet beetles roosting on the descent first. They won't let anyone pass quietly, allies included.\"",
+    progress: 'The descent rattles with comet beetles, and somewhere far below, something enormous keeps almost-breathing.',
+    complete:
+      "Vane and Cantor Rell both arrive at the spire's edge, for once not arguing. The Archivist looks between the three of you. \"Good. Whatever happens down there, it happens with all of you watching. That matters more than any of you probably realize.\"",
+    objectives: [
+      { type: 'kill', monsterId: 'comet_beetle', count: 8 },
+      { type: 'talk', npcId: 'npc_vane' },
+      { type: 'talk', npcId: 'npc_cantor_rell' },
+    ],
+    rewards: { xp: 17640, gold: 1250, items: [{ itemId: 'mat_enhance_stone_3', qty: 1 }] },
+  },
+  {
+    id: 'mq_27_vesper_heartsong',
+    name: 'The Vesper Heartsong',
+    type: 'main',
+    chapter: 6,
+    giver: 'npc_archivist_lume',
+    level: 40,
+    reqs: [{ type: 'quest', questId: 'mq_26_the_calling', state: 'completed' }, { type: 'level', min: 40 }],
+    summary: 'Descend to the Vesper\'s core, face the Heartsong, and decide what an old, old wound deserves this time.',
+    offer:
+      "\"Whatever wakes at the bottom of the spire, it is not the Blight. It is older, and stranger, and — I think — simply in pain, the way anything left alone with a wound for long enough becomes,\" the Archivist says. \"You have already answered this question once, for Oma. I do not know if that makes this easier or harder for you.\"\n\n\"Go. Listen first, if you can manage it. Then decide.\"",
+    progress: "The Vesper's core pulses far below, starlight and old grief in equal measure.",
+    complete:
+      "The Heartsong falls silent, and for the first time since you arrived, the whole spire seems to exhale. Whatever you chose to do about it, the Archivist watches you with something that might, finally, be hope.",
+    objectives: [
+      { type: 'visit', mapId: 'vesper_core' },
+      { type: 'boss', monsterId: 'vesper_heartsong' },
+      { type: 'collect', itemId: 'qi_vesper_song', count: 1 },
+    ],
+    rewards: { xp: 19600, gold: 1500 },
+    choices: [
+      {
+        id: 'harvest_song',
+        label: "Harvest the Vesper's Song",
+        description:
+          "You take the last of the Heartsong's power for your own use, the same choice the Harpooners would make of Oma's Ember given the chance. Efficient. Final. It does not feel as satisfying the second time.",
+        rewards: { items: [{ itemId: 'eq_amulet_vesper_harvest' }], flags: { vesper_ending: 'harvest' }, title: 'Star-Harvester', reputation: { harpooners: 300 } },
+      },
+      {
+        id: 'let_it_drift',
+        label: 'Let the Vesper Drift On',
+        description:
+          "You let the wound close on its own terms, and let the Vesper drift wherever she chooses next. It costs you the Heartsong's power outright — and gains you something else instead.",
+        rewards: { items: [{ itemId: 'eq_ring_vesper_drift' }], flags: { vesper_ending: 'drift' }, title: 'Vesper-Warden', reputation: { tidekeepers: 300 } },
+      },
+      {
+        id: 'sing_the_last_song',
+        label: 'Sing the Last Song Together',
+        description:
+          "Because you already sang one whale back from the brink with both mercy and courage, you know exactly how to do it again — not harvest, not distance, but a second duet, rarer for being repeated at all.",
+        reqs: [{ type: 'flag', flag: 'ending', value: 'song' }],
+        lockedHint: "This ending remembers the first duet: only those who sang Oma back together may sing this one too.",
+        rewards: { items: [{ itemId: 'eq_amulet_vesper_songbound' }], flags: { vesper_ending: 'song' }, title: 'Twice-Songbound' },
+      },
+    ],
+  },
 ];

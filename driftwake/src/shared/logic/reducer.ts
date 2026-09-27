@@ -169,6 +169,7 @@ function applyDialogueActions(s: CharacterState, events: GameEvent[], actions: D
           s.mapId = a.mapId; s.position = { x: -1, y: -1 };
           if (!s.discoveredMaps.includes(a.mapId)) s.discoveredMaps.push(a.mapId);
           if (dm.town) s.townMapId = a.mapId;
+          forEachActiveQuestObjective(s, events, (o) => o.type === 'visit' && (o as any).mapId === a.mapId, () => 1);
           events.push({ type: 'mapChanged', mapId: a.mapId, portalId: a.portalId, x: -1, y: -1 });
         }
         break;
@@ -619,6 +620,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
         s.mapId = dest; s.position = { x: -1, y: -1 };
         if (!s.discoveredMaps.includes(dest)) s.discoveredMaps.push(dest);
         if (destMap.town) s.townMapId = dest;
+        forEachActiveQuestObjective(s, events, (o) => o.type === 'visit' && (o as any).mapId === dest, () => 1);
         events.push({ type: 'mapChanged', mapId: dest, x: -1, y: -1 });
       }
       if (use.learnRecipe && !s.knownRecipes.includes(use.learnRecipe)) {

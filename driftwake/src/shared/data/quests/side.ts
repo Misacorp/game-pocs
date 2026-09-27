@@ -1088,6 +1088,140 @@ const HOLLOW_QUESTS: QuestDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// VESPER'S LANDING — Act VI side content (levels 36-40)
+// ---------------------------------------------------------------------------
+
+const VESPER_QUESTS: QuestDef[] = [
+  {
+    id: 'sq_vesper_bryns_orders',
+    name: "Bryn's First Orders",
+    type: 'side',
+    giver: 'npc_bryn_wick',
+    level: 36,
+    reqs: [{ type: 'level', min: 36 }],
+    summary: 'Fetch a fresh haul of star shards and void scales for Bryn Wick\'s new stall.',
+    offer:
+      "\"Set up shop three days ago and I'm already out of stock,\" Bryn says, only half-joking. \"Star shards, void scales, whatever's got a market on somebody's belt out here. Bring me a haul and I'll make it worth the trip.\"",
+    progress: '"Star shards, void scales. You know the drill by now, I hope."',
+    complete: '"Now THAT\'S a stockroom. Thank you — truly, business has never moved this fast."',
+    objectives: [
+      { type: 'collect', itemId: 'mat_star_shard', count: 6 },
+      { type: 'collect', itemId: 'mat_void_scale', count: 6 },
+    ],
+    rewards: { xp: qxp(36), gold: qgold(36, 16), items: [{ itemId: 'use_hp_potion_xl', qty: 1 }] },
+  },
+  {
+    id: 'sq_vesper_archivists_memory',
+    name: "The Archivist's Memory",
+    type: 'side',
+    giver: 'npc_archivist_lume',
+    level: 37,
+    reqs: [{ type: 'level', min: 36 }],
+    summary: 'Recover a stargazer\'s charm from the ruins — and decide whether the Archivist should have it back.',
+    offer:
+      "\"Before I was only an echo, I had a friend who wore a little charm shaped like a whale mid-breach,\" the Archivist says, wistful in a way that seems to cost her something. \"I have not seen it since the city drowned. If it still exists, it will be somewhere in the deeper ruins.\"",
+    progress: "\"Search the ruins carefully. It's small, and it's been a very long time.\"",
+    complete: "You find it wedged in coral-choked stone, tarnished but whole. The Archivist goes very still at the sight of it.",
+    objectives: [
+      { type: 'visit', mapId: 'starfall_ruins' },
+      { type: 'collect', itemId: 'qi_stargazers_charm', count: 1 },
+    ],
+    onAccept: [{ type: 'giveItem', itemId: 'qi_stargazers_charm', qty: 1 }],
+    rewards: { xp: qxp(37), gold: qgold(37, 10) },
+    choices: [
+      {
+        id: 'charm_return',
+        label: 'Give the charm back to the Archivist',
+        description: 'Some things belong to the person who lost them, however long ago.',
+        completeText:
+          "The Archivist holds the charm like it might dissolve, and for a moment her translucent form looks almost solid. \"Thank you. I did not know how much I still wanted this until you put it in my hand.\"",
+        rewards: { xp: qxp(37, 0.25), gold: qgold(37, 6), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+      },
+      {
+        id: 'charm_keep',
+        label: 'Keep the charm as a memento',
+        description: "The Archivist won't begrudge you a keepsake from a drowned world, surely.",
+        completeText:
+          "\"...Keep it, then,\" the Archivist says, quieter than before. \"I have kept far less generous company than a thief with a kind excuse.\" She does not sound angry. She does not quite sound fine, either.",
+        rewards: { xp: qxp(37, 0.15), gold: qgold(37, 16), items: [{ itemId: 'qi_stargazers_charm', qty: 1 }] },
+      },
+    ],
+  },
+  {
+    id: 'sq_vesper_vane_prospecting',
+    name: "Vane's Prospecting Claim",
+    type: 'side',
+    giver: 'npc_vane',
+    level: 37,
+    reqs: [{ type: 'level', min: 37 }],
+    summary: "Clear singer constructs from a vein of star shards Vane wants to claim — then decide who gets the haul.",
+    offer:
+      "\"Found a vein of star shards worth a fortune, guarded by a handful of those construct things,\" Vane says, all business. \"Clear them out, bring me the haul, and I'll cut you in properly. Or — if you'd rather — hand it to the Cantor instead. Your call, not mine to make twice.\"",
+    progress: '"Constructs, then the haul. In that order, ideally."',
+    complete: 'Vane counts the shards with the satisfaction of a man who was right about something.',
+    objectives: [
+      { type: 'kill', monsterId: 'singer_construct', count: 6 },
+      { type: 'collect', itemId: 'mat_star_shard', count: 5 },
+    ],
+    rewards: { xp: qxp(37, 0.15), gold: qgold(37, 8) },
+    choices: [
+      {
+        id: 'claim_vane',
+        label: 'Hand the haul to Vane',
+        description: 'Coin now, no questions asked.',
+        completeText: '"Knew you were the sensible sort. Pleasure doing business." Vane counts out a generous cut without being asked twice.',
+        rewards: { xp: qxp(37, 0.2), gold: qgold(37, 24), reputation: { harpooners: 100 } },
+      },
+      {
+        id: 'claim_cantor',
+        label: 'Give the haul to Cantor Rell instead',
+        description: "Let the shards go somewhere Vane won't immediately monetize.",
+        completeText: 'Vane\'s jaw tightens, but he doesn\'t argue. "...Fine. Your call. Was always going to be, wasn\'t it." Cantor Rell, when you find her, hums something grateful under her breath.',
+        rewards: { xp: qxp(37, 0.3), gold: qgold(37, 6), reputation: { tidekeepers: 100 }, items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+      },
+    ],
+  },
+  {
+    id: 'sq_vesper_cantors_hymn',
+    name: "Cantor's Unfinished Hymn",
+    type: 'side',
+    giver: 'npc_cantor_rell',
+    level: 38,
+    reqs: [{ type: 'level', min: 38 }],
+    summary: 'Gather fragments of the nebula wisps\' song for a hymn Cantor Rell has been composing.',
+    offer:
+      "\"The nebula wisps carry pieces of a melody I can't quite finish alone,\" Cantor Rell says, eyes still closed, listening. \"If you could gather a few fragments — gently, if you can manage gently — I think I could complete it.\"",
+    progress: '"The wisps, when you have a moment. No rush the song hasn\'t waited this long to be rude about it."',
+    complete: 'Cantor Rell hums the completed hymn once, softly, and something in the wind seems to settle.',
+    objectives: [
+      { type: 'kill', monsterId: 'nebula_wisp', count: 8 },
+      { type: 'collect', itemId: 'mat_star_shard', count: 4 },
+    ],
+    rewards: {
+      xp: qxp(38),
+      gold: qgold(38, 14),
+      items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }],
+      chooseOne: [{ itemId: 'eq_wand_starforged' }, { itemId: 'eq_knives_starforged' }, { itemId: 'eq_gun_starforged' }, { itemId: 'eq_amulet_vesper_chorus' }],
+    },
+  },
+  {
+    id: 'sq_vesper_comet_watch',
+    name: 'Comet Watch',
+    type: 'side',
+    giver: 'npc_archivist_lume',
+    level: 39,
+    reqs: [{ type: 'level', min: 39 }],
+    summary: "Clear comet beetles threatening the spire's lower stair before the descent opens for good.",
+    offer:
+      "\"Comet beetles have been nesting on the lower stair since long before I lost count of the years,\" the Archivist says. \"They were never a threat to anyone drowned. They will absolutely be a threat to you.\"",
+    progress: '"The lower stair, when you\'re ready. Mind the charge — they don\'t telegraph kindly."',
+    complete: 'The stair goes quiet, for the first time in longer than the Archivist can remember.',
+    objectives: [{ type: 'kill', monsterId: 'comet_beetle', count: 8 }],
+    rewards: { xp: qxp(39), gold: qgold(39, 14), items: [{ itemId: 'mat_enhance_stone_3', qty: 1 }] },
+  },
+];
+
+// ---------------------------------------------------------------------------
 // DAILY / REPEATABLE (bounty board style)
 // ---------------------------------------------------------------------------
 
@@ -1268,6 +1402,44 @@ const DAILY_QUESTS: QuestDef[] = [
     rewards: { xp: qxp(5, 0.15), gold: qgold(5, 12), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }] },
     repeatable: { cooldownMs: 20 * 3600 * 1000 },
   },
+  {
+    id: 'dq_starfall_bounty',
+    name: 'Bounty: Starfall Cleanup',
+    type: 'daily',
+    giver: 'npc_bryn_wick',
+    level: 36,
+    reqs: [{ type: 'level', min: 36 }],
+    summary: 'Standing bounty on star jellies and nebula wisps in the Starfall Ruins.',
+    offer: '"Standing order, same as any bounty board," Bryn says. "Star jellies and nebula wisps, thin them when you pass through. I\'ll make it worth the detour."',
+    progress: '"Jellies and wisps. The ruins never run short."',
+    complete: '"Nicely done. Come back whenever — the ruins restock faster than my shelves do."',
+    objectives: [
+      { type: 'kill', monsterId: 'star_jelly', count: 10 },
+      { type: 'kill', monsterId: 'nebula_wisp', count: 8 },
+    ],
+    rewards: { xp: qxp(36, 0.15), gold: qgold(36, 18), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+    repeatable: { cooldownMs: 20 * 3600 * 1000 },
+  },
+  {
+    id: 'dq_spire_bounty',
+    name: 'Bounty: Silence the Spire',
+    type: 'daily',
+    giver: 'npc_archivist_lume',
+    level: 39,
+    reqs: [{ type: 'level', min: 38 }],
+    summary: 'Standing task: thin the constructs and beetles still patrolling the Singer\'s Spire.',
+    offer:
+      '"The spire rebuilds its guard faster than I would like," the Archivist says. "Singer constructs, echo knights, comet beetles — thin them when you\'re able. A standing task, I\'m afraid, same as the wraiths were for the Echo before me."',
+    progress: '"Constructs, knights, beetles. The usual climb."',
+    complete: '"Quieter, for now. My thanks — truly, every time you make this trip."',
+    objectives: [
+      { type: 'kill', monsterId: 'singer_construct', count: 6 },
+      { type: 'kill', monsterId: 'echo_knight', count: 6 },
+      { type: 'kill', monsterId: 'comet_beetle', count: 6 },
+    ],
+    rewards: { xp: qxp(39, 0.15), gold: qgold(39, 18), items: [{ itemId: 'mat_enhance_stone_3', qty: 1 }] },
+    repeatable: { cooldownMs: 20 * 3600 * 1000 },
+  },
 ];
 
 export const SIDE_QUESTS: QuestDef[] = [
@@ -1276,5 +1448,6 @@ export const SIDE_QUESTS: QuestDef[] = [
   ...STORMBREAK_QUESTS,
   ...LANTERNREEF_QUESTS,
   ...HOLLOW_QUESTS,
+  ...VESPER_QUESTS,
   ...DAILY_QUESTS,
 ];

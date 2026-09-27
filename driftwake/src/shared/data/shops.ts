@@ -138,4 +138,21 @@ export const SHOP_LIST: ShopDef[] = [
       { itemId: 'pet_lanternfish' },
     ],
   },
+  {
+    id: 'shop_vesper',
+    name: "Bryn Wick's Landing Stall",
+    items: [
+      { itemId: 'use_hp_potion_xl' },
+      { itemId: 'use_mp_potion_xl' },
+      { itemId: 'use_return_scroll' },
+      ...weaponSet('voidforged', 35),
+      ...weaponSet('starforged', 40),
+      { itemId: 'eq_armor_starguard', reqs: lvl(40) },
+      { itemId: 'eq_armor_voidsilk', reqs: lvl(40) },
+      { itemId: 'eq_armor_choirhide', reqs: lvl(40) },
+      { itemId: 'eq_ring_starlight_signet', reqs: lvl(38) },
+      { itemId: 'eq_amulet_vesper_chorus', reqs: lvl(39) },
+      { itemId: 'use_whetstone_4', reqs: lvl(30) },
+    ],
+  },
 ];

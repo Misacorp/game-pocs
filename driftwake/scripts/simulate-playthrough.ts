@@ -15,7 +15,7 @@ import type {
 import { EQUIP_SLOTS } from '../src/shared/types';
 import type { ClientAction, ActionResult, GameEvent } from '../src/shared/protocol';
 import {
-  MAPS, NPCS, MONSTERS, ITEMS, QUESTS, RECIPES, SHOPS, GATHER_NODES, JOBS,
+  MAPS, NPCS, MONSTERS, ITEMS, QUESTS, RECIPES, SHOPS, GATHER_NODES, JOBS, DIALOGUES,
 } from '../src/shared/data';
 import {
   createCharacter, handleAction, createSession, checkConditions, getQuestState, countItem,
@@ -124,7 +124,37 @@ for (const q of Object.values(QUESTS)) for (const rid of q.rewards.recipes ?? []
 
 // ---------------------------------------------------------------------------
 // Map graph / navigation
+//
+// Edges are either a real MapDef portal (walked via `changeMap`) or a "ferry edge": any
+// {mapId, cost, conditions} teleport option offered by an NPC placed on multiple maps (e.g.
+// npc_ferry_tamsin's Skyferry), walked via `dialogueAction` + `teleport`. Some maps (like
+// vesper_landing) are ONLY reachable this way, so the sim must know about both edge kinds.
 // ---------------------------------------------------------------------------
+
+interface FerryEdge { from: string; to: string; npcId: string; cost: number; reqs?: Condition[]; action: import('../src/shared/types').DialogueAction }
+
+const FERRY_EDGES: FerryEdge[] = (() => {
+  const edges: FerryEdge[] = [];
+  for (const npc of Object.values(NPCS)) {
+    if (!npc.dialogue) continue;
+    const dlg = DIALOGUES[npc.dialogue];
+    if (!dlg) continue;
+    const fromMaps = Object.values(MAPS).filter((m) => m.npcs.some((p) => p.npcId === npc.id)).map((m) => m.id);
+    if (fromMaps.length < 2) continue; // needs to be placed on 2+ maps to actually connect anything
+    for (const node of Object.values(dlg.nodes)) {
+      for (const opt of node.options ?? []) {
+        for (const act of opt.actions ?? []) {
+          if (act.type !== 'teleport' || !MAPS[act.mapId]) continue;
+          for (const from of fromMaps) {
+            if (from === act.mapId) continue;
+            edges.push({ from, to: act.mapId, npcId: npc.id, cost: act.cost ?? 0, reqs: opt.conditions, action: act });
+          }
+        }
+      }
+    }
+  }
+  return edges;
+})();
 
 function reachableSet(respectReqs: boolean): Set<string> {
   const seen = new Set<string>([state.mapId]);
@@ -132,38 +162,53 @@ function reachableSet(respectReqs: boolean): Set<string> {
   while (queue.length) {
     const cur = queue.shift()!;
     const map = MAPS[cur];
-    if (!map) continue;
-    for (const portal of map.portals) {
+    for (const portal of map?.portals ?? []) {
       if (seen.has(portal.to)) continue;
       if (respectReqs && !checkConditions(state, portal.reqs)) continue;
       seen.add(portal.to);
       queue.push(portal.to);
     }
+    for (const edge of FERRY_EDGES) {
+      if (edge.from !== cur || seen.has(edge.to)) continue;
+      if (respectReqs && !checkConditions(state, edge.reqs)) continue;
+      seen.add(edge.to);
+      queue.push(edge.to);
+    }
   }
   return seen;
 }
 
-function bfsPath(targetMapId: string, respectReqs: boolean): string[] | null {
+interface PathStep { to: string; kind: 'portal' | 'ferry'; portalId?: string; edge?: FerryEdge }
+
+function bfsPath(targetMapId: string, respectReqs: boolean): PathStep[] | null {
   if (state.mapId === targetMapId) return [];
-  const prev = new Map<string, string>();
+  const prev = new Map<string, { from: string; step: PathStep }>();
   const seen = new Set<string>([state.mapId]);
   const queue = [state.mapId];
   while (queue.length) {
     const cur = queue.shift()!;
     const map = MAPS[cur];
-    if (!map) continue;
-    for (const portal of map.portals) {
-      if (seen.has(portal.to)) continue;
-      if (respectReqs && !checkConditions(state, portal.reqs)) continue;
-      seen.add(portal.to);
-      prev.set(portal.to, cur);
-      if (portal.to === targetMapId) {
-        const path = [portal.to];
+    const candidates: PathStep[] = [
+      ...(map?.portals ?? []).map((p): PathStep => ({ to: p.to, kind: 'portal', portalId: p.id })),
+      ...FERRY_EDGES.filter((e) => e.from === cur).map((e): PathStep => ({ to: e.to, kind: 'ferry', edge: e })),
+    ];
+    for (const step of candidates) {
+      if (seen.has(step.to)) continue;
+      const reqs = step.kind === 'portal' ? map!.portals.find((p) => p.id === step.portalId)!.reqs : step.edge!.reqs;
+      if (respectReqs && !checkConditions(state, reqs)) continue;
+      seen.add(step.to);
+      prev.set(step.to, { from: cur, step });
+      if (step.to === targetMapId) {
+        const path: PathStep[] = [step];
         let cursor = cur;
-        while (cursor !== state.mapId) { path.unshift(cursor); cursor = prev.get(cursor)!; }
+        while (cursor !== state.mapId) {
+          const p = prev.get(cursor)!;
+          path.unshift(p.step);
+          cursor = p.from;
+        }
         return path;
       }
-      queue.push(portal.to);
+      queue.push(step.to);
     }
   }
   return null;
@@ -174,7 +219,8 @@ function isReachable(mapId: string): boolean {
   return bfsPath(mapId, true) !== null;
 }
 
-/** Navigate the player through real changeMap actions to targetMapId. Reports blockers. */
+/** Navigate the player through real changeMap actions (and, where that's the only route, ferry
+ * dialogueAction teleports) to targetMapId. Reports blockers. */
 function navigateTo(targetMapId: string): boolean {
   if (!MAPS[targetMapId]) { blocker(`navigateTo: unknown map '${targetMapId}'`); return false; }
   if (state.mapId === targetMapId) return true;
@@ -182,25 +228,38 @@ function navigateTo(targetMapId: string): boolean {
   if (!path) {
     const ignoring = bfsPath(targetMapId, false);
     if (ignoring) {
-      // Find the first portal along the ignoring-reqs path whose reqs currently fail, for a useful message.
+      // Find the first edge along the ignoring-reqs path whose reqs currently fail, for a useful message.
       let cursor = state.mapId;
       let detail = '';
-      for (const nextId of ignoring) {
-        const cm = MAPS[cursor];
-        const portal = cm?.portals.find((p) => p.to === nextId);
-        if (portal && !checkConditions(state, portal.reqs)) { detail = `portal '${portal.id}' on '${cursor}' -> '${nextId}' reqs not met: ${JSON.stringify(portal.reqs)} (${portal.lockedText ?? ''})`; break; }
-        cursor = nextId;
+      for (const step of ignoring) {
+        if (step.kind === 'portal') {
+          const cm = MAPS[cursor];
+          const portal = cm?.portals.find((p) => p.id === step.portalId);
+          if (portal && !checkConditions(state, portal.reqs)) { detail = `portal '${portal.id}' on '${cursor}' -> '${step.to}' reqs not met: ${JSON.stringify(portal.reqs)} (${portal.lockedText ?? ''})`; break; }
+        } else if (!checkConditions(state, step.edge!.reqs)) {
+          detail = `ferry '${step.edge!.npcId}' on '${cursor}' -> '${step.to}' reqs not met: ${JSON.stringify(step.edge!.reqs)}`;
+          break;
+        }
+        cursor = step.to;
       }
-      blocker(`Portal reqs block the route from '${state.mapId}' to '${targetMapId}': ${detail}`);
+      blocker(`Route reqs block the path from '${state.mapId}' to '${targetMapId}': ${detail}`);
     } else {
-      blocker(`Map '${targetMapId}' is not reachable from '${state.mapId}' via any portal chain (disconnected map graph).`);
+      blocker(`Map '${targetMapId}' is not reachable from '${state.mapId}' via any portal or ferry chain (disconnected map graph).`);
     }
     return false;
   }
-  for (const nextMap of path) {
-    const res = dispatch({ type: 'changeMap', mapId: nextMap }, `-> ${nextMap}`);
-    if (!res.ok) { blocker(`changeMap to '${nextMap}' failed: ${res.error}`); return false; }
-    timeMs += 20_000;
+  for (const step of path) {
+    if (step.kind === 'portal') {
+      const res = dispatch({ type: 'changeMap', mapId: step.to }, `-> ${step.to}`);
+      if (!res.ok) { blocker(`changeMap to '${step.to}' failed: ${res.error}`); return false; }
+      timeMs += 20_000;
+    } else {
+      const edge = step.edge!;
+      if (edge.cost > 0) ensureGold(edge.cost);
+      const res = dispatch({ type: 'dialogueAction', npcId: edge.npcId, action: edge.action }, `ferry -> ${step.to}`);
+      if (!res.ok) { blocker(`Ferry teleport to '${step.to}' via '${edge.npcId}' failed: ${res.error}`); return false; }
+      timeMs += 30_000;
+    }
   }
   return true;
 }
@@ -672,6 +731,16 @@ function choiceIdFor(quest: QuestDef): string | undefined {
       blocker(`Intended ending '${strategy.finalEnding}' is locked at mq_19_heart (reqs: ${JSON.stringify(wanted?.reqs)}) — falling back to 'purify'.`);
       return 'purify';
     }
+    case 'mq_22_two_more_currents': return strategy.faction === 'harpooners' ? 'trust_vane' : 'trust_cantor';
+    case 'mq_27_vesper_heartsong': {
+      // Mirror the mq_19 ending where possible: the 'true' duet is only unlocked for runs that
+      // sang Oma back together; harpooner/tidekeeper runs harvest or let the Vesper drift instead.
+      const wantedId = strategy.finalEnding === 'sing_together' ? 'sing_the_last_song' : strategy.finalEnding === 'harvest' ? 'harvest_song' : 'let_it_drift';
+      const wanted = quest.choices.find((c) => c.id === wantedId);
+      if (wanted && (!wanted.reqs || checkConditions(state, wanted.reqs))) return wantedId;
+      blocker(`Intended Vesper ending '${wantedId}' is locked at mq_27_vesper_heartsong (reqs: ${JSON.stringify(wanted?.reqs)}) — falling back to 'let_it_drift'.`);
+      return 'let_it_drift';
+    }
     case 'jq_vanguard': case 'jq_stormcaller': case 'jq_windrunner': case 'jq_shade':
       return strategy.jobAdvance;
     case 'sq_driftmoor_wren_kite': return 'kite_honest';
@@ -909,6 +978,9 @@ const MAIN_ORDER = [
   'mq_10_old_tangle', 'mq_11_updraft', 'mq_11b_skyships_down', 'mq_12_kraelith',
   'mq_13_glowtide', 'mq_14_lamplighter', 'mq_15_logbook', 'mq_16_captain',
   'mq_17_inside', 'mq_18_echoes', 'mq_19_heart', 'mq_20_epilogue',
+  // Act VI — The Drift Beyond (post-game)
+  'mq_21_second_whale', 'mq_22_two_more_currents', 'mq_23_starfall_descent', 'mq_24_the_drowned_choir',
+  'mq_25_singers_spire', 'mq_26_the_calling', 'mq_27_vesper_heartsong',
 ];
 
 function tryOpportunisticQuests() {

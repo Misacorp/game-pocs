@@ -93,4 +93,52 @@ export const QUEST_ITEMS: ItemDef[] = [
     sellPrice: 0,
     quest: true,
   },
+
+  // -------------------------------------------------------------------------
+  // Act VI — The Drift Beyond (post-game, mq_21..mq_27)
+  // -------------------------------------------------------------------------
+  {
+    id: 'qi_vesper_signal',
+    name: "Tamsin's Signal Flare",
+    description: 'A spent flare, still warm. Tamsin fired it the moment the second whale broke the clouds — proof, if anyone doubted her.',
+    category: 'etc',
+    rarity: 'common',
+    icon: { shape: 'lantern', colors: ['#8ae0ff', '#4a6bff'] },
+    stack: 99,
+    sellPrice: 0,
+    quest: true,
+  },
+  {
+    id: 'qi_archivist_ledger',
+    name: "The Archivist's Ledger",
+    description: 'A waterlogged, star-charted ledger kept by whoever tended the drowned observatory. The handwriting shifts, as if several hands once shared it.',
+    category: 'etc',
+    rarity: 'uncommon',
+    icon: { shape: 'book', colors: ['#4a2a8a', '#ffd24a'] },
+    stack: 99,
+    sellPrice: 0,
+    quest: true,
+  },
+  {
+    id: 'qi_choir_fragment',
+    name: 'Choir Fragment',
+    description: "A splinter of song-construct, still humming a note in a scale no living choir sings. Six or seven, together, sound like a sentence.",
+    category: 'etc',
+    rarity: 'uncommon',
+    icon: { shape: 'crystal', colors: ['#8ae0ff', '#ffd24a'] },
+    stack: 99,
+    sellPrice: 0,
+    quest: true,
+  },
+  {
+    id: 'qi_vesper_song',
+    name: "The Vesper's Last Note",
+    description: "A single held note, somehow carried out of the Heartsong's chamber in your open hands. It has not faded yet. You suspect it never will.",
+    category: 'etc',
+    rarity: 'epic',
+    icon: { shape: 'core', colors: ['#ffd24a', '#3a2a6a'] },
+    stack: 99,
+    sellPrice: 0,
+    quest: true,
+  },
 ];

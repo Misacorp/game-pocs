@@ -205,6 +205,12 @@ export const TOWN_DIALOGUES: DialogueDef[] = [
             conditions: [{ type: 'quest', questId: 'mq_13_glowtide', state: 'completed' }],
             actions: [{ type: 'teleport', mapId: 'glowtide_shallows', cost: 100 }],
           },
+          {
+            text: "Take me to Vesper's Landing",
+            next: 'travel_vesper',
+            conditions: [{ type: 'quest', questId: 'mq_20_epilogue', state: 'completed' }],
+            actions: [{ type: 'teleport', mapId: 'vesper_landing', cost: 150 }],
+          },
         ],
       },
       ferry_info: {
@@ -212,6 +218,9 @@ export const TOWN_DIALOGUES: DialogueDef[] = [
       },
       travel_done: {
         text: '"Hold onto your hat!" The gondola lurches into the wind.',
+      },
+      travel_vesper: {
+        text: '"Hold onto your hat — and maybe your nerve, too." Tamsin\'s gondola climbs higher than you\'ve ever flown it, straight toward the second whale breaking the clouds.',
       },
     },
   },

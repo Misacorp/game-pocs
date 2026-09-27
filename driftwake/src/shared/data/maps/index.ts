@@ -4,6 +4,7 @@ import { FINREACH_MAPS } from './finreach';
 import { STORMBREAK_MAPS } from './stormbreak';
 import { LANTERNREEF_MAPS } from './lanternreef';
 import { HOLLOW_MAPS } from './hollow';
+import { DRIFT_MAPS } from './drift';
 
 /**
  * Geometry normalization applied to every authored map so small authoring slips can't
@@ -27,4 +28,4 @@ function normalizeMap(m: MapDef): MapDef {
   return { ...m, platforms, ropes };
 }
 
-export const MAP_LIST: MapDef[] = [...DRIFTMOOR_MAPS, ...FINREACH_MAPS, ...STORMBREAK_MAPS, ...LANTERNREEF_MAPS, ...HOLLOW_MAPS].map(normalizeMap);
+export const MAP_LIST: MapDef[] = [...DRIFTMOOR_MAPS, ...FINREACH_MAPS, ...STORMBREAK_MAPS, ...LANTERNREEF_MAPS, ...HOLLOW_MAPS, ...DRIFT_MAPS].map(normalizeMap);

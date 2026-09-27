@@ -4,7 +4,7 @@
  * class/job/weapon combination shares one code path.
  */
 import Phaser from 'phaser';
-import type { WeaponType, ClassId } from '@shared/types';
+import type { WeaponType, ClassId, JobId } from '@shared/types';
 import {
   makeCanvas, ctx2d, outlined, rect, rrect, circle, ellipse, line, poly,
   registerSpriteSheet, ensureAnim, shade, hashStr,
@@ -15,7 +15,7 @@ import type { CharacterLook, SpriteInfo } from './spec';
 const FW = 32, FH = 40, CX = 16;
 
 interface Pose {
-  headBob: number; crouch: number; lying: boolean; climb: boolean;
+  headBob: number; crouch: number; chest: number; lying: boolean; climb: boolean;
   legFrontA: number; legBackA: number; legFrontL: number; legBackL: number;
   armFrontA: number; armBackA: number;
   weaponDeg: number; weaponHand: 'front' | 'back' | 'both';
@@ -25,12 +25,21 @@ interface Pose {
 
 function basePose(): Pose {
   return {
-    headBob: 0, crouch: 0, lying: false, climb: false,
+    headBob: 0, crouch: 0, chest: 0, lying: false, climb: false,
     legFrontA: 0, legBackA: 0, legFrontL: 9, legBackL: 9,
     armFrontA: 5, armBackA: -5,
     weaponDeg: 100, weaponHand: 'front', mouth: 'smile',
   };
 }
+
+/** Fixed "elemental identity" tints per tier-2 job, so a specialization reads at a glance
+ *  regardless of the player's chosen armor colors — layered on top of the tier-1 silhouette. */
+const JOB_ACCENT: Partial<Record<JobId, string>> = {
+  bulwark: '#c9d6de', reaver: '#c93a3a',
+  tempest: '#ffe066', tidesinger: '#8fe0ff',
+  skyhunter: '#e8dcb0', sparkgunner: '#caa64a',
+  duskblade: '#d6dde3', hexslinger: '#b25be0',
+};
 
 function weaponDefaults(t?: WeaponType): string[] {
   switch (t) {
@@ -65,15 +74,18 @@ function drawWeapon(ctx: CanvasRenderingContext2D, hx: number, hy: number, type:
     case 'axe':
       rect(ctx, 0, -1, 9, 2, secondary ?? '#6b4a30');
       poly(ctx, [[7, -1], [15, -6], [16, 0], [15, 7], [7, 1]], primary);
+      line(ctx, 8, -4.4, 13.6, -1.6, 0.6, shade(primary, 0.35)); // blade edge glint
       break;
     case 'staff':
       rect(ctx, 0, -1, 15, 2, secondary ?? '#7a5636');
       circle(ctx, 16, 0, 3.4, accent ?? primary);
       circle(ctx, 16, 0, 1.6, '#ffffff');
+      poly(ctx, [[2, 1], [1, 4], [3, 4]], shade(secondary ?? '#7a5636', -0.2)); // dangling cord/tassel
       break;
     case 'wand':
       rect(ctx, 0, -1, 8, 2, secondary ?? '#8a6a4a');
       circle(ctx, 9, 0, 2.4, accent ?? primary);
+      circle(ctx, 8.2, -0.8, 0.7, '#ffffff');
       break;
     case 'bow':
       ctx.strokeStyle = primary; ctx.lineWidth = 1.6;
@@ -81,15 +93,18 @@ function drawWeapon(ctx: CanvasRenderingContext2D, hx: number, hy: number, type:
       ctx.strokeStyle = secondary ?? '#e8dcb0'; ctx.lineWidth = 0.8;
       ctx.beginPath(); ctx.moveTo(4 + Math.cos(-1.15) * 9, Math.sin(-1.15) * 9);
       ctx.lineTo(4 + Math.cos(1.15) * 9, Math.sin(1.15) * 9); ctx.stroke();
+      circle(ctx, 4, 0, 0.9, accent ?? secondary ?? '#e8dcb0'); // grip wrap
       break;
     case 'gun':
       rect(ctx, 0, -2, 11, 4, primary);
       rect(ctx, 1, 2, 4, 6, secondary ?? '#6b4a30');
       rect(ctx, 9, -3, 2, 1, accent ?? '#caa64a');
+      rect(ctx, 1, -1.6, 8, 0.6, shade(primary, 0.3)); // barrel glint
       break;
     case 'dagger':
       rect(ctx, -2, -1.5, 3, 3, secondary ?? '#6b5438');
       poly(ctx, [[1, -1.5], [8, -0.6], [9, 0], [8, 0.6], [1, 1.5]], primary);
+      line(ctx, 2, -0.9, 7, -0.3, 0.4, shade(primary, 0.35));
       break;
     case 'knives':
       poly(ctx, [[1, -2], [7, -1.2], [8, -0.6], [7, 0], [1, 0.6]], primary);
@@ -100,6 +115,7 @@ function drawWeapon(ctx: CanvasRenderingContext2D, hx: number, hy: number, type:
       rect(ctx, -2, -1.6, 3, 3.2, secondary ?? '#6b5438');
       rect(ctx, -3, -2.4, 6, 0.8, accent ?? '#8a97a6');
       poly(ctx, [[1, -1.4], [12, -1], [14, 0], [12, 1], [1, 1.4]], primary);
+      line(ctx, 2, -0.7, 11, -0.4, 0.5, shade(primary, 0.35)); // blade edge glint
       break;
   }
   ctx.restore();
@@ -107,31 +123,36 @@ function drawWeapon(ctx: CanvasRenderingContext2D, hx: number, hy: number, type:
 
 function drawHair(ctx: CanvasRenderingContext2D, style: number, cx: number, cy: number, r: number, color: string): void {
   const dark = shade(color, -0.25);
+  const light = shade(color, 0.28);
   switch (style % 6) {
     case 0: // buzz
       ellipse(ctx, cx, cy - r * 0.55, r * 0.96, r * 0.42, color);
+      rect(ctx, cx - r * 0.5, cy - r * 0.72, r * 0.55, r * 0.16, light);
       break;
     case 1: // short & spiky
       ellipse(ctx, cx, cy - r * 0.5, r * 1.0, r * 0.55, color);
-      for (let i = -2; i <= 2; i++) poly(ctx, [[cx + i * 2.6 - 1.4, cy - r * 0.55], [cx + i * 2.6, cy - r * 1.5], [cx + i * 2.6 + 1.4, cy - r * 0.55]], color);
+      for (let i = -2; i <= 2; i++) poly(ctx, [[cx + i * 2.6 - 1.4, cy - r * 0.55], [cx + i * 2.6, cy - r * 1.5], [cx + i * 2.6 + 1.4, cy - r * 0.55]], i === -1 ? light : color);
       break;
     case 2: // bob — top cap + side locks framing the face (never covers it)
       ellipse(ctx, cx, cy - r * 0.52, r * 1.02, r * 0.5, color);
       rect(ctx, cx - r * 1.05, cy - r * 0.35, r * 0.4, r * 1.15, color);
       rect(ctx, cx + r * 0.65, cy - r * 0.35, r * 0.4, r * 1.15, color);
+      rect(ctx, cx - r * 0.35, cy - r * 0.78, r * 0.5, r * 0.14, light);
       break;
     case 3: // ponytail
       ellipse(ctx, cx, cy - r * 0.52, r * 0.98, r * 0.48, color);
       poly(ctx, [[cx + r * 0.7, cy - r * 0.3], [cx + r * 2.3, cy + r * 0.4], [cx + r * 1.9, cy + r * 1.6], [cx + r * 0.9, cy + r * 0.6]], dark);
+      rect(ctx, cx - r * 0.3, cy - r * 0.76, r * 0.5, r * 0.14, light);
       break;
     case 4: // long flowing — top cap + long side strands past the shoulders
       ellipse(ctx, cx, cy - r * 0.52, r * 1.02, r * 0.5, color);
       rect(ctx, cx - r * 1.15, cy - r * 0.35, r * 0.5, r * 2.1, color);
       rect(ctx, cx + r * 0.65, cy - r * 0.35, r * 0.5, r * 2.1, color);
+      rect(ctx, cx - r * 1.02, cy - r * 0.3, r * 0.16, r * 1.9, light);
       break;
     case 5: // mohawk
       ellipse(ctx, cx, cy - r * 0.5, r * 0.9, r * 0.4, shade(color, 0.15));
-      for (let i = -1; i <= 1; i++) poly(ctx, [[cx + i * 2.4 - 1.6, cy - r * 0.5], [cx + i * 2.4, cy - r * 1.9], [cx + i * 2.4 + 1.6, cy - r * 0.5]], color);
+      for (let i = -1; i <= 1; i++) poly(ctx, [[cx + i * 2.4 - 1.6, cy - r * 0.5], [cx + i * 2.4, cy - r * 1.9], [cx + i * 2.4 + 1.6, cy - r * 0.5]], i === 0 ? light : color);
       break;
   }
 }
@@ -152,12 +173,21 @@ function resolveColors(look: CharacterLook): Colors {
   };
 }
 
-function drawFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, eye: string, mouth: Pose['mouth'], masked: boolean): void {
+function drawFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, eye: string, hair: string, mouth: Pose['mouth'], masked: boolean): void {
   if (masked) { rect(ctx, cx - r * 0.85, cy + r * 0.05, r * 1.7, r * 0.65, '#26232b'); }
-  circle(ctx, cx - r * 0.42, cy + r * 0.05, 1.3, '#12100f');
-  circle(ctx, cx + r * 0.42, cy + r * 0.05, 1.3, '#12100f');
-  circle(ctx, cx - r * 0.42, cy - r * 0.05, 0.5, '#ffffff');
-  circle(ctx, cx + r * 0.42, cy - r * 0.05, 0.5, '#ffffff');
+  else {
+    // soft brows hint at expression without adding extra frames
+    const browY = cy - r * 0.32;
+    line(ctx, cx - r * 0.56, browY, cx - r * 0.22, browY - r * 0.06, r * 0.16, shade(hair, -0.2));
+    line(ctx, cx + r * 0.22, browY - r * 0.06, cx + r * 0.56, browY, r * 0.16, shade(hair, -0.2));
+  }
+  // eyes: 2px pupil + a clear 2-tone highlight for a lively, expressive read
+  for (const dx of [-0.42, 0.42]) {
+    const ex = cx + dx * r, ey = cy + r * 0.05;
+    circle(ctx, ex, ey, 1.5, eye);
+    circle(ctx, ex, ey, 0.9, '#12100f');
+    circle(ctx, ex - 0.4, ey - 0.5, 0.55, '#ffffff');
+  }
   if (masked) return;
   if (mouth === 'smile') { ctx.strokeStyle = '#7a3a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy + r * 0.45, r * 0.3, 0.2, Math.PI - 0.2); ctx.stroke(); }
   else if (mouth === 'open') circle(ctx, cx, cy + r * 0.55, 1.3, '#5a1f1f');
@@ -165,31 +195,94 @@ function drawFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
   else rect(ctx, cx - 1.6, cy + r * 0.5, 3.2, 0.8, '#7a3a3a');
 }
 
+/** Small fixed-color hints layered over the tier-1 silhouette so a tier-2 specialization reads
+ *  at a glance, independent of the player's own armor-color customization. */
+function drawJobAccent(ctx: CanvasRenderingContext2D, jobId: JobId, cx: number, torsoTop: number, torsoBot: number, w: number): void {
+  const tint = JOB_ACCENT[jobId];
+  if (!tint) return;
+  const dark = shade(tint, -0.55);
+  switch (jobId) {
+    case 'bulwark': { // bold riveted shield emblem on the chest, dark-rimmed for contrast
+      const pts: [number, number][] = [[cx, torsoTop + 1.5], [cx + 2.8, torsoTop + 3], [cx + 2.8, torsoTop + 6.5], [cx, torsoTop + 9], [cx - 2.8, torsoTop + 6.5], [cx - 2.8, torsoTop + 3]];
+      ctx.save(); ctx.strokeStyle = dark; ctx.lineWidth = 1; poly(ctx, pts, tint); ctx.beginPath(); ctx.moveTo(...pts[0]); for (const p of pts.slice(1)) ctx.lineTo(...p); ctx.closePath(); ctx.stroke(); ctx.restore();
+      line(ctx, cx, torsoTop + 2.4, cx, torsoTop + 7.4, 0.6, dark);
+      break;
+    }
+    case 'reaver': // jagged crimson spikes bristling off both pauldrons — reads as feral at a glance
+      for (const s of [-1, 1]) poly(ctx, [[cx + s * w * 0.55, torsoTop], [cx + s * w * 0.85, torsoTop - 3.5], [cx + s * w * 0.65, torsoTop + 1.5]], tint);
+      poly(ctx, [[cx - w * 0.35, torsoTop + 2], [cx - w * 0.05, torsoTop + 5], [cx + w * 0.35, torsoTop + 9], [cx + w * 0.2, torsoTop + 9.5], [cx - w * 0.15, torsoTop + 5.5]], tint); // claw-slash streak
+      break;
+    case 'tempest': { // a crackling bolt diagonally across the chest, dark-outlined so it pops on any armor color
+      const pts: [number, number][] = [[cx - w * 0.35, torsoTop], [cx - w * 0.02, torsoTop + 2.5], [cx - w * 0.22, torsoTop + 3.3], [cx + w * 0.4, torsoTop + 8.5], [cx + w * 0.05, torsoTop + 5.6], [cx + w * 0.24, torsoTop + 4.6]];
+      ctx.save(); ctx.strokeStyle = dark; ctx.lineWidth = 0.8; poly(ctx, pts, tint); ctx.beginPath(); ctx.moveTo(...pts[0]); for (const p of pts.slice(1)) ctx.lineTo(...p); ctx.closePath(); ctx.stroke(); ctx.restore();
+      break;
+    }
+    case 'tidesinger': { // bright frost sigil at the collar
+      circle(ctx, cx, torsoTop + 1.8, 2.1, tint);
+      circle(ctx, cx, torsoTop + 1.8, 0.9, '#ffffff');
+      for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI; line(ctx, cx - Math.cos(a) * 3, torsoTop + 1.8 - Math.sin(a) * 3, cx + Math.cos(a) * 3, torsoTop + 1.8 + Math.sin(a) * 3, 0.6, tint); }
+      break;
+    }
+    case 'skyhunter': // bright fletching tips on the quiver + a fine feather charm at the collar
+      for (let i = -1; i <= 1; i++) rect(ctx, cx + w * 0.28 + i * 1.4 - 0.4, torsoTop - 5.5, 1.4, 2, tint);
+      poly(ctx, [[cx - w * 0.15, torsoTop], [cx - w * 0.05, torsoTop - 3.2], [cx + w * 0.05, torsoTop]], tint);
+      break;
+    case 'sparkgunner': break; // goggles are drawn over the hair in drawBody (see drawHeadAccent), not here
+    case 'duskblade': { // crossed twin blades emblem on the back, dark-outlined
+      ctx.save(); ctx.strokeStyle = dark; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(cx - 3.2, torsoTop); ctx.lineTo(cx + 3.2, torsoTop + 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + 3.2, torsoTop); ctx.lineTo(cx - 3.2, torsoTop + 7); ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = tint; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(cx - 3.2, torsoTop); ctx.lineTo(cx + 3.2, torsoTop + 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + 3.2, torsoTop); ctx.lineTo(cx - 3.2, torsoTop + 7); ctx.stroke();
+      break;
+    }
+    case 'hexslinger': // a glowing violet rune ring with marks descending the chest
+      ctx.save(); ctx.strokeStyle = tint; ctx.lineWidth = 0.9; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.arc(cx, torsoTop + 2.6, 2.2, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      circle(ctx, cx, torsoTop + 2.6, 0.9, tint);
+      circle(ctx, cx, torsoTop + 6.5, 0.9, tint);
+      break;
+  }
+}
+
 function classSilhouette(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors, cx: number, torsoTop: number, torsoBot: number, crouch: number): void {
   const w = 11 - crouch * 1.5;
   const armor = c.armor, acc = c.armorAcc;
+  const rim = shade(armor, 0.32);
   switch (look.classId) {
     case 'vanguard':
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, armor);
-      rect(ctx, cx - w / 2 - 1.5, torsoTop + 1, 2.5, 3, acc); // pauldron L
-      rect(ctx, cx + w / 2 - 1, torsoTop + 1, 2.5, 3, acc); // pauldron R
-      rect(ctx, cx - w / 2 + 1, torsoTop + 4, w - 2, 1.5, acc); // belt/plate seam
+      rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, rim); // rim light, left edge
+      rect(ctx, cx - 1.4, torsoTop + 2, 2.8, torsoBot - torsoTop - 3, acc); // tabard band
+      rect(ctx, cx - w / 2 - 2, torsoTop, 3.4, 4, acc); rect(ctx, cx - w / 2 - 2, torsoTop, 3.4, 1.2, rim); // pauldron L (+ rim)
+      rect(ctx, cx + w / 2 - 1.4, torsoTop, 3.4, 4, acc); rect(ctx, cx + w / 2 - 1.4, torsoTop, 3.4, 1.2, rim); // pauldron R (+ rim)
+      rect(ctx, cx - w / 2 + 1, torsoTop + 4, w - 2, 1.5, shade(acc, -0.15)); // belt/plate seam
       break;
     case 'stormcaller':
       poly(ctx, [[cx - w * 0.5, torsoTop], [cx + w * 0.5, torsoTop], [cx + w * 0.85, torsoBot], [cx - w * 0.85, torsoBot]], armor);
+      poly(ctx, [[cx - w * 0.5, torsoTop], [cx - w * 0.42, torsoTop], [cx - w * 0.72, torsoBot], [cx - w * 0.85, torsoBot]], rim); // robe fold rim light
       rect(ctx, cx - w / 2, torsoTop + 2, w, 1.4, acc);
+      line(ctx, cx, torsoTop + 3, cx, torsoBot - 1, 1, shade(acc, -0.2)); // clasp trim
       break;
     case 'windrunner':
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, armor);
+      rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, rim);
       poly(ctx, [[cx - w / 2 - 1, torsoTop - 1], [cx - 1, torsoTop - 4], [cx - 1, torsoTop + 1]], acc); // hood point back
+      poly(ctx, [[cx - w * 0.3, torsoTop], [cx, torsoTop + 2], [cx + w * 0.3, torsoTop]], acc); // scarf knot at collar
+      // quiver of fletched arrows peeking over the back shoulder
+      for (let i = -1; i <= 1; i++) line(ctx, cx + w * 0.42 + i * 1.1, torsoTop + 1, cx + w * 0.55 + i * 1.4, torsoTop - 5, 0.9, i === 0 ? acc : shade(acc, -0.15));
+      rect(ctx, cx + w * 0.3, torsoTop + 1, 3.2, 4, shade(acc, -0.3)); // quiver body
       rect(ctx, cx - w / 2 + 1, torsoBot - 2, w - 2, 1.4, acc); // belt
       break;
     case 'shade':
     default:
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, armor);
-      poly(ctx, [[cx - w / 2, torsoTop + 1], [cx + w / 2 + 2, torsoTop + 3], [cx + w / 2 - 1, torsoTop + 5]], acc); // scarf flap
+      rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, rim);
+      // long scarf, trailing well past the hips for a dramatic silhouette
+      poly(ctx, [[cx - w / 2, torsoTop + 1], [cx + w / 2 + 2, torsoTop + 3], [cx + w / 2 + 4, torsoBot + 6], [cx + w / 2 - 2, torsoBot + 7], [cx + w / 2 - 3, torsoTop + 6], [cx + w / 2 - 1, torsoTop + 5]], acc);
       break;
   }
+  drawJobAccent(ctx, look.jobId, cx, torsoTop, torsoBot, w);
 }
 
 function drawBody(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors, pose: Pose): void {
@@ -197,7 +290,7 @@ function drawBody(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors,
   const crouchOff = pose.crouch * 3;
   const headCy = 12 + pose.headBob + crouchOff;
   const torsoTop = 18 + crouchOff * 0.6;
-  const torsoBot = 29 + crouchOff;
+  const torsoBot = 29 + crouchOff + pose.chest * 0.5;
   const hipY = torsoBot;
   const shoulderY = torsoTop + 1.5;
   const r = 7.2;
@@ -215,11 +308,22 @@ function drawBody(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors,
 
   // head
   circle(ctx, cx, headCy, r, c.skin);
+  circle(ctx, cx - r * 0.4, headCy - r * 0.45, r * 0.32, shade(c.skin, 0.22)); // soft cheek/rim highlight
   const masked = look.classId === 'shade';
-  drawFace(ctx, cx, headCy, r, c.eye, pose.mouth, masked);
+  drawFace(ctx, cx, headCy, r, c.eye, c.hair, pose.mouth, masked);
   drawHair(ctx, look.appearance.hairStyle, cx, headCy, r, c.hair);
   if (c.helmet) ellipse(ctx, cx, headCy - r * 0.6, r * 1.05, r * 0.5, c.helmet);
-  if (look.classId === 'stormcaller') poly(ctx, [[cx - r * 0.9, headCy - r * 0.7], [cx, headCy - r * 2.3], [cx + r * 0.9, headCy - r * 0.7]], c.armor);
+  if (look.classId === 'stormcaller') {
+    // pointed hat with a brim, worn over the hair
+    poly(ctx, [[cx - r * 0.9, headCy - r * 0.7], [cx, headCy - r * 2.3], [cx + r * 0.9, headCy - r * 0.7]], c.armor);
+    ellipse(ctx, cx, headCy - r * 0.68, r * 1.15, r * 0.3, shade(c.armor, -0.1)); // brim
+    circle(ctx, cx, headCy - r * 1.5, r * 0.18, c.armorAcc); // hat band jewel
+  }
+  if (look.jobId === 'sparkgunner') { // brass goggles pushed up on the forehead, drawn over the hair so they read clearly
+    const tint = JOB_ACCENT.sparkgunner!, dark = shade(tint, -0.55), gy = headCy - r * 0.62;
+    for (const s of [-1, 1]) { circle(ctx, cx + s * r * 0.42, gy, r * 0.26, dark); circle(ctx, cx + s * r * 0.42, gy, r * 0.16, tint); circle(ctx, cx + s * r * 0.42 - 0.4, gy - 0.4, 0.5, '#ffffff'); }
+    line(ctx, cx - r * 0.16, gy, cx + r * 0.16, gy, 1, dark); // bridge
+  }
 
   // front arm + weapon
   const [handX, handY] = limb(ctx, cx + 4.2, shoulderY, pose.armFrontA, 8.6, 2.6, c.armor, c.gloves);
@@ -270,8 +374,16 @@ function buildAnims(weaponType?: WeaponType): AnimTable[] {
   const isCaster = weaponType === 'staff' || weaponType === 'wand';
 
   return [
-    { name: 'idle', frameRate: 3, repeat: -1, poses: [0, 1, 0].map((b) => ({ ...p(), headBob: b, armBackA: -6 + b, armFrontA: 6 - b, weaponDeg: 100 })) },
-    { name: 'walk', frameRate: 10, repeat: -1, poses: [-30, -12, 10, 30, 12, -10].map((a) => ({ ...p(), legFrontA: a, legBackA: -a, armFrontA: -a * 0.6, armBackA: a * 0.6, headBob: Math.abs(a) > 20 ? 1 : 0, weaponDeg: 100 })) },
+    // idle: slow 4-frame breathing cycle (chest rise + a hair's-breadth head bob) reads as alive at a standstill
+    { name: 'idle', frameRate: 3, repeat: -1, poses: [0, 1, 2, 1].map((b) => ({ ...p(), headBob: b * 0.4, chest: b * 0.5, armBackA: -6 + b * 0.6, armFrontA: 6 - b * 0.6, weaponDeg: 100 })) },
+    {
+      name: 'walk', frameRate: 10, repeat: -1,
+      poses: [-30, -12, 10, 30, 12, -10].map((a, i, arr) => ({
+        ...p(), legFrontA: a, legBackA: -a, armFrontA: -a * 0.6, armBackA: a * 0.6,
+        headBob: Math.sin((i / arr.length) * Math.PI * 2) * 0.8, // smooth continuous bounce, not a 2-step toggle
+        chest: Math.abs(a) < 15 ? 0.4 : 0, weaponDeg: 100,
+      })),
+    },
     { name: 'jump', frameRate: 1, repeat: -1, poses: [{ ...p(), legFrontA: 18, legBackA: -14, armFrontA: -70, armBackA: -50, weaponDeg: 90 }] },
     { name: 'fall', frameRate: 1, repeat: -1, poses: [{ ...p(), legFrontA: -8, legBackA: 12, armFrontA: -40, armBackA: -20, weaponDeg: 100 }] },
     { name: 'crouch', frameRate: 1, repeat: -1, poses: [{ ...p(), crouch: 1, legFrontA: 12, legBackA: -12, armFrontA: 20, armBackA: -20, weaponDeg: 110 }] },

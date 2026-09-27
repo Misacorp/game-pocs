@@ -7,7 +7,7 @@ import Phaser from 'phaser';
 import type { MonsterDef, MonsterBase } from '@shared/types';
 import {
   makeCanvas, ctx2d, outlined, rect, rrect, circle, ellipse, line, poly,
-  registerSpriteSheet, ensureAnim, shade, hashStr, mix,
+  registerSpriteSheet, ensureAnim, shade, hashStr, mix, seedRandom,
 } from './canvasKit';
 import { OUTLINE } from './palette';
 import type { SpriteInfo } from './spec';
@@ -27,6 +27,17 @@ function eyeDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
   if (dead) { line(ctx, x - r, y - r, x + r, y + r, Math.max(1, r * 0.5), color); line(ctx, x - r, y + r, x + r, y - r, Math.max(1, r * 0.5), color); return; }
   circle(ctx, x, y, r, color);
   circle(ctx, x - r * 0.3, y - r * 0.3, r * 0.35, '#ffffff');
+}
+
+/** Cute-mob personality: a soft pink blush under the eyes. Called only from the friendly,
+ *  early-game bases below (slime, mushroom, snail, bird, crab, jelly, beetle, wisp, boar, grub, fish) —
+ *  bats, spiders, wraiths, golems and boss-only bases stay unblushed to keep their read menacing. */
+function blush(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, spread: number, dead: boolean): void {
+  if (dead) return;
+  ctx.save(); ctx.globalAlpha = 0.45;
+  ellipse(ctx, cx - spread, cy, r, r * 0.62, '#ff8fa8');
+  ellipse(ctx, cx + spread, cy, r, r * 0.62, '#ff8fa8');
+  ctx.restore();
 }
 
 function spots(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, n: number, color: string, seed: number): void {
@@ -55,6 +66,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       ellipse(ctx, cx, cy - h * 0.05, w * 0.42, h * 0.3, p.secondary);
       eyeDot(ctx, cx - w * 0.16, cy + h * 0.04, s * 1.5, eye, pose.dead);
       eyeDot(ctx, cx + w * 0.16, cy + h * 0.04, s * 1.5, eye, pose.dead);
+      blush(ctx, cx, cy + h * 0.13, w * 0.09, w * 0.3, pose.dead);
       if (pose.mouth) ellipse(ctx, cx, cy + h * 0.22, s * 2.2, s * 1.4, '#3a1622');
       spots(ctx, cx, cy, w * 0.4, h * 0.3, 2 + variant, p.accent ?? p.secondary, variant);
       break;
@@ -65,6 +77,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       spots(ctx, cx, cy - h * 0.22, w * 0.42, h * 0.24, 3 + variant, p.accent ?? '#fff', variant + 1);
       eyeDot(ctx, cx - w * 0.12, cy + h * 0.16, s * 1.3, eye, pose.dead);
       eyeDot(ctx, cx + w * 0.12, cy + h * 0.16, s * 1.3, eye, pose.dead);
+      blush(ctx, cx, cy + h * 0.24, w * 0.07, w * 0.24, pose.dead);
       break;
     }
     case 'snail': {
@@ -75,6 +88,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       line(ctx, cx - w * 0.2, cy + h * 0.02, cx - w * 0.28, cy - h * 0.34, s * 0.8, p.secondary);
       eyeDot(ctx, cx - w * 0.44, cy - h * 0.34, s * 1.1, eye, pose.dead);
       eyeDot(ctx, cx - w * 0.28, cy - h * 0.36, s * 1.1, eye, pose.dead);
+      blush(ctx, cx - w * 0.36, cy - h * 0.22, w * 0.07, w * 0.1, pose.dead);
       break;
     }
     case 'bird': {
@@ -83,6 +97,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       poly(ctx, [[cx + w * 0.28, cy + h * 0.2], [cx + w * 0.5, cy + h * 0.05], [cx + w * 0.3, cy - h * 0.1]], p.secondary);
       poly(ctx, [[cx, cy + h * 0.42], [cx + w * 0.22, cy + h * 0.6], [cx - w * 0.05, cy + h * 0.48]], p.accent ?? '#f0a030');
       eyeDot(ctx, cx + w * 0.12, cy - h * 0.12, s * 1.3, eye, pose.dead);
+      blush(ctx, cx + w * 0.1, cy, w * 0.06, w * 0.14, pose.dead);
       break;
     }
     case 'crab': {
@@ -91,6 +106,15 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       for (let i = -2; i <= 2; i++) line(ctx, cx + i * w * 0.14, cy + h * 0.3, cx + i * w * 0.18 + pose.lunge * s * 0.3, cy + h * 0.5, s * 1.1, p.secondary);
       eyeDot(ctx, cx - w * 0.12, cy - h * 0.14, s * 1.2, eye, pose.dead);
       eyeDot(ctx, cx + w * 0.12, cy - h * 0.14, s * 1.2, eye, pose.dead);
+      blush(ctx, cx, cy - h * 0.02, w * 0.07, w * 0.24, pose.dead);
+      // King Barnacle: a crown of jagged barnacle spires ringing the top of the shell
+      if (s >= 2) {
+        for (let i = -3; i <= 3; i++) {
+          const bx = cx + i * w * 0.09, bh2 = h * (0.16 + (Math.abs(i) % 2) * 0.06);
+          poly(ctx, [[bx - w * 0.035, cy - h * 0.26], [bx, cy - h * 0.26 - bh2], [bx + w * 0.035, cy - h * 0.26]], p.accent ?? '#c98a4a');
+          circle(ctx, bx, cy - h * 0.26 - bh2, w * 0.02, shade(p.accent ?? '#c98a4a', 0.3));
+        }
+      }
       break;
     }
     case 'jelly': {
@@ -100,6 +124,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       for (let i = -2; i <= 2; i++) line(ctx, cx + i * w * 0.16, cy + h * 0.05, cx + i * w * 0.2, cy + h * 0.48 - pose.squash * h * 0.15, s * 1, p.secondary);
       eyeDot(ctx, cx - w * 0.12, cy - h * 0.16, s * 1.3, eye, pose.dead);
       eyeDot(ctx, cx + w * 0.12, cy - h * 0.16, s * 1.3, eye, pose.dead);
+      blush(ctx, cx, cy - h * 0.04, w * 0.07, w * 0.24, pose.dead);
       break;
     }
     case 'beetle': {
@@ -108,6 +133,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       for (const d of [-1, 1]) poly(ctx, [[cx + d * w * 0.36, cy - h * 0.3], [cx + d * w * 0.5, cy - h * 0.42 - variant], [cx + d * w * 0.4, cy - h * 0.12]], p.secondary);
       eyeDot(ctx, cx - w * 0.1, cy - h * 0.06, s * 1.2, eye, pose.dead);
       eyeDot(ctx, cx + w * 0.1, cy - h * 0.06, s * 1.2, eye, pose.dead);
+      blush(ctx, cx, cy + h * 0.06, w * 0.06, w * 0.2, pose.dead);
       break;
     }
     case 'bat': {
@@ -127,6 +153,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       circle(ctx, cx, cy, glowR * 0.55, p.secondary);
       eyeDot(ctx, cx - glowR * 0.28, cy, s * 1, eye, pose.dead);
       eyeDot(ctx, cx + glowR * 0.28, cy, s * 1, eye, pose.dead);
+      blush(ctx, cx, cy + glowR * 0.3, s * 1, glowR * 0.42, pose.dead);
       break;
     }
     case 'plant': {
@@ -163,6 +190,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       poly(ctx, [[cx - w * 0.32, cy], [cx - w * 0.5 - pose.lunge * s, cy - h * 0.24], [cx - w * 0.5 - pose.lunge * s, cy + h * 0.24]], p.secondary);
       poly(ctx, [[cx, cy - h * 0.28], [cx + w * 0.08, cy - h * 0.5], [cx + w * 0.16, cy - h * 0.24]], p.secondary);
       eyeDot(ctx, cx + w * 0.14, cy - h * 0.04, s * 1.2, eye, pose.dead);
+      blush(ctx, cx + w * 0.08, cy + h * 0.1, w * 0.06, w * 0.1, pose.dead);
       break;
     }
     case 'humanoid': {
@@ -190,11 +218,13 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       poly(ctx, [[cx + w * 0.5, cy - h * 0.02], [cx + w * 0.66, cy + h * 0.02], [cx + w * 0.5, cy + h * 0.14]], '#f2ead0');
       for (const d of [-1, 1]) line(ctx, cx + d * w * 0.2, cy + h * 0.24, cx + d * w * 0.2, cy + h * 0.46, s * 2, p.secondary);
       eyeDot(ctx, cx + w * 0.4, cy - h * 0.16, s * 1.1, eye, pose.dead);
+      blush(ctx, cx + w * 0.34, cy - h * 0.02, w * 0.06, w * 0.1, pose.dead);
       break;
     }
     case 'grub': {
       for (let i = 0; i < 4; i++) circle(ctx, cx - w * 0.34 + i * w * 0.22, cy + Math.sin(i + pose.t) * h * 0.05, w * (0.2 - i * 0.01), i % 2 ? p.secondary : p.primary);
       eyeDot(ctx, cx - w * 0.42, cy - h * 0.06, s * 1, eye, pose.dead);
+      blush(ctx, cx - w * 0.36, cy + h * 0.06, w * 0.05, w * 0.09, pose.dead);
       break;
     }
     case 'wraith': {
@@ -206,14 +236,23 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       eyeDot(ctx, cx + w * 0.08, cy - h * 0.38, s * 1.1, p.eye ?? '#c85bff', pose.dead);
       break;
     }
-    case 'hydra': {
+    case 'hydra': { // Old Tangle: multi-headed vine hydra — thorned heads, leafy neck growth
       ellipse(ctx, cx, cy + h * 0.18, w * 0.4, h * 0.26, p.primary);
       const heads = 3;
       for (let i = 0; i < heads; i++) {
         const hx = cx + (i - 1) * w * 0.26;
         const hy = cy - h * 0.16 - Math.abs(i - 1) * h * 0.06 - (i === 1 ? pose.lunge * s * 1.5 : 0);
-        line(ctx, cx + (i - 1) * w * 0.14, cy + h * 0.05, hx, hy + h * 0.14, s * 2.2, p.secondary);
+        const neckX = cx + (i - 1) * w * 0.14, neckY = cy + h * 0.05;
+        line(ctx, neckX, neckY, hx, hy + h * 0.14, s * 2.2, p.secondary);
+        // small leaves sprouting off each neck, alternating sides along its length
+        for (let seg = 1; seg <= 2; seg++) {
+          const t2 = seg / 3, lx = neckX + (hx - neckX) * t2, ly = neckY + (hy + h * 0.14 - neckY) * t2;
+          const sign = seg % 2 === 0 ? 1 : -1;
+          poly(ctx, [[lx, ly], [lx + sign * w * 0.12, ly - h * 0.03], [lx + sign * w * 0.02, ly + h * 0.05]], p.accent ?? '#c9e87a');
+        }
         circle(ctx, hx, hy, w * 0.13, p.secondary);
+        // thorn crown on each head
+        for (const d of [-1, 1]) poly(ctx, [[hx + d * w * 0.08, hy - h * 0.06], [hx + d * w * 0.16, hy - h * 0.16], [hx + d * w * 0.03, hy - h * 0.1]], p.secondary);
         eyeDot(ctx, hx - w * 0.04, hy - h * 0.02, s * 1.2, p.eye ?? '#ffcf40', pose.dead);
         eyeDot(ctx, hx + w * 0.04, hy - h * 0.02, s * 1.2, p.eye ?? '#ffcf40', pose.dead);
         if (pose.mouth) ellipse(ctx, hx, hy + h * 0.06, s * 2, s * 1.2, '#3a1622');
@@ -221,38 +260,69 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
       spots(ctx, cx, cy + h * 0.2, w * 0.36, h * 0.2, 5, p.accent ?? shade(p.primary, -0.2), variant);
       break;
     }
-    case 'roc': {
+    case 'roc': { // Kraelith: storm roc — feathers crackle with static along every wingtip
       ellipse(ctx, cx, cy, w * 0.22, h * 0.4, p.primary);
       const wingFlap = Math.sin(pose.t) * 0.3 + 0.3;
-      poly(ctx, [[cx - w * 0.16, cy - h * 0.1], [cx - w * 0.62, cy - h * 0.5 - wingFlap * h * 0.3], [cx - w * 0.5, cy + h * 0.02], [cx - w * 0.2, cy + h * 0.24]], p.secondary);
-      poly(ctx, [[cx + w * 0.16, cy - h * 0.1], [cx + w * 0.62, cy - h * 0.5 - wingFlap * h * 0.3], [cx + w * 0.5, cy + h * 0.02], [cx + w * 0.2, cy + h * 0.24]], p.secondary);
+      const wL: [number, number][] = [[cx - w * 0.16, cy - h * 0.1], [cx - w * 0.62, cy - h * 0.5 - wingFlap * h * 0.3], [cx - w * 0.5, cy + h * 0.02], [cx - w * 0.2, cy + h * 0.24]];
+      const wR: [number, number][] = [[cx + w * 0.16, cy - h * 0.1], [cx + w * 0.62, cy - h * 0.5 - wingFlap * h * 0.3], [cx + w * 0.5, cy + h * 0.02], [cx + w * 0.2, cy + h * 0.24]];
+      poly(ctx, wL, p.secondary); poly(ctx, wR, p.secondary);
+      // crackling static sparks along the leading edge of each wing
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = '#fff6c9'; ctx.lineWidth = Math.max(1, s * 0.6);
+      for (const tip of [wL[1], wR[1]]) {
+        const jx = tip[0] + (Math.random() - 0.5) * w * 0.1, jy = tip[1] + (Math.random() - 0.5) * h * 0.08;
+        ctx.beginPath(); ctx.moveTo(tip[0], tip[1]); ctx.lineTo(jx, jy - h * 0.06); ctx.lineTo(jx + (jx > cx ? 1 : -1) * w * 0.06, jy); ctx.stroke();
+      }
+      ctx.restore();
       circle(ctx, cx, cy - h * 0.36, w * 0.15, p.primary);
       poly(ctx, [[cx - w * 0.1, cy - h * 0.34], [cx - w * 0.28, cy - h * 0.3], [cx - w * 0.1, cy - h * 0.24]], p.accent ?? '#f0a030');
       poly(ctx, [[cx, cy + h * 0.36], [cx + w * 0.1, cy + h * 0.56], [cx - w * 0.06, cy + h * 0.44]], p.accent ?? '#f0a030');
       eyeDot(ctx, cx + w * 0.04, cy - h * 0.38, s * 1.4, p.eye ?? '#ffe070', pose.dead);
       break;
     }
-    case 'captain': {
+    case 'captain': { // Captain Vashti Rook: spectral pirate — glowing harpoon and a ghostly halo
       ctx.save(); ctx.globalAlpha = 0.75;
       poly(ctx, [[cx - w * 0.24, cy - h * 0.2], [cx + w * 0.24, cy - h * 0.2], [cx + w * 0.3, cy + h * 0.46], [cx, cy + h * 0.3], [cx - w * 0.3, cy + h * 0.46]], p.primary);
       ctx.restore();
       circle(ctx, cx, cy - h * 0.36, w * 0.2, p.secondary);
       poly(ctx, [[cx - w * 0.26, cy - h * 0.44], [cx + w * 0.26, cy - h * 0.44], [cx + w * 0.14, cy - h * 0.54], [cx - w * 0.14, cy - h * 0.54]], p.accent ?? '#1a1a22');
+      // pale eerie glow rimming the whole silhouette
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.3; circle(ctx, cx, cy - h * 0.05, w * 0.5, p.eye ?? '#5adfff'); ctx.restore();
       eyeDot(ctx, cx - w * 0.06, cy - h * 0.37, s * 1.1, p.eye ?? '#5adfff', pose.dead);
       eyeDot(ctx, cx + w * 0.06, cy - h * 0.37, s * 1.1, p.eye ?? '#5adfff', pose.dead);
-      line(ctx, cx + w * 0.28, cy - h * 0.1, cx + w * 0.5 + pose.lunge * s * 2, cy - h * 0.5 - pose.lunge * s * 2, s * 1.6, '#8a97a6');
-      poly(ctx, [[cx + w * 0.46 + pose.lunge * s * 2, cy - h * 0.56 - pose.lunge * s * 2], [cx + w * 0.6 + pose.lunge * s * 2, cy - h * 0.44 - pose.lunge * s * 2], [cx + w * 0.5 + pose.lunge * s * 2, cy - h * 0.36 - pose.lunge * s * 2]], '#c9d6de');
+      { // harpoon, glowing at the tip
+        const tipX = cx + w * 0.5 + pose.lunge * s * 2, tipY = cy - h * 0.5 - pose.lunge * s * 2;
+        line(ctx, cx + w * 0.28, cy - h * 0.1, tipX, tipY, s * 1.6, '#8a97a6');
+        poly(ctx, [[tipX - w * 0.04, tipY - h * 0.06], [tipX + w * 0.14, tipY + h * 0.06], [tipX + w * 0.04, tipY + h * 0.14]], '#c9d6de');
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        circle(ctx, tipX + w * 0.05, tipY + h * 0.04, w * 0.16, p.eye ?? '#5adfff');
+        ctx.restore();
+      }
       break;
     }
-    case 'heart': {
+    case 'heart': { // The Blight Heart: one great central eye, pulsing veins radiating to the rim
       const pulse = 1 + Math.sin(pose.t) * 0.06;
       ctx.save(); ctx.translate(cx, cy); ctx.scale(pulse, pulse); ctx.translate(-cx, -cy);
       poly(ctx, [[cx, cy + h * 0.42], [cx - w * 0.4, cy - h * 0.04], [cx - w * 0.4, cy - h * 0.3], [cx - w * 0.14, cy - h * 0.42], [cx, cy - h * 0.24], [cx + w * 0.14, cy - h * 0.42], [cx + w * 0.4, cy - h * 0.3], [cx + w * 0.4, cy - h * 0.04]], p.primary);
-      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; line(ctx, cx, cy, cx + Math.cos(a) * w * 0.42, cy + Math.sin(a) * h * 0.42, s * 1.1, p.secondary); }
-      circle(ctx, cx, cy - h * 0.02, w * 0.14, p.accent ?? '#ff2f4f');
+      // jagged veins pulsing outward from the core, brighter than the plain spoke lines
+      const rnd = seedRandom(variant + 11);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        let vx = cx, vy = cy;
+        ctx.strokeStyle = i % 2 === 0 ? (p.accent ?? '#ff2f4f') : p.secondary;
+        ctx.lineWidth = s * 0.9; ctx.beginPath(); ctx.moveTo(vx, vy);
+        for (let seg = 1; seg <= 3; seg++) {
+          vx = cx + Math.cos(a) * w * 0.42 * (seg / 3) + (rnd() - 0.5) * w * 0.05;
+          vy = cy + Math.sin(a) * h * 0.42 * (seg / 3) + (rnd() - 0.5) * h * 0.05;
+          ctx.lineTo(vx, vy);
+        }
+        ctx.stroke();
+      }
       ctx.restore();
-      eyeDot(ctx, cx - w * 0.1, cy - h * 0.1, s * 1.3, p.eye ?? '#ffffff', pose.dead);
-      eyeDot(ctx, cx + w * 0.1, cy - h * 0.1, s * 1.3, p.eye ?? '#ffffff', pose.dead);
+      // one great central eye — the "wound" watching back
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; circle(ctx, cx, cy - h * 0.04, w * 0.22, p.accent ?? '#ff2f4f'); ctx.restore();
+      ellipse(ctx, cx, cy - h * 0.04, w * 0.22, h * 0.13, p.eye ?? '#ffffff');
+      circle(ctx, cx, cy - h * 0.04, w * 0.09, pose.dead ? (p.eye ?? '#ffffff') : '#181018');
+      if (!pose.dead) circle(ctx, cx - w * 0.05, cy - h * 0.08, w * 0.03, '#ffffff');
       break;
     }
   }
@@ -262,7 +332,7 @@ function drawBase(base: MonsterBase, ctx: CanvasRenderingContext2D, cx: number, 
 function poseFor(anim: string, i: number, n: number): Pose {
   const t = (i / Math.max(1, n)) * Math.PI * 2;
   switch (anim) {
-    case 'idle': return { squash: 0.06 * Math.sin(t), lunge: 0, flash: false, dead: false, tilt: 0, mouth: false, t };
+    case 'idle': return { squash: 0.06 * Math.sin(t), lunge: 0, flash: false, dead: false, tilt: 2.5 * Math.sin(t * 0.5), mouth: false, t }; // subtle standing wobble for personality
     case 'move': return { squash: 0.16 * Math.abs(Math.sin(t)), lunge: 0, flash: false, dead: false, tilt: 6 * Math.sin(t), mouth: false, t };
     case 'attack': {
       const k = i / (n - 1 || 1);

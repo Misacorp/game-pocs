@@ -4,11 +4,17 @@
  */
 import Phaser from 'phaser';
 import type { ThemeId } from '@shared/types';
-import { makeCanvas, ctx2d, rect, circle, registerCanvasTexture, shade, seedRandom } from './canvasKit';
+import { makeCanvas, ctx2d, rect, circle, ellipse, poly, registerCanvasTexture, shade, seedRandom } from './canvasKit';
 import { THEMES } from './palette';
 import type { PlatformTextures } from './spec';
 
 const T = 16;
+/** groundTop is drawn WV tiles wide (a whole seamless repeat block) instead of a single 16x16
+ *  tile, so the TileSprite that renders it shows a natural 3-tile rotation of variants as it
+ *  tiles across the map — different-looking ground "chosen deterministically by x" with zero
+ *  changes needed in the terrain-building code that consumes this texture. */
+const WV = 3;
+const FULL = T * WV;
 
 type Family = 'planks' | 'planksDark' | 'grass' | 'mossRock' | 'kelp' | 'rock' | 'coral' | 'flesh';
 
@@ -18,56 +24,77 @@ const FAMILY: Record<ThemeId, Family> = {
   hollow: 'flesh', heart: 'flesh',
 };
 
-function wrapDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
-  for (const dx of [-T, 0, T]) for (const dy of [-T, 0, T]) circle(ctx, x + dx, y + dy, r, color);
+function wrapDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, span = T): void {
+  for (const dx of [-span, 0, span]) for (const dy of [-T, 0, T]) circle(ctx, x + dx, y + dy, r, color);
 }
 
-function fillBase(ctx: CanvasRenderingContext2D, color: string): void { rect(ctx, 0, 0, T, T, color); }
+function fillBase(ctx: CanvasRenderingContext2D, color: string, w = T): void { rect(ctx, 0, 0, w, T, color); }
+/** Same as fillBase but at a given column offset — used inside the wide groundTop variant strip. */
+function fillAt(ctx: CanvasRenderingContext2D, ox: number, color: string): void { rect(ctx, ox, 0, T, T, color); }
 
-function groundTop(family: Family, top: string, accent: string, seed: number): HTMLCanvasElement {
-  const c = makeCanvas(T, T); const ctx = ctx2d(c);
-  const rnd = seedRandom(seed);
+/** One 16px sub-tile's decorative top edge, for variant index v (0..WV-1) at column origin `ox`. */
+function groundTopVariant(ctx: CanvasRenderingContext2D, family: Family, top: string, accent: string, rnd: () => number, ox: number, v: number): void {
   switch (family) {
     case 'grass':
-      fillBase(ctx, top);
-      rect(ctx, 0, 0, T, 3, shade(top, 0.18));
-      for (let i = 0; i < 10; i++) wrapDot(ctx, rnd() * T, rnd() * 2.4, 0.8, shade(top, -0.15));
-      for (let i = 0; i < 5; i++) { const x = rnd() * T; rect(ctx, x, 0, 1, 2 + rnd() * 2, shade(top, 0.3)); }
+      fillAt(ctx, ox, top);
+      rect(ctx, ox, 0, T, 3, shade(top, 0.18));
+      // grass tufts: variant 1 is a tall single blade, others a scattered clump — reads as natural variation
+      if (v === 1) { rect(ctx, ox + T * 0.5 - 0.5, -2, 1, 4.5, shade(top, 0.32)); rect(ctx, ox + T * 0.4, -1, 1, 3, shade(top, 0.25)); }
+      for (let i = 0; i < 8 + v * 2; i++) { const x = ox + rnd() * T; rect(ctx, x, -0.5, 1, 1.6 + rnd() * 2.2, shade(top, 0.28 + rnd() * 0.1)); }
+      for (let i = 0; i < 6; i++) circle(ctx, ox + rnd() * T, rnd() * 2, 0.7, shade(top, -0.15));
       break;
     case 'mossRock':
-      fillBase(ctx, shade(top, -0.1));
-      rect(ctx, 0, 0, T, 4, top);
-      for (let i = 0; i < 6; i++) wrapDot(ctx, rnd() * T, rnd() * 3, 1.1, accent);
+      fillAt(ctx, ox, shade(top, -0.1));
+      rect(ctx, ox, 0, T, 4, top);
+      for (let i = 0; i < 6; i++) circle(ctx, ox + rnd() * T, rnd() * 3, 1.1, accent);
+      // hanging moss drips at the seam into the fill below — length varies per variant
+      for (let i = 0; i < 2 + v; i++) { const x = ox + 2 + rnd() * (T - 4); rect(ctx, x, T - 5, 1, 3 + rnd() * (2 + v * 1.5), shade(accent, -0.1)); }
       break;
     case 'kelp':
-      fillBase(ctx, top);
-      for (let x = -2; x < T; x += 5) rect(ctx, x + (seed % 3), 0, 2, T, shade(top, -0.12));
-      for (let i = 0; i < 6; i++) wrapDot(ctx, rnd() * T, rnd() * T, 0.7, accent);
+      fillAt(ctx, ox, top);
+      for (let x = -2; x < T; x += 5) rect(ctx, ox + x + (v % 3), 0, 2, T, shade(top, -0.12));
+      for (let i = 0; i < 6; i++) circle(ctx, ox + rnd() * T, rnd() * T, 0.7, accent);
+      // small frond tips curling above the edge
+      for (let i = 0; i < 2; i++) { const x = ox + 3 + i * 8 + v * 2; poly(ctx, [[x, 1], [x + 2, -2 - v], [x + 3, 1]], shade(top, 0.2)); }
       break;
     case 'rock':
-      fillBase(ctx, top);
-      rect(ctx, 0, 0, T, 3, shade(top, 0.12));
-      for (let i = 0; i < 8; i++) { const x = rnd() * T, y = rnd() * T; rect(ctx, x, y, 1 + rnd() * 2, 1, shade(top, -0.15)); }
+      fillAt(ctx, ox, top);
+      rect(ctx, ox, 0, T, 3, shade(top, 0.12));
+      for (let i = 0; i < 8; i++) { const x = ox + rnd() * T, y = rnd() * T; rect(ctx, x, y, 1 + rnd() * 2, 1, shade(top, -0.15)); }
+      // jagged silhouette notch + an occasional crystal glint for variety
+      poly(ctx, [[ox + 2 + v * 3, 0], [ox + 5 + v * 3, -2.5 - v], [ox + 8 + v * 3, 0]], shade(top, -0.2));
+      if (v === 2) circle(ctx, ox + T * 0.7, 1.4, 1, accent);
       break;
     case 'coral':
-      fillBase(ctx, shade(top, -0.15));
-      for (let i = 0; i < 8; i++) wrapDot(ctx, (i * 2 + rnd() * 2) % T, T - 2 - rnd() * 4, 1.6, top);
-      for (let i = 0; i < 5; i++) wrapDot(ctx, rnd() * T, rnd() * 6, 0.9, accent);
+      fillAt(ctx, ox, shade(top, -0.15));
+      for (let i = 0; i < 8; i++) circle(ctx, ox + (i * 2 + rnd() * 2) % T, T - 2 - rnd() * 4, 1.6, top);
+      for (let i = 0; i < 5; i++) circle(ctx, ox + rnd() * T, rnd() * 6, 0.9, accent);
+      // coral fringe knuckles poking above the line, height varies by variant
+      for (let i = 0; i < 3; i++) { const x = ox + 2 + i * 5 + (v % 2); ellipse(ctx, x, 0.5 - v * 0.4, 1.4, 2 + v * 0.8, i % 2 ? top : shade(top, 0.15)); }
       break;
     case 'flesh':
-      fillBase(ctx, top);
-      for (let i = 0; i < 3; i++) { const x = rnd() * T; rect(ctx, x, 0, 1, T, shade(accent, 0.1)); }
-      for (let i = 0; i < 5; i++) wrapDot(ctx, rnd() * T, rnd() * T, 1, shade(top, -0.2));
+      fillAt(ctx, ox, top);
+      for (let i = 0; i < 3; i++) { const x = ox + rnd() * T; rect(ctx, x, 0, 1, T, shade(accent, 0.1)); }
+      for (let i = 0; i < 5; i++) circle(ctx, ox + rnd() * T, rnd() * T, 1, shade(top, -0.2));
+      // a pulsing vein bulge along the top, bigger on the "swollen" variant
+      ellipse(ctx, ox + T * 0.5, 1, 3 + v * 1.2, 1.4 + v * 0.5, shade(accent, 0.15));
       break;
     case 'planksDark':
     case 'planks':
     default:
-      fillBase(ctx, top);
-      rect(ctx, 0, 0, T, 2, shade(top, 0.2));
-      rect(ctx, 0, T / 2, T, 1, shade(top, -0.25));
-      rect(ctx, T / 2, 0, 1, T, shade(top, -0.15));
+      fillAt(ctx, ox, top);
+      rect(ctx, ox, 0, T, 2, shade(top, 0.2));
+      rect(ctx, ox, T / 2, T, 1, shade(top, -0.25));
+      rect(ctx, ox + T / 2, 0, 1, T, shade(top, -0.15));
+      // a nail head per plank, position varies so the seam between planks doesn't repeat obviously
+      circle(ctx, ox + 3 + v * 4, 1, 0.6, shade(top, -0.3));
       break;
   }
+}
+
+function groundTop(family: Family, top: string, accent: string, seed: number): HTMLCanvasElement {
+  const c = makeCanvas(FULL, T); const ctx = ctx2d(c);
+  for (let v = 0; v < WV; v++) groundTopVariant(ctx, family, top, accent, seedRandom(seed + v * 41), v * T, v);
   return c;
 }
 

@@ -93,6 +93,13 @@ const CLASS_WEAPON: [ClassId, JobId, WeaponType][] = [
   ['vanguard', 'vanguard', 'sword'], ['stormcaller', 'stormcaller', 'staff'],
   ['windrunner', 'windrunner', 'bow'], ['shade', 'shade', 'dagger'],
 ];
+// tier-2 specializations, shown as an extra block so their job-accent markings can be QA'd visually
+const TIER2_WEAPON: [ClassId, JobId, WeaponType][] = [
+  ['vanguard', 'bulwark', 'sword'], ['vanguard', 'reaver', 'axe'],
+  ['stormcaller', 'tempest', 'staff'], ['stormcaller', 'tidesinger', 'wand'],
+  ['windrunner', 'skyhunter', 'bow'], ['windrunner', 'sparkgunner', 'gun'],
+  ['shade', 'duskblade', 'dagger'], ['shade', 'hexslinger', 'knives'],
+];
 const ANIM_ORDER = ['idle', 'walk', 'jump', 'fall', 'crouch', 'attack', 'cast', 'shoot', 'climb', 'hurt', 'dead'];
 
 function look(classId: ClassId, jobId: JobId, weaponType: WeaponType, hairStyle: number): CharacterLook {
@@ -120,6 +127,21 @@ class CharactersScene extends Phaser.Scene {
     this.add.rectangle(0, 0, 4000, 3000, 0x1a2030).setOrigin(0);
     let row = 0;
     for (const [classId, jobId, weaponType] of CLASS_WEAPON) {
+      let col = 0;
+      for (const anim of ANIM_ORDER) {
+        const info = getCharacterSprite(this, look(classId, jobId, weaponType, row));
+        const x = 30 + col * 40, y = 30 + row * 60;
+        const s = this.add.sprite(x, y, info.key).setOrigin(0.5, 1);
+        playLoop(this, s, info.anims[anim]);
+        this.add.text(x, y + 4, anim, { fontSize: '6px', color: '#9fb2ff' }).setOrigin(0.5, 0);
+        col++;
+      }
+      this.add.text(6, 30 + row * 60 - 34, `${jobId} (${weaponType})`, { fontSize: '7px', color: '#ffe07a' });
+      row++;
+    }
+    row += 1;
+    this.add.text(6, 30 + row * 60 - 44, 'tier-2 specializations (job accents)', { fontSize: '8px', color: '#9fe0ff' });
+    for (const [classId, jobId, weaponType] of TIER2_WEAPON) {
       let col = 0;
       for (const anim of ANIM_ORDER) {
         const info = getCharacterSprite(this, look(classId, jobId, weaponType, row));
@@ -189,8 +211,10 @@ class WorldScene extends Phaser.Scene {
     this.parallax = createParallax(this, theme, 640, 360);
     this.weather = createWeather(this, THEME_PALETTES[theme].weather);
     const tex = getPlatformTextures(this, theme);
+    // groundTop tiles as a wider seamless block (variant tiles baked in) — a tileSprite here
+    // matches exactly how Terrain.ts renders real ground, so this is a faithful preview.
+    this.add.tileSprite(0, 300, 640, tex.tile, tex.groundTop).setOrigin(0).setDepth(1);
     for (let x = 0; x < 640; x += tex.tile) {
-      this.add.image(x, 300, tex.groundTop).setOrigin(0).setDepth(1);
       for (let yy = 316; yy < 360; yy += tex.tile) this.add.image(x, yy, tex.groundFill).setOrigin(0).setDepth(1);
     }
     for (let x = 0; x < 160; x += tex.tile) this.add.image(x + 20, 220, tex.oneway).setOrigin(0).setDepth(1);
@@ -348,6 +372,16 @@ function buildIconGrid() {
   for (const [classId, jobId, weaponType] of CLASS_WEAPON) {
     cell(portraitGrid, characterPortraitUrl(look(classId, jobId, weaponType, 2), 64), `${jobId} portrait`);
     cell(portraitGrid, characterPreviewUrl(look(classId, jobId, weaponType, 2), 3), `${jobId} preview`);
+  }
+  const tier2Grid = section('Tier-2 previews (job accents, x6)');
+  const bigCell = (grid: HTMLElement, url: string, label: string) => {
+    const c = document.createElement('div'); c.className = 'cell'; c.style.width = '140px';
+    const img = document.createElement('img'); img.src = url; img.style.width = '128px'; img.style.height = '160px'; c.appendChild(img);
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = label; c.appendChild(l);
+    grid.appendChild(c);
+  };
+  for (const [classId, jobId, weaponType] of TIER2_WEAPON) {
+    bigCell(tier2Grid, characterPreviewUrl(look(classId, jobId, weaponType, 2), 6), jobId);
   }
   const npcGrid = section('NPC portraits');
   for (const def of (NPC_LIST.length ? NPC_LIST : FALLBACK_NPCS)) cell(npcGrid, npcPortraitUrl(def, 64), def.id);

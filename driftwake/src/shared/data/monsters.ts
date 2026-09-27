@@ -425,10 +425,84 @@ const HOLLOW_MONSTERS: MonsterDef[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Act VI — The Drift Beyond (levels 36-41, post-game)
+// ---------------------------------------------------------------------------
+
+const VESPER_MONSTERS: MonsterDef[] = [
+  {
+    id: 'star_jelly', name: 'Star Jelly', level: 36, hp: 3637, attack: 123, defense: 43, xp: 584, gold: [72, 144],
+    speed: 44, behavior: 'flyer', aggressive: false,
+    drops: drops([mat('mat_star_shard', 0.4), mat('mat_wraith_wisp', 0.15)], 'use_hp_potion_xl', 'use_mp_potion_xl', { stone2: true }),
+    sprite: { base: 'jelly', palette: { primary: '#8ae0ff', secondary: '#4a6bff', accent: '#ffffff' }, variant: 1, scale: 1.1 },
+    knockbackResist: 0, respawnMs: 9000,
+  },
+  {
+    id: 'nebula_wisp', name: 'Nebula Wisp', level: 36, hp: 2910, attack: 123, defense: 43, xp: 584, gold: [72, 144], // wisp: -20% hp
+    speed: 58, behavior: 'flyer', aggressive: false,
+    drops: drops([mat('mat_star_shard', 0.4), mat('mat_blighted_wing', 0.15)], 'use_hp_potion_xl', 'use_mp_potion_xl', { stone2: true }),
+    sprite: { base: 'wisp', palette: { primary: '#c9a4ff', secondary: '#4a2a8a', accent: '#8ae0ff' }, variant: 1, scale: 1.1 },
+    knockbackResist: 0, respawnMs: 9000,
+  },
+  {
+    id: 'void_ray', name: 'Void Ray', level: 37, hp: 3794, attack: 127, defense: 45, xp: 607, gold: [74, 148],
+    speed: 62, behavior: 'flyer', aggressive: true,
+    drops: drops([mat('mat_void_scale', 0.4), mat('mat_blight_goo', 0.15)], 'use_hp_potion_xl', 'use_mp_potion_xl',
+      { stone2: true, extra: [mat('qi_archivist_ledger', 0.25)] }),
+    sprite: { base: 'fish', palette: { primary: '#2a1a4a', secondary: '#5a3f9a', accent: '#8ae0ff', eye: '#fff0a0' }, scale: 1.2 },
+    knockbackResist: 0.15, respawnMs: 9000,
+  },
+  {
+    id: 'singer_construct', name: 'Singer Construct', level: 38, hp: 5140, attack: 130, defense: 46, xp: 631, gold: [76, 152], // golem +30% hp
+    speed: 27, behavior: 'walker', aggressive: true,
+    drops: drops([mat('mat_singer_core', 0.35), mat('mat_sentinel_rune', 0.15)], 'use_hp_potion_xl', 'use_mp_potion_xl',
+      { stone2: true, extra: [mat('qi_choir_fragment', 0.3)] }),
+    sprite: { base: 'golem', palette: { primary: '#4a2a8a', secondary: '#2a1a4a', accent: '#ffd24a', eye: '#8ae0ff' }, scale: 1.3, variant: 1 },
+    knockbackResist: 0.6, respawnMs: 9500,
+  },
+  {
+    id: 'echo_knight', name: 'Echo Knight', level: 39, hp: 4115, attack: 133, defense: 47, xp: 655, gold: [78, 156],
+    speed: 38, behavior: 'walker', aggressive: false,
+    attacks: [proj('echo_lance', { damageMult: 1.1, cooldownMs: 2900, range: 260, telegraphMs: 480, projectileSpeed: 210, vfx: 'bolt', color: '#8ae0ff' })],
+    drops: drops([mat('mat_singer_core', 0.4), mat('mat_rot_cap', 0.15)], 'use_hp_potion_xl', 'use_mp_potion_xl',
+      { stone2: true, extra: [mat('qi_choir_fragment', 0.3)] }),
+    sprite: { base: 'humanoid', palette: { primary: '#3a2a6a', secondary: '#1a1035', accent: '#ffd24a', eye: '#8ae0ff' }, variant: 2, scale: 1.2 },
+    knockbackResist: 0.2, respawnMs: 9500,
+  },
+  {
+    id: 'comet_beetle', name: 'Comet Beetle', level: 40, hp: 4279, attack: 136, defense: 48, xp: 679, gold: [80, 160],
+    speed: 50, behavior: 'charger', aggressive: false,
+    attacks: [charge('comet_charge', { damageMult: 1.3, cooldownMs: 4800, range: 320, telegraphMs: 580, vfx: 'explosion', color: '#8ae0ff' })],
+    drops: drops([mat('mat_void_scale', 0.4), mat('mat_grub_meat', 0.15)], 'use_hp_potion_xl', 'use_mp_potion_xl', { stone2: true }),
+    sprite: { base: 'beetle', palette: { primary: '#2a1a4a', secondary: '#8ae0ff', accent: '#ffd24a', eye: '#ffffff' }, variant: 1, scale: 1.2 },
+    knockbackResist: 0.3, respawnMs: 9500,
+  },
+  {
+    id: 'vesper_heartsong', name: 'The Vesper Heartsong', level: 41, hp: 472810, attack: 148, defense: 62, xp: 14080, gold: [1900, 2600],
+    speed: 0, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Leviathan\'s Old Wound',
+    attacks: [
+      { id: 'vh_starfall_rain', kind: 'rain', damageMult: 1.1, cooldownMs: 7000, range: 500, telegraphMs: 950, count: 9, vfx: 'ice', color: '#8ae0ff' },
+      { id: 'vh_choir_shockwave', kind: 'shockwave', damageMult: 1.3, cooldownMs: 4500, range: 9999, telegraphMs: 800, vfx: 'wave', color: '#4a6bff' },
+      { id: 'vh_void_beam', kind: 'beam', damageMult: 1.5, cooldownMs: 9000, range: 9999, telegraphMs: 1000, vfx: 'shadow', color: '#2a1a4a' },
+      { id: 'vh_construct_summon', kind: 'summon', damageMult: 0, cooldownMs: 14000, range: 9999, telegraphMs: 1000, summonId: 'singer_construct', summonCount: 2, vfx: 'buff', color: '#4a2a8a' },
+      { id: 'vh_comet_leap', kind: 'leap', damageMult: 1.5, cooldownMs: 8500, range: 380, telegraphMs: 900, radius: 170, vfx: 'explosion', color: '#ffd24a' },
+    ],
+    phases: [
+      { hpBelow: 1, attacks: ['vh_starfall_rain', 'vh_choir_shockwave'], speedMult: 1, shout: 'Something in the deep dark finally answers your knock.' },
+      { hpBelow: 0.6, attacks: ['vh_starfall_rain', 'vh_choir_shockwave', 'vh_construct_summon', 'vh_comet_leap'], speedMult: 1, shout: 'Older than Oma. Older than your whole sky. Listen.' },
+      { hpBelow: 0.3, attacks: ['vh_starfall_rain', 'vh_choir_shockwave', 'vh_construct_summon', 'vh_comet_leap', 'vh_void_beam'], speedMult: 1, shout: 'THE WOUND WAS NEVER YOURS TO CLOSE. SING ANYWAY.' },
+    ],
+    drops: bossDrops('mat_vesper_heartsong_core', [mat('qi_vesper_song', 1, 1, 2)]),
+    sprite: { base: 'heart', palette: { primary: '#3a2a6a', secondary: '#1a1035', accent: '#8ae0ff', eye: '#ffd24a' }, scale: 4, variant: 1 },
+    knockbackResist: 1, immune: ['stun', 'freeze'], respawnMs: 200000,
+  },
+];
+
 export const MONSTER_LIST: MonsterDef[] = [
   ...DRIFTMOOR_MONSTERS,
   ...FINREACH_MONSTERS,
   ...STORMBREAK_MONSTERS,
   ...LANTERNREEF_MONSTERS,
   ...HOLLOW_MONSTERS,
+  ...VESPER_MONSTERS,
 ];

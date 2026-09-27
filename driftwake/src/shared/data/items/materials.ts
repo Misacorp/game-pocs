@@ -95,6 +95,17 @@ const BOSS_MATS: ItemDef[] = [
   mat('mat_storm_plume', "Kraelith's Storm Plume", 'rare', 48, "A single unbroken feather from the storm roc's wing, humming with charge.", 'feather', ['#cfe0ee', '#4fd1ff', '#5a6b7a']),
   mat('mat_captain_doubloon', "Captain Rook's Doubloon", 'rare', 55, "An old harpooner's coin, corroded green but still recognizably a whale-and-harpoon.", 'coin', ['#3fe0c8', '#f0e6d2', '#ff7f8a']),
   mat('mat_heart_ember', "Ember of the Blight Heart", 'epic', 70, "A cooling coal-red fragment of the Blight Heart itself. It pulses, very faintly, still.", 'core', ['#8a5fd0', '#3a1f4a', '#ff8844']),
+  mat('mat_vesper_heartsong_core', "The Heartsong's Core", 'epic', 85, "The still-singing core of the Leviathan Vesper's own wound. It hums a note older than words.", 'core', ['#ffd24a', '#3a2a6a', '#8ae0ff']),
+];
+
+// ---------------------------------------------------------------------------
+// Act VI — The Drift Beyond (Vesper's Landing / Starfall Ruins / Singer's Spire, L36-41)
+// ---------------------------------------------------------------------------
+
+const VESPER_MATS: ItemDef[] = [
+  mat('mat_star_shard', 'Star Shard', 'uncommon', 20, 'A sliver of crystallized starlight, shed from the drowned observatory. Cool to the touch, never dims.', 'crystal', ['#4a6bff', '#8ae0ff', '#ffffff']),
+  mat('mat_void_scale', 'Void Scale', 'uncommon', 22, "A scale sheared from something that swims in the space between clouds. It has no shadow.", 'scale', ['#2a1a4a', '#5a3f9a', '#8ae0ff']),
+  mat('mat_singer_core', "First Singer's Core", 'rare', 28, "A fragment of song given form — one of the constructs the First Singers built to keep their spire watching. Still warm with old purpose.", 'core', ['#ffd24a', '#4a2a8a', '#fff0c0']),
 ];
 
 // ---------------------------------------------------------------------------
@@ -172,6 +183,7 @@ export const MATERIAL_ITEMS: ItemDef[] = [
   ...LANTERNREEF_MATS,
   ...HOLLOW_MATS,
   ...BOSS_MATS,
+  ...VESPER_MATS,
   ...SALVAGE_MATS,
   ...ENHANCE_MATS,
   ...ORES,

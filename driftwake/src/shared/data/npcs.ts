@@ -431,4 +431,69 @@ export const NPC_LIST: NpcDef[] = [
       'She can still hear you, you know. Even now. Especially now.',
     ],
   },
+
+  // -------------------------------------------------------------------------
+  // Act VI — The Drift Beyond (Vesper's Landing, post-game)
+  // -------------------------------------------------------------------------
+  {
+    id: 'npc_archivist_lume',
+    name: 'The Archivist',
+    title: 'Ghost of the First Singers',
+    sprite: { base: 'spirit', palette: { skin: '#d8e8ff', hair: '#ffd24a', outfit: '#3a2a6a', accent: '#8ae0ff' }, accessory: 'glasses' },
+    dialogue: 'dlg_archivist_lume',
+    greeting: 'Oh — a living reader. It has been an age since anyone turned these pages but me.',
+    barks: [
+      'The Vesper is older than Oma. Older, I think, than the sky-sea itself.',
+      'We built the spire to listen, not to rule. I wish more of my kin had remembered the difference.',
+      'Every fragment you bring me is a word. Enough words, and I can finally finish the sentence.',
+      'Oma\'s heart healed because someone chose, in the end, to listen. This one deserves the same chance.',
+      'I do not know what wakes at the bottom of the spire. I have had a very long time to be afraid of finding out.',
+    ],
+  },
+  {
+    id: 'npc_vane',
+    name: 'Harlan Vane',
+    title: 'Harpooner Prospector',
+    sprite: { base: 'sailor', palette: { skin: '#c9946a', hair: '#4a3a2a', outfit: '#3a2a2a', accent: '#8a3a2a' }, accessory: 'hat' },
+    dialogue: 'dlg_vane',
+    greeting: "Two skywhales in one lifetime. Grell would call that a gift. I call it an opportunity — carefully handled.",
+    barks: [
+      'A whale this old has to be carrying something worth harvesting. Old things always are.',
+      'I\'m not here to hurt it. I\'m here to make sure somebody sensible gets to it first.',
+      'The Guild taught me: don\'t wait for permission from something the size of a mountain.',
+      'That archivist ghost is polite about it, but she doesn\'t trust me an inch. Fair, honestly.',
+      'You handled Oma\'s heart with some care, I hear. I\'m hoping you\'ll extend the Vesper the same courtesy — my way.',
+    ],
+  },
+  {
+    id: 'npc_cantor_rell',
+    name: 'Cantor Rell',
+    title: 'Tidekeeper Cantor',
+    sprite: { base: 'mystic', palette: { skin: '#a87858', hair: '#e0e8ff', outfit: '#3a2a6a', accent: '#8ae0ff' }, accessory: 'hood' },
+    dialogue: 'dlg_cantor_rell',
+    greeting: 'Hush. Do you feel it? A song older than Aolani\'s oldest hymn, drifting up through the clouds.',
+    barks: [
+      'Two whales, singing across the sky-sea to each other — I never thought I\'d live to hear it.',
+      'Vane wants to cut into something we don\'t understand yet. I would rather listen a little longer.',
+      'The Vesper hasn\'t harmed a soul. That should count for something, even to a Harpooner.',
+      'If Oma could be healed, so can whatever wound this one carries. I have to believe that.',
+      'Sing with me at the landing sometime. The wind up here carries a note I can\'t place alone.',
+    ],
+  },
+  {
+    id: 'npc_bryn_wick',
+    name: 'Bryn Wick',
+    title: "Landing Trader",
+    sprite: { base: 'merchant', palette: { skin: '#e0b898', hair: '#8a6a4a', outfit: '#3a2a6a', accent: '#8ae0ff' }, accessory: 'glasses' },
+    dialogue: 'dlg_bryn_wick',
+    greeting: "Set up shop the week the Vesper surfaced. Best business decision I've ever made, and the scariest.",
+    shopId: 'shop_vesper',
+    barks: [
+      'Star shards move fast. Everybody wants a piece of the new whale, one way or another.',
+      'I don\'t ask where the gear comes from. I just make sure it fits.',
+      'The Archivist buys nothing and reads everything. Strange customer, good company.',
+      'Vane and Cantor argue by my stall every single day. I\'ve started selling tickets. Joking. Mostly.',
+      'Restocked fresh gear off the new whale\'s own hide, if you\'ve got the coin for it.',
+    ],
+  },
 ];

@@ -47,6 +47,7 @@ const WEAPON_TIERS: WeaponTier[] = [
   { level: 25, material: 'Galewrought', rarity: 'rare', colors: ['#cfe0ee', '#5a6b7a', '#4fd1ff'], flavor: 'Fitted with storm-roc feathers that hum faintly in high wind.' },
   { level: 30, material: 'Coralbright', rarity: 'rare', colors: ['#ff7f8a', '#3fe0c8', '#f0e6d2'], flavor: 'Grown from living reef coral, faintly bioluminescent in the dark.' },
   { level: 35, material: 'Voidforged', rarity: 'rare', colors: ['#5a3f7a', '#3a1f4a', '#8a5fd0'], flavor: 'Shaped from voidstone pulled out of the Hollow, humming with quiet dread.' },
+  { level: 40, material: 'Starforged', rarity: 'rare', colors: ['#8ae0ff', '#4a2a8a', '#fff0c0'], flavor: "Forged from a shard of the Vesper's own starlight core, cool light given an edge." },
 ];
 
 interface WeaponTypeCfg {
@@ -120,8 +121,8 @@ for (const tier of WEAPON_TIERS) {
   }
 }
 
-// Crafted weapon upgrades (Smithing), at tiers 5/15/25/35, +15% stats, better min rarity.
-const CRAFTED_WEAPON_TIERS = WEAPON_TIERS.filter((t) => [5, 15, 25, 35].includes(t.level));
+// Crafted weapon upgrades (Smithing), at tiers 5/15/25/35/40, +15% stats, better min rarity.
+const CRAFTED_WEAPON_TIERS = WEAPON_TIERS.filter((t) => [5, 15, 25, 35, 40].includes(t.level));
 const CRAFTED_WEAPONS: ItemDef[] = [];
 for (const tier of CRAFTED_WEAPON_TIERS) {
   for (const wt of WEAPON_TYPES) {
@@ -332,6 +333,20 @@ const ACCESSORIES: ItemDef[] = [
   { id: 'eq_ring_heartcrystal', name: 'Heartcrystal Ring', description: "Sera's finest cut: a sliver of Oma's own heart-crystal, ringed in voidforged silver.", category: 'equip', rarity: 'epic', icon: { shape: 'ring', colors: ['#8a5fd0', '#3a1f4a', '#5a3f7a'] }, stack: 1, sellPrice: sell(34, 'epic'), buyPrice: buy(sell(34, 'epic')), levelReq: 34, equip: { slot: 'ring', stats: { attack: 8, magicAttack: 8, critRate: 0.03, critDamage: 0.05 }, randomLines: 2 }, tags: ['crafted'] },
   { id: 'eq_amulet_hollow_lantern', name: 'Hollow Lantern Amulet', description: 'A bottled will-o-wisp that never gutters, even in the Hollow\'s deep dark.', category: 'equip', rarity: 'epic', icon: { shape: 'amulet', colors: ['#3fe0c8', '#3a1f4a', '#8a5fd0'] }, stack: 1, sellPrice: sell(35, 'epic'), buyPrice: buy(sell(35, 'epic')), levelReq: 35, equip: { slot: 'amulet', stats: { hpRegen: 8, mpRegen: 8, dropBonus: 0.04 }, randomLines: 2 }, tags: ['crafted'] },
   { id: 'eq_ring_blightglass', name: 'Blightglass Signet', description: 'Cooled blight-glass, unnervingly warm at the core. It should not still be beating.', category: 'equip', rarity: 'epic', icon: { shape: 'ring', colors: ['#3a1f4a', '#5a3f7a', '#8a5fd0'] }, stack: 1, sellPrice: sell(36, 'epic'), buyPrice: buy(sell(36, 'epic')), levelReq: 36, equip: { slot: 'ring', stats: { damagePct: 0.03, defense: 8 }, randomLines: 2 }, tags: ['worlddrop'] },
+
+  // --- Act VI (L40 tier) ---
+  { id: 'eq_ring_starlight_signet', name: 'Starlight Signet', description: "Cut from a star shard by an unusually steady hand; it never quite stops twinkling.", category: 'equip', rarity: 'epic', icon: { shape: 'ring', colors: ['#8ae0ff', '#4a6bff', '#ffffff'] }, stack: 1, sellPrice: sell(38, 'epic'), buyPrice: buy(sell(38, 'epic')), levelReq: 38, equip: { slot: 'ring', stats: { attack: 10, magicAttack: 10, critRate: 0.04, critDamage: 0.06 }, randomLines: 2 }, tags: ['worlddrop'] },
+  { id: 'eq_amulet_vesper_chorus', name: 'Vesper Chorus Amulet', description: 'A cluster of void scales strung on wire; together they hum a chord instead of a note.', category: 'equip', rarity: 'epic', icon: { shape: 'amulet', colors: ['#2a1a4a', '#5a3f9a', '#8ae0ff'] }, stack: 1, sellPrice: sell(39, 'epic'), buyPrice: buy(sell(39, 'epic')), levelReq: 39, equip: { slot: 'amulet', stats: { maxHp: 50, maxMp: 50, xpBonus: 0.05 }, randomLines: 2 }, tags: ['worlddrop'] },
+];
+
+// ---------------------------------------------------------------------------
+// Act VI armor (L40 tier) — chest pieces only, one per archetype.
+// ---------------------------------------------------------------------------
+
+const VESPER_ARMOR: ItemDef[] = [
+  { id: 'eq_armor_starguard', name: 'Starguard Chestwrap', description: "Riveted from the same starlight-veined ore as the Starforged weapons — heavy, and faintly luminous.", category: 'equip', rarity: 'epic', icon: { shape: 'armor', colors: ['#8ae0ff', '#4a2a8a', '#fff0c0'] }, stack: 1, sellPrice: sell(40, 'epic'), buyPrice: buy(sell(40, 'epic')), levelReq: 40, classReq: ['vanguard'], equip: { slot: 'armor', stats: { defense: defenseFor(40, 'armor'), maxHp: 80 }, randomLines: RANDOM_LINES.epic }, tags: ['worlddrop'] },
+  { id: 'eq_armor_voidsilk', name: 'Voidsilk Vestment', description: "Woven from void scale thread; it moves like it's still underwater, even in open air.", category: 'equip', rarity: 'epic', icon: { shape: 'armor', colors: ['#2a1a4a', '#5a3f9a', '#8ae0ff'] }, stack: 1, sellPrice: sell(40, 'epic'), buyPrice: buy(sell(40, 'epic')), levelReq: 40, classReq: ['stormcaller'], equip: { slot: 'armor', stats: { defense: Math.max(1, Math.round(defenseFor(40, 'armor') * 0.8)), maxMp: 80, int: Math.max(1, Math.floor(statBonus(40) / 2)) }, randomLines: RANDOM_LINES.epic }, tags: ['worlddrop'] },
+  { id: 'eq_armor_choirhide', name: 'Choirhide Wraps', description: "Supple leather tanned with singer-construct core dust; footsteps in it land almost silent.", category: 'equip', rarity: 'epic', icon: { shape: 'armor', colors: ['#ffd24a', '#4a2a8a', '#fff0c0'] }, stack: 1, sellPrice: sell(40, 'epic'), buyPrice: buy(sell(40, 'epic')), levelReq: 40, classReq: ['windrunner', 'shade'], equip: { slot: 'armor', stats: { defense: Math.max(1, Math.round(defenseFor(40, 'armor') * 0.9)), dex: statBonus(40), speed: 4 }, randomLines: RANDOM_LINES.epic }, tags: ['worlddrop'] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -368,6 +383,13 @@ const BOSS_ITEMS: ItemDef[] = [
   { id: 'eq_knives_blightfang', name: 'Blightfang Knives', description: "Twin knives grown from crystallized blight-rot. They never dull.", category: 'equip', rarity: 'epic', icon: { shape: 'knives', colors: ['#5a3f7a', '#8a5fd0', '#3a1f4a'] }, stack: 1, sellPrice: sell(36, 'epic'), levelReq: 36, classReq: ['shade'], equip: { slot: 'weapon', weaponType: 'knives', stats: { attack: physAtk(36) + 22, critRate: 0.04 }, randomLines: 2 }, tags: ['bossdrop:blight_heart'] },
   { id: 'eq_armor_blightplate', name: 'Blight-Purified Plate', description: "Voidstone armor cleansed of its rot, humming faintly with clean light instead.", category: 'equip', rarity: 'epic', icon: { shape: 'armor', colors: ['#5a3f7a', '#8a5fd0', '#3a1f4a'] }, stack: 1, sellPrice: sell(36, 'epic'), levelReq: 36, classReq: ['vanguard'], equip: { slot: 'armor', stats: { defense: defenseFor(36, 'armor') + 10, maxHp: 70 }, randomLines: 2, setId: 'set_blightheart' }, tags: ['bossdrop:blight_heart'] },
   { id: 'eq_amulet_blightheart_core', name: 'Blight Heart Core', description: "The last ember of the heart's corruption, cold now, and quiet.", category: 'equip', rarity: 'epic', icon: { shape: 'amulet', colors: ['#8a5fd0', '#3a1f4a', '#5a3f7a'] }, stack: 1, sellPrice: sell(36, 'epic'), levelReq: 36, equip: { slot: 'amulet', stats: { attack: 10, magicAttack: 10, damagePct: 0.04 }, randomLines: 2, setId: 'set_blightheart' }, tags: ['bossdrop:blight_heart'] },
+
+  // The Vesper Heartsong (L41, superboss) — epic/legendary
+  { id: 'eq_bow_starfall', name: 'Starfall Bow', description: "Strung with a fiber pulled from the Heartsong's own chorus. Arrows leave a trail of drifting light.", category: 'equip', rarity: 'epic', icon: { shape: 'bow', colors: ['#8ae0ff', '#4a2a8a', '#fff0c0'] }, stack: 1, sellPrice: sell(41, 'epic'), levelReq: 41, classReq: ['windrunner'], equip: { slot: 'weapon', weaponType: 'bow', stats: { attack: physAtk(41) + 20, critRate: 0.04 }, randomLines: 2 }, tags: ['bossdrop:vesper_heartsong'] },
+  { id: 'eq_dagger_voidsong', name: 'Voidsong Fang', description: "Carved from a void ray's needle-fang, tuned to the Heartsong's own resonance.", category: 'equip', rarity: 'epic', icon: { shape: 'dagger', colors: ['#2a1a4a', '#5a3f9a', '#8ae0ff'] }, stack: 1, sellPrice: sell(41, 'epic'), levelReq: 41, classReq: ['shade'], equip: { slot: 'weapon', weaponType: 'dagger', stats: { attack: physAtk(41) + 18, critRate: 0.05 }, randomLines: 2 }, tags: ['bossdrop:vesper_heartsong'] },
+  { id: 'eq_helmet_vesperscale', name: 'Vesperscale Helm', description: "Plated in scales shed from the Heartsong itself; it never quite stops humming a low note.", category: 'equip', rarity: 'legendary', icon: { shape: 'helmet', colors: ['#3a2a6a', '#1a1035', '#8ae0ff'] }, stack: 1, sellPrice: sell(41, 'legendary'), levelReq: 41, classReq: ['vanguard'], equip: { slot: 'helmet', stats: { defense: defenseFor(41, 'helmet') + 12, maxHp: 90 }, randomLines: 2, setId: 'set_vesperheartsong' }, tags: ['bossdrop:vesper_heartsong'] },
+  { id: 'eq_ring_choirsinger', name: "Choirsinger's Ring", description: "Forged from the same core that powered every singer construct in the spire, all at once.", category: 'equip', rarity: 'legendary', icon: { shape: 'ring', colors: ['#ffd24a', '#4a2a8a', '#fff0c0'] }, stack: 1, sellPrice: sell(41, 'legendary'), levelReq: 41, equip: { slot: 'ring', stats: { bossDamagePct: 0.06, critRate: 0.04 }, randomLines: 2, setId: 'set_vesperheartsong' }, tags: ['bossdrop:vesper_heartsong'] },
+  { id: 'eq_amulet_heartsong_core', name: "The Heartsong's Core", description: "The Vesper's own wound, cooled and quiet, worn now instead of hidden.", category: 'equip', rarity: 'legendary', icon: { shape: 'amulet', colors: ['#8ae0ff', '#3a2a6a', '#ffd24a'] }, stack: 1, sellPrice: sell(41, 'legendary'), levelReq: 41, equip: { slot: 'amulet', stats: { attack: 14, magicAttack: 14, damagePct: 0.05 }, randomLines: 2 }, tags: ['bossdrop:vesper_heartsong'] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -392,6 +414,15 @@ const QUEST_REWARD_GEAR: ItemDef[] = [
   { id: 'eq_amulet_ember_harvest', name: "Oma's Harvested Ember", description: "The whale's own heart-ember, cut free and bound to serve the Harpooners' cause. Legendary and terrible.", category: 'equip', rarity: 'legendary', icon: { shape: 'amulet', colors: ['#ff8844', '#5a3f7a', '#8a5fd0'] }, stack: 1, sellPrice: sell(36, 'legendary'), levelReq: 36, equip: { slot: 'amulet', stats: { attack: 20, magicAttack: 20, damagePct: 0.06, critDamage: 0.06 }, randomLines: 2 }, tags: ['questreward'] },
   { id: 'eq_amulet_oma_purified', name: "Oma's Purified Heart", description: "The Blight burned away by the Tidekeepers' song; the ember beats clean and warm again.", category: 'equip', rarity: 'legendary', icon: { shape: 'amulet', colors: ['#3fe0c8', '#f0e6d2', '#ffb238'] }, stack: 1, sellPrice: sell(36, 'legendary'), levelReq: 36, equip: { slot: 'amulet', stats: { maxHp: 80, maxMp: 80, hpRegen: 12, mpRegen: 12, xpBonus: 0.06 }, randomLines: 2 }, tags: ['questreward'] },
   { id: 'eq_ring_songbound', name: 'Songbound Ring', description: "Worn by whoever sang Oma back from the brink — Harpooner steel and Tidekeeper song, together at last.", category: 'equip', rarity: 'legendary', icon: { shape: 'ring', colors: ['#ffb238', '#3fe0c8', '#8a5fd0'] }, stack: 1, sellPrice: sell(36, 'legendary'), levelReq: 36, equip: { slot: 'ring', stats: { attack: 12, magicAttack: 12, critRate: 0.04, xpBonus: 0.04, dropBonus: 0.04 }, randomLines: 2 }, tags: ['questreward'] },
+
+  // --- Act VI: mq_22_two_more_currents (trust Vane / trust Cantor) ---
+  { id: 'eq_ring_vane_favor', name: "Vane's Prospecting Ring", description: "A rough-cut ring Vane presses into your hand 'for services rendered' — pragmatic, like everything he does.", category: 'equip', rarity: 'rare', icon: { shape: 'ring', colors: ['#8a3a2a', '#c9946a', '#8ae0ff'] }, stack: 1, sellPrice: sell(36, 'rare'), levelReq: 36, equip: { slot: 'ring', stats: { attack: 8, goldBonus: 0.04 }, randomLines: 1 }, tags: ['questreward'] },
+  { id: 'eq_amulet_cantor_favor', name: "Cantor's Resonance Charm", description: "A charm Cantor Rell hums a note into before handing it over. It keeps humming, faintly, on its own.", category: 'equip', rarity: 'rare', icon: { shape: 'amulet', colors: ['#3a2a6a', '#8ae0ff', '#e0e8ff'] }, stack: 1, sellPrice: sell(36, 'rare'), levelReq: 36, equip: { slot: 'amulet', stats: { magicAttack: 8, hpRegen: 6, mpRegen: 6 }, randomLines: 1 }, tags: ['questreward'] },
+
+  // --- Act VI finale: mq_27_vesper_heartsong ---
+  { id: 'eq_amulet_vesper_harvest', name: "The Vesper's Harvested Song", description: "You have taken the last of the Heartsong's power for your own use, same as you did — or would have — with Oma's Ember. Efficient. Legendary. Quiet, in a way that isn't comfortable.", category: 'equip', rarity: 'legendary', icon: { shape: 'amulet', colors: ['#ffd24a', '#2a1a4a', '#8ae0ff'] }, stack: 1, sellPrice: sell(41, 'legendary'), levelReq: 41, equip: { slot: 'amulet', stats: { attack: 22, magicAttack: 22, damagePct: 0.06, critDamage: 0.06 }, randomLines: 2 }, tags: ['questreward'] },
+  { id: 'eq_ring_vesper_drift', name: "Ring of the Drifting Vesper", description: "You let the old wound close on its own terms and let the Vesper drift on, unharvested. She left you this — a ring that never quite stops turning, like a whale still choosing its course.", category: 'equip', rarity: 'legendary', icon: { shape: 'ring', colors: ['#8ae0ff', '#4a6bff', '#fff0c0'] }, stack: 1, sellPrice: sell(41, 'legendary'), levelReq: 41, equip: { slot: 'ring', stats: { maxHp: 90, maxMp: 90, hpRegen: 14, mpRegen: 14, xpBonus: 0.05 }, randomLines: 2 }, tags: ['questreward'] },
+  { id: 'eq_amulet_vesper_songbound', name: 'Duet Amulet', description: "Because you already sang one whale back from the brink together, the Vesper answers you the same way — not harvest, not distance, but a second duet, rarer than the first for being repeated at all.", category: 'equip', rarity: 'legendary', icon: { shape: 'amulet', colors: ['#ffb238', '#8ae0ff', '#ffd24a'] }, stack: 1, sellPrice: sell(41, 'legendary'), levelReq: 41, equip: { slot: 'amulet', stats: { attack: 16, magicAttack: 16, critRate: 0.04, xpBonus: 0.05, dropBonus: 0.05 }, randomLines: 2 }, tags: ['questreward'] },
 ];
 
 export const EQUIPMENT_ITEMS: ItemDef[] = [
@@ -401,6 +432,7 @@ export const EQUIPMENT_ITEMS: ItemDef[] = [
   ...CRAFTED_WEAPONS,
   ...ARMOR_ITEMS,
   ...CRAFTED_ARMOR,
+  ...VESPER_ARMOR,
   ...ACCESSORIES,
   ...BOSS_ITEMS,
   ...QUEST_REWARD_GEAR,

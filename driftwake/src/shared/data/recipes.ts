@@ -30,6 +30,7 @@ const FORGE_TIERS: ForgeTier[] = [
   { material: 'amberlit', profLevel: 5, ingot: 'mat_iron_ingot', ingotQty: 3, monsterMat: 'mat_kelp_essence', scrap: 'mat_scrap_iron', xp: 40, gold: 40, minRarity: 'uncommon', learn: 'auto' },
   { material: 'galewrought', profLevel: 8, ingot: 'mat_stormsteel_ingot', ingotQty: 3, monsterMat: 'mat_storm_feather', scrap: 'mat_scrap_fine', xp: 60, gold: 70, minRarity: 'rare', learn: 'trainer', trainerCost: 300 },
   { material: 'voidforged', profLevel: 10, ingot: 'mat_voidstone_ingot', ingotQty: 4, monsterMat: 'mat_wraith_wisp', scrap: 'mat_scrap_arcane', xp: 90, gold: 120, minRarity: 'rare', learn: 'trainer', trainerCost: 600 },
+  { material: 'starforged', profLevel: 10, ingot: 'mat_voidstone_ingot', ingotQty: 5, monsterMat: 'mat_singer_core', scrap: 'mat_scrap_arcane', xp: 130, gold: 220, minRarity: 'rare', learn: 'trainer', trainerCost: 900 },
 ];
 for (const tier of FORGE_TIERS) {
   for (const type of WEAPON_TYPES) {
@@ -61,6 +62,23 @@ for (const slot of ARMOR_SLOTS) {
     output: { itemId: `eq_${slot}_galehide_forged`, qty: 1 }, goldCost: 50, xp: 50, learn: 'trainer', trainerCost: 250, minRarity: 'rare',
   });
 }
+
+// Act VI armor chest pieces (Smithing, profession level 10, new materials).
+add({
+  id: 'rec_smith_armor_starguard', profession: 'smithing', level: 10,
+  inputs: [{ itemId: 'mat_voidstone_ingot', qty: 3 }, { itemId: 'mat_singer_core', qty: 1 }, { itemId: 'mat_scrap_arcane', qty: 1 }],
+  output: { itemId: 'eq_armor_starguard', qty: 1 }, goldCost: 260, xp: 110, learn: 'trainer', trainerCost: 800, minRarity: 'epic',
+});
+add({
+  id: 'rec_smith_armor_voidsilk', profession: 'smithing', level: 10,
+  inputs: [{ itemId: 'mat_voidstone_ingot', qty: 2 }, { itemId: 'mat_void_scale', qty: 2 }, { itemId: 'mat_scrap_arcane', qty: 1 }],
+  output: { itemId: 'eq_armor_voidsilk', qty: 1 }, goldCost: 260, xp: 110, learn: 'trainer', trainerCost: 800, minRarity: 'epic',
+});
+add({
+  id: 'rec_smith_armor_choirhide', profession: 'smithing', level: 10,
+  inputs: [{ itemId: 'mat_voidstone_ingot', qty: 2 }, { itemId: 'mat_star_shard', qty: 2 }, { itemId: 'mat_scrap_arcane', qty: 1 }],
+  output: { itemId: 'eq_armor_choirhide', qty: 1 }, goldCost: 260, xp: 110, learn: 'trainer', trainerCost: 800, minRarity: 'epic',
+});
 
 // Whetstones
 const WHETSTONE_RECIPES = [
@@ -165,5 +183,9 @@ add({ id: 'rec_jewel_amulet_hollow_lantern', profession: 'jewelcrafting', level:
 
 add({ id: 'rec_jewel_enhance_stone_2', profession: 'jewelcrafting', level: 7, inputs: [{ itemId: 'mat_cut_amber', qty: 2 }, { itemId: 'mat_scrap_fine', qty: 2 }], output: { itemId: 'mat_enhance_stone_2', qty: 1 }, xp: 50, learn: 'trainer', trainerCost: 250 });
 add({ id: 'rec_jewel_enhance_stone_3', profession: 'jewelcrafting', level: 10, inputs: [{ itemId: 'mat_cut_heart_crystal', qty: 2 }, { itemId: 'mat_scrap_arcane', qty: 2 }], output: { itemId: 'mat_enhance_stone_3', qty: 1 }, xp: 90, learn: 'trainer', trainerCost: 500 });
+
+// Act VI accessories (Jewelcrafting, profession level 10, new materials).
+add({ id: 'rec_jewel_ring_starlight_signet', profession: 'jewelcrafting', level: 10, inputs: [{ itemId: 'mat_star_shard', qty: 2 }, { itemId: 'mat_cut_heart_crystal', qty: 1 }], output: { itemId: 'eq_ring_starlight_signet', qty: 1 }, xp: 95, learn: 'trainer', trainerCost: 450, minRarity: 'epic' });
+add({ id: 'rec_jewel_amulet_vesper_chorus', profession: 'jewelcrafting', level: 10, inputs: [{ itemId: 'mat_void_scale', qty: 2 }, { itemId: 'mat_singer_core', qty: 1 }], output: { itemId: 'eq_amulet_vesper_chorus', qty: 1 }, xp: 95, learn: 'trainer', trainerCost: 450, minRarity: 'epic' });
 
 export const RECIPE_LIST: RecipeDef[] = RECIPES;

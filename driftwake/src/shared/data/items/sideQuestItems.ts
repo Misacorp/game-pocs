@@ -89,4 +89,15 @@ export const SIDE_QUEST_ITEMS: ItemDef[] = [
     sellPrice: 0,
     quest: true,
   },
+  {
+    id: 'qi_stargazers_charm',
+    name: "Stargazer's Charm",
+    description: 'A small charm shaped like a whale mid-breach, strung on cord gone silver with age. Someone carried this a very long way.',
+    category: 'etc',
+    rarity: 'common',
+    icon: { shape: 'relic', colors: ['#8ae0ff', '#ffd24a'] },
+    stack: 99,
+    sellPrice: 0,
+    quest: true,
+  },
 ];

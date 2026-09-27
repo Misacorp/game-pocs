@@ -39,10 +39,17 @@ Play online against the server: `npm run server`, then open `http://localhost:51
 | Shift | Dash (brief invulnerability) |
 | Z | Interact / gather / pick up |
 | Q W E R A S D F, 1–6 | Hotbar (drag skills & items onto it) |
-| I / C / K / L / B / M / N | Inventory / Character / Skills / Quests / Professions / World map / Bestiary |
+| I / C / K / L / B / M / N / J | Inventory / Character / Skills / Quests / Professions / World map / Bestiary / Achievements |
 | H or F1 | Help |
 | Enter | Chat |
 | Esc | Close window / menu |
+
+## Pacing
+
+A headless bot (`scripts/simulate-playthrough.ts`) plays the whole story through the real game rules for every
+class. An efficient player finishes the main story (all three endings are reachable) at **level ~36 in ~80
+minutes**; side, faction, profession and daily content add several more hours. Global XP speed is one knob:
+`XP_CURVE.globalRate` in `src/shared/constants.ts`.
 
 ## What's in the game
 
@@ -56,14 +63,18 @@ Play online against the server: `npm run server`, then open `http://localhost:51
 - **18 maps across 5 regions** — Driftmoor harbor town, Mossback Meadows & Hills, Barnacle Grotto,
   the floating Kelpwood, Gale Outpost & the Stormbreak Spires, the bioluminescent Lanternreef and a
   sunken ghost galleon, and finally the inside of the whale itself.
-- **94 quests** — a 5-act main story with faction politics (Harpooners vs Tidekeepers), job quests,
-  faction quests, 31 side quests, daily bounties and profession quests. Big choices set flags that later
+- **108 quests** — a 5-act main story with faction politics (Harpooners vs Tidekeepers), job quests,
+  faction quests, 43 side quests, 10 daily bounties and 17 profession quests. Big choices set flags that later
   content reacts to; a secret "true ending" unlocks only if you made the merciful choices along the way.
-- **Progression** — levels 1–40 (tunable curve in `src/shared/constants.ts`), AP/SP, 330+ items across
-  5 rarities with random bonus lines, set bonuses, star enhancement, titles, bestiary.
+- **Progression** — levels 1–40 (tunable curve in `src/shared/constants.ts`), AP/SP, items across
+  5 rarities (350+ items) with random bonus lines, set bonuses, star enhancement, titles, bestiary,
+  and 36 achievements (J) with rewards.
 - **Professions** — everyone gathers (Mining, Foraging); pick two crafts: Smithing (the best non-boss gear
   + enhancement stones), Alchemy (potions & elixirs), Cooking (long XP/drop/stat food buffs),
   Jewelcrafting (the best accessories). 104 recipes, salvage for materials.
+- **Pets** — six companions (from a baby Puffmoss to a tiny floating Skywhale) that follow you,
+  auto-loot nearby drops and grant small bonuses.
+- **Onboarding** — first-time contextual tutorial tips (toggle in Settings).
 - **MMO feel offline** — the local backend simulates other wandering players and chat.
 
 ## Architecture

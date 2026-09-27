@@ -80,16 +80,22 @@ describe('driftwake server (smoke)', () => {
       ws.on('error', reject);
     });
 
-    sendMsg(ws, { t: 'hello', token: 'smoke-test-token', protocol: PROTOCOL_VERSION });
+    // Unique token + name per run: server/data/ persists across runs (it's gitignored, local
+    // dev state), so a fixed token+name would collide with a previous run's "name taken" check.
+    const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const token = `smoke-test-token-${runId}`;
+    const name = `Smokey${runId}`.slice(0, 14);
+
+    sendMsg(ws, { t: 'hello', token, protocol: PROTOCOL_VERSION });
     const welcome = await once(ws, (m) => m.t === 'welcome');
     expect(welcome.t).toBe('welcome');
 
-    sendMsg(ws, { t: 'createCharacter', rid: 1, req: { name: 'Smokey', classId: 'vanguard', appearance: { skin: '#e8b98a', hair: '#3a2a1e', hairStyle: 0, eyes: '#2a2a2a', outfit: '#5a7a9a' } } });
+    sendMsg(ws, { t: 'createCharacter', rid: 1, req: { name, classId: 'vanguard', appearance: { skin: '#e8b98a', hair: '#3a2a1e', hairStyle: 0, eyes: '#2a2a2a', outfit: '#5a7a9a' } } });
     const created = await once(ws, (m) => m.t === 'reply' && m.rid === 1);
     if (created.t !== 'reply') throw new Error('unreachable');
     expect(created.ok).toBe(true);
     const character = created.data as { id: string; name: string };
-    expect(character.name).toBe('Smokey');
+    expect(character.name).toBe(name);
 
     sendMsg(ws, { t: 'enterWorld', rid: 2, characterId: character.id });
     const entered = await once(ws, (m) => m.t === 'reply' && m.rid === 2);

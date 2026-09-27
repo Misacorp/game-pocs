@@ -77,7 +77,7 @@ export function migrateCharacter(c: any): CharacterState {
   c.xp = c.xp ?? 0;
   c.gold = c.gold ?? 0;
   c.appearance = c.appearance ?? { skin: '#e8c39e', hair: '#4a3728', hairStyle: 0, eyes: '#3a2a1a', outfit: '#888888' };
-  c.baseStats = { str: 0, dex: 0, int: 0, luk: 0, ...STARTING_STATS, ...(c.baseStats ?? {}) };
+  c.baseStats = { ...STARTING_STATS, ...(c.baseStats ?? {}) };
   c.ap = c.ap ?? 0;
   c.sp = c.sp ?? 0;
   c.skills = c.skills ?? {};

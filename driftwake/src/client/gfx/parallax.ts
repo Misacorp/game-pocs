@@ -118,30 +118,47 @@ function nearLayer(theme: ThemeId): HTMLCanvasElement {
 
 export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, _h: number): Parallax {
   const pal = THEMES[theme];
-  const zoom = scene.cameras.main.zoom || 2;
-  const vw = scene.scale.width / zoom, vh = scene.scale.height / zoom;
 
   const skyKey = `bg_${theme}_sky`; registerCanvasTexture(scene, skyKey, skyCanvas(theme));
   const whaleKey = `bg_${theme}_whale`; registerCanvasTexture(scene, whaleKey, whaleLayer(theme));
   const midKey = `bg_${theme}_mid`; registerCanvasTexture(scene, midKey, midLayer(theme));
   const nearKey = `bg_${theme}_near`; registerCanvasTexture(scene, nearKey, nearLayer(theme));
 
-  const sky = scene.add.image(0, 0, skyKey).setOrigin(0).setScrollFactor(0).setDepth(-100).setDisplaySize(vw, vh);
-  const whale = scene.add.tileSprite(0, vh * 0.05, vw, vh * 0.55, whaleKey).setOrigin(0).setScrollFactor(0).setDepth(-90);
-  const mid = scene.add.tileSprite(0, vh * 0.1, vw, vh * 0.6, midKey).setOrigin(0).setScrollFactor(0).setDepth(-80).setAlpha(0.9);
-  const near = scene.add.tileSprite(0, vh - vh * 0.28, vw, vh * 0.3, nearKey).setOrigin(0).setScrollFactor(0).setDepth(-70).setAlpha(0.95);
+  // NOTE: these layers are positioned every update() from the camera's actual visible world
+  // rect (via cam.getWorldPoint), not from scrollFactor(0) + fixed screen coords. Phaser's
+  // camera zoom pivots around the camera's origin (default center), so a scrollFactor(0)
+  // object at a fixed x/y is NOT guaranteed to sit at that screen position once zoom != 1 —
+  // recomputing from the camera each frame keeps this correct for whatever origin/zoom/scroll
+  // the engine's camera ends up using, and keeps full coverage at any camera position.
+  const sky = scene.add.image(0, 0, skyKey).setOrigin(0).setDepth(-100);
+  const whale = scene.add.tileSprite(0, 0, 10, 10, whaleKey).setOrigin(0).setDepth(-90);
+  const mid = scene.add.tileSprite(0, 0, 10, 10, midKey).setOrigin(0).setDepth(-80).setAlpha(0.9);
+  const near = scene.add.tileSprite(0, 0, 10, 10, nearKey).setOrigin(0).setDepth(-70).setAlpha(0.95);
 
   let lightning: Phaser.GameObjects.Rectangle | undefined;
   let lightningTimer = 2000 + Math.random() * 3000;
   if (pal.weather === 'storm') {
-    lightning = scene.add.rectangle(0, 0, vw, vh, 0xffffff, 0).setOrigin(0).setScrollFactor(0).setDepth(-75);
+    lightning = scene.add.rectangle(0, 0, 10, 10, 0xffffff, 0).setOrigin(0).setDepth(-75);
   }
+
+  function layout(cam: Phaser.Cameras.Scene2D.Camera) {
+    const tl = cam.getWorldPoint(0, 0);
+    const br = cam.getWorldPoint(cam.width, cam.height);
+    const w = br.x - tl.x, h = br.y - tl.y;
+    sky.setPosition(tl.x, tl.y).setDisplaySize(w, h);
+    whale.setPosition(tl.x, tl.y + h * 0.05).setDisplaySize(w, h * 0.55);
+    mid.setPosition(tl.x, tl.y + h * 0.1).setDisplaySize(w, h * 0.6);
+    near.setPosition(tl.x, tl.y + h * 0.72).setDisplaySize(w, h * 0.3);
+    lightning?.setPosition(tl.x, tl.y).setDisplaySize(w, h);
+  }
+  layout(scene.cameras.main);
 
   let t = 0;
   const start = performance.now();
 
   return {
     update(cam: Phaser.Cameras.Scene2D.Camera) {
+      layout(cam);
       t = (performance.now() - start) / 1000;
       whale.tilePositionX = cam.scrollX * 0.04 + t * 1.6;
       whale.tilePositionY = Math.sin(t * 0.15) * 3;

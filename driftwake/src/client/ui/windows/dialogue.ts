@@ -28,17 +28,21 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
 
   function currentDlgId(): string | undefined { return NPCS[npcId]?.dialogue; }
 
+  const CHARS_PER_SEC = 55;
   function typeText(text: string, onDone: () => void) {
     typingCancel?.();
     textEl.textContent = '';
-    let i = 0;
+    optionsEl.innerHTML = ''; // clear the previous view's options immediately, don't let them linger mid-typing
     let done = false;
+    const start = performance.now();
     const finish = () => { if (done) return; done = true; textEl.textContent = text; onDone(); };
+    // Elapsed-time based (not tick-count based) so a laggy frame never slows total reveal time.
     const timer = window.setInterval(() => {
-      i += 2;
+      const elapsed = performance.now() - start;
+      const i = Math.floor((elapsed / 1000) * CHARS_PER_SEC);
       textEl.textContent = text.slice(0, i);
       if (i >= text.length) { window.clearInterval(timer); finish(); }
-    }, 14);
+    }, 16);
     typingCancel = () => { window.clearInterval(timer); finish(); };
     textEl.onclick = () => { if (!done) typingCancel?.(); };
   }

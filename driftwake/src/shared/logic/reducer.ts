@@ -4,7 +4,7 @@ import type {
 } from '../types';
 import type { ClientAction, GameEvent, LootDrop } from '../protocol';
 import type { ServerContext } from './context';
-import { ITEMS, MONSTERS, MAPS, NPCS, QUESTS, DIALOGUES, RECIPES, PROFESSIONS } from '../data';
+import { ITEMS, MONSTERS, MAPS, NPCS, QUESTS, DIALOGUES, RECIPES, PROFESSIONS, GATHER_NODES, SHOPS, JOBS } from '../data';
 import {
   XP_CURVE, xpToNext, levelDiffXpMult, LEVEL_CAP, AP_PER_LEVEL, SP_PER_LEVEL, SP_ON_ADVANCE, JOB_ADVANCE_LEVEL,
   STARTING_STATS, DEATH_XP_PENALTY, PROFESSION_MAX_LEVEL, professionXpToNext, MAX_CRAFTING_PROFESSIONS,
@@ -123,13 +123,6 @@ function tryLearnProfession(s: CharacterState, professionId: CraftingProfessionI
   return { ok: true };
 }
 
-function performJobAdvance(s: CharacterState, jobId: string): { ok: boolean; error?: string } {
-  const jobDef = (ITEMS as any) && require('../data').JOBS[jobId];
-  return performJobAdvanceImpl(s, jobId);
-}
-
-// (kept as its own function so it can be imported by name below without require())
-import { JOBS } from '../data';
 function performJobAdvanceImpl(s: CharacterState, jobId: string): { ok: boolean; error?: string } {
   const jobDef = JOBS[jobId as keyof typeof JOBS];
   if (!jobDef || jobDef.tier !== 2) return { ok: false, error: 'Invalid job' };
@@ -500,7 +493,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
     }
 
     case 'gather': {
-      const node = require('../data').GATHER_NODES[action.nodeId];
+      const node = GATHER_NODES[action.nodeId];
       if (!node) return err('Unknown gather node.');
       const map = MAPS[action.mapId];
       if (!map) return err('Unknown map.');
@@ -860,9 +853,9 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
 
     // ------------------------------------------------------------------ economy
     case 'buy': {
-      const shop = require('../data').SHOPS[action.shopId];
+      const shop = SHOPS[action.shopId];
       if (!shop) return err('Unknown shop.');
-      const entry = shop.items.find((i: any) => i.itemId === action.itemId);
+      const entry = shop.items.find((i) => i.itemId === action.itemId);
       if (!entry) return err('That item is not sold here.');
       if (!checkConditions(s, entry.reqs)) return err('That is not available to you yet.');
       const def = ITEMS[action.itemId];

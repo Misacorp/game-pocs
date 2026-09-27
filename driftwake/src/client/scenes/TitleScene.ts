@@ -20,7 +20,7 @@ export class TitleScene extends Phaser.Scene {
     this.events.once('shutdown', () => { this.parallax?.destroy(); this.weatherFx?.destroy(); });
   }
 
-  update(_time: number, delta: number): void {
+  override update(_time: number, delta: number): void {
     this.parallax.update(this.cameras.main);
     this.weatherFx.update(this.cameras.main, delta);
   }

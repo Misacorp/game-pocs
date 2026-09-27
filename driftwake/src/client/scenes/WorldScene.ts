@@ -174,7 +174,7 @@ export class WorldScene extends Phaser.Scene {
 
   // ---- per-frame -------------------------------------------------------------
 
-  update(_time: number, delta: number): void {
+  override update(_time: number, delta: number): void {
     const now = performance.now();
     const scale = now < this.hitstopUntil ? 0.12 : 1;
     const dt = delta * scale;

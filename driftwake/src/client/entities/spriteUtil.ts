@@ -7,8 +7,9 @@ import type { SpriteInfo } from '../gfx';
 /** Size + offset the physics body so it's centered horizontally and flush with the bottom of the frame
  *  (sprites use origin 0.5,1 so x,y is the "feet" position). */
 export function applyBodyBottomAligned(sprite: Phaser.Physics.Arcade.Sprite, info: SpriteInfo): void {
-  sprite.body.setSize(info.bodyWidth, info.bodyHeight);
-  sprite.body.setOffset((info.frameWidth - info.bodyWidth) / 2, info.frameHeight - info.bodyHeight);
+  const body = sprite.body as Phaser.Physics.Arcade.Body;
+  body.setSize(info.bodyWidth, info.bodyHeight);
+  body.setOffset((info.frameWidth - info.bodyWidth) / 2, info.frameHeight - info.bodyHeight);
 }
 
 /** Play an anim by logical name if it exists on this sprite's sheet; no-op + warn-free otherwise. */

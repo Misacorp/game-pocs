@@ -116,7 +116,7 @@ class CharactersScene extends Phaser.Scene {
   constructor() { super('characters'); }
   create() {
     registerBaseTextures(this);
-    this.cameras.main.setZoom(3);
+    this.cameras.main.setOrigin(0, 0).setZoom(3);
     this.add.rectangle(0, 0, 4000, 3000, 0x1a2030).setOrigin(0);
     let row = 0;
     for (const [classId, jobId, weaponType] of CLASS_WEAPON) {
@@ -139,7 +139,7 @@ class MonstersScene extends Phaser.Scene {
   constructor() { super('monsters'); }
   create() {
     registerBaseTextures(this);
-    this.cameras.main.setZoom(1.6);
+    this.cameras.main.setOrigin(0, 0).setZoom(1.6);
     this.add.rectangle(0, 0, 4000, 3000, 0x161a26).setOrigin(0);
     const list = MONSTER_LIST.length ? MONSTER_LIST : FALLBACK_MONSTERS;
     let x = 40, y = 40, rowH = 0;
@@ -159,7 +159,7 @@ class NpcsScene extends Phaser.Scene {
   constructor() { super('npcs'); }
   create() {
     registerBaseTextures(this);
-    this.cameras.main.setZoom(2.4);
+    this.cameras.main.setOrigin(0, 0).setZoom(2.4);
     this.add.rectangle(0, 0, 3000, 2000, 0x1a2030).setOrigin(0);
     const list = NPC_LIST.length ? NPC_LIST : FALLBACK_NPCS;
     let x = 30, y = 30, rowH = 0, col = 0;
@@ -183,7 +183,7 @@ class WorldScene extends Phaser.Scene {
   create() { this.buildTheme(currentTheme); (window as any).__setGalleryTheme = (t: ThemeId) => this.buildTheme(t); }
   buildTheme(theme: ThemeId) {
     registerBaseTextures(this);
-    this.cameras.main.setZoom(2);
+    this.cameras.main.setOrigin(0, 0).setZoom(2);
     this.children.removeAll();
     this.parallax?.destroy(); this.weather?.destroy();
     this.parallax = createParallax(this, theme, 640, 360);
@@ -206,13 +206,13 @@ class WorldScene extends Phaser.Scene {
       if (dx > 620) { dx = 420; }
     }
   }
-  update() { this.parallax?.update(this.cameras.main); this.weather?.update(this.cameras.main, 16); }
+  override update() { this.parallax?.update(this.cameras.main); this.weather?.update(this.cameras.main, 16); }
 }
 class VfxScene extends Phaser.Scene {
   constructor() { super('vfx'); }
   create() {
     registerBaseTextures(this);
-    this.cameras.main.setZoom(1.4);
+    this.cameras.main.setOrigin(0, 0).setZoom(1.4);
     this.add.rectangle(0, 0, 2400, 1400, 0x10141e).setOrigin(0);
     const styles: VfxStyle[] = ['slash', 'heavySlash', 'thrust', 'spin', 'arc', 'bolt', 'orb', 'arrow', 'bullet', 'shuriken', 'dagger', 'explosion', 'lightning', 'ice', 'water', 'wave', 'wind', 'fire', 'shadow', 'holy', 'poison', 'heal', 'buff', 'shield', 'smoke', 'spark', 'bubble'];
     let x = 40, y = 40;
@@ -271,7 +271,7 @@ class VfxScene extends Phaser.Scene {
 // ---------------------------------------------------------------------------
 
 const game = new Phaser.Game({
-  type: Phaser.CANVAS,
+  type: Phaser.AUTO,
   parent: 'game',
   width: 1280,
   height: 720,

@@ -39,7 +39,7 @@ function elixir(idBase: string, name: string, desc: string, colors: [string, str
   return ELIXIR_TIERS.map((t, i) => {
     const price = Math.round(t.buy);
     return {
-      id: `use_${idBase}_${t.suffix}`,
+      id: `use_elixir_${idBase}_${t.suffix}`,
       name: `${name} ${'I'.repeat(i + 1)}`,
       description: desc,
       category: 'use' as const,
@@ -98,7 +98,7 @@ const FOODS: ItemDef[] = [
 // ---------------------------------------------------------------------------
 
 const RECIPE_SCROLLS: ItemDef[] = [
-  { id: 'rec_scroll_stormsteel_blade', name: 'Smithing Plans: Stormsteel Blade', description: 'Brina traded a favor for this — proper diagrams for a stormsteel edge.', category: 'use', rarity: 'rare', icon: { shape: 'book', colors: ['#5a6b7a', '#cfe0ee', '#4fd1ff'] }, stack: 5, sellPrice: 40, buyPrice: 300, levelReq: 18, use: { learnRecipe: 'rec_smith_stormsteel_forged_weapons' } },
+  { id: 'rec_scroll_galewrought_saber', name: 'Smithing Plans: Galewrought Saber', description: 'Brina traded a favor for this — proper diagrams for a storm-roc-feathered blade.', category: 'use', rarity: 'rare', icon: { shape: 'book', colors: ['#cfe0ee', '#5a6b7a', '#4fd1ff'] }, stack: 5, sellPrice: 40, buyPrice: 300, levelReq: 22, use: { learnRecipe: 'rec_smith_sword_galewrought_forged' } },
   { id: 'rec_scroll_precision_elixir', name: "Alchemist's Notes: Precision III", description: "Juniper's own handwriting, smudged with reagent stains.", category: 'use', rarity: 'rare', icon: { shape: 'book', colors: ['#ffd166', '#e0a833', '#fff0c0'] }, stack: 5, sellPrice: 40, buyPrice: 300, levelReq: 26, use: { learnRecipe: 'rec_alchemy_elixir_precision_3' } },
   { id: 'rec_scroll_heartcrystal_ring', name: "Jeweler's Secret: Heartcrystal Setting", description: "Sera only shares this with jewelers she trusts not to undercut her.", category: 'use', rarity: 'epic', icon: { shape: 'book', colors: ['#8a5fd0', '#3a1f4a', '#5a3f7a'] }, stack: 5, sellPrice: 60, buyPrice: 500, levelReq: 32, use: { learnRecipe: 'rec_jewel_heartcrystal_ring' } },
   { id: 'rec_scroll_hollow_grub_surprise', name: "Tobbin's Dare: Hollow Grub Surprise", description: "'If you can find someone brave enough to eat it, this recipe is yours.'", category: 'use', rarity: 'rare', icon: { shape: 'book', colors: ['#5a3f7a', '#8a5fd0', '#3a1f4a'] }, stack: 5, sellPrice: 40, buyPrice: 300, levelReq: 30, use: { learnRecipe: 'rec_cook_hollow_grub_surprise' } },

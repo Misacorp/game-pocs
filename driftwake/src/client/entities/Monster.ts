@@ -128,7 +128,7 @@ export class MonsterEntity {
     const info = this.info();
     playAnim(this.sprite, info, 'die');
     audio.playSfx('monsterDie');
-    this.sprite.body.enable = false;
+    (this.sprite.body as Phaser.Physics.Arcade.Body).enable = false;
     this.hpBar?.bg.destroy(); this.hpBar?.fill.destroy(); this.hpBar?.label?.destroy();
     if (this.isBoss) { bus.emit('ui:bossBar', null); audio.playSfx('bossRoar'); }
     this.scene.tweens.add({

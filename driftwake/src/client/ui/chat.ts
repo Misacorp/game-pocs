@@ -47,6 +47,9 @@ export function createChat(session: GameSession): { root: HTMLElement; cleanup: 
     if (panel !== 'chat') return;
     if (document.activeElement === input) closeInput(); else openInput();
   });
+  // The engine emits 'ui:open' (not 'ui:toggle') for chat, since Enter should always focus the
+  // input rather than sometimes closing it (Enter also submits/sends).
+  const offOpen = bus.on('ui:open', ({ panel }) => { if (panel === 'chat') openInput(); });
 
   input.addEventListener('keydown', (e) => {
     e.stopPropagation();

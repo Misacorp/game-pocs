@@ -90,6 +90,23 @@ export interface SkillRunnerCtx {
   bounds: { width: number; height: number };
 }
 
+/** Closest distance from a point to a monster's physics body (0 if inside). Big monsters/bosses need body-based checks. */
+function distToBody(m: MonsterEntity, x: number, y: number): number {
+  const b = m.sprite.body as Phaser.Physics.Arcade.Body | null;
+  if (!b) return Phaser.Math.Distance.Between(x, y, m.sprite.x, m.sprite.y - m.sprite.displayHeight / 2);
+  const cx = Phaser.Math.Clamp(x, b.x, b.x + b.width);
+  const cy = Phaser.Math.Clamp(y, b.y, b.y + b.height);
+  return Phaser.Math.Distance.Between(x, y, cx, cy);
+}
+
+/** Does the monster's body overlap the axis-aligned rect [x1,x2]x[y1,y2]? */
+function bodyOverlaps(m: MonsterEntity, x1: number, y1: number, x2: number, y2: number): boolean {
+  const b = m.sprite.body as Phaser.Physics.Arcade.Body | null;
+  const bx = b ? b.x : m.sprite.x - 8, by = b ? b.y : m.sprite.y - 16, bw = b ? b.width : 16, bh = b ? b.height : 16;
+  const lx = Math.min(x1, x2), rx = Math.max(x1, x2), ty = Math.min(y1, y2), byy = Math.max(y1, y2);
+  return bx <= rx && bx + bw >= lx && by <= byy && by + bh >= ty;
+}
+
 export class SkillRunner {
   constructor(
     private scene: Phaser.Scene,
@@ -146,7 +163,7 @@ export class SkillRunner {
     let best: MonsterEntity | null = null; let bestD = within;
     for (const m of this.aliveMonsters()) {
       if (exclude?.has(m)) continue;
-      const d = Phaser.Math.Distance.Between(x, y, m.sprite.x, m.sprite.y);
+      const d = distToBody(m, x, y);
       if (d <= bestD) { bestD = d; best = m; }
     }
     return best;
@@ -154,7 +171,7 @@ export class SkillRunner {
 
   private inRadius(x: number, y: number, radius: number, max: number): MonsterEntity[] {
     return this.aliveMonsters()
-      .map((m) => ({ m, d: Phaser.Math.Distance.Between(x, y, m.sprite.x, m.sprite.y) }))
+      .map((m) => ({ m, d: distToBody(m, x, y) }))
       .filter((e) => e.d <= radius).sort((a, b) => a.d - b.d).slice(0, max).map((e) => e.m);
   }
 
@@ -181,7 +198,7 @@ export class SkillRunner {
         const cy = caster.y - (effect.offsetY ?? 14);
         const max = desc.maxTargets ?? (effect.hitsAll ? Infinity : 1);
         const targets = this.aliveMonsters().filter((m) =>
-          Math.abs(m.sprite.x - cx) <= effect.range / 2 + 12 && Math.abs((m.sprite.y - m.sprite.displayHeight / 2) - cy) <= effect.height / 2 + 14,
+          bodyOverlaps(m, caster.x - dir * 6, cy - effect.height / 2 - 8, caster.x + dir * (effect.range + 6), cy + effect.height / 2 + 8),
         ).sort((a, b) => Math.abs(a.sprite.x - caster.x) - Math.abs(b.sprite.x - caster.x)).slice(0, max);
         for (const m of targets) dealt += this.resolveHit(m, desc, caster.x);
         if (desc.vfx) spawnVfx(this.scene, desc.vfx.style, cx, cy, { color: desc.vfx.color, flipX: dir < 0, width: effect.range, height: effect.height });
@@ -205,7 +222,7 @@ export class SkillRunner {
             color: desc.vfx?.color ?? '#ffffff', style: desc.vfx?.style ?? 'bullet', bounds: this.ctx.bounds,
             homingTarget: effect.homing ? () => { const n = this.nearest(caster.x, caster.y, 500, hitSetLocal); return n ? { x: n.sprite.x, y: n.sprite.y - n.sprite.displayHeight / 2 } : null; } : undefined,
             queryHit: (x, y, already) => {
-              const m = this.aliveMonsters().find((mm) => !already.has(mm) && Phaser.Math.Distance.Between(x, y, mm.sprite.x, mm.sprite.y - mm.sprite.displayHeight / 2) < 16);
+              const m = this.aliveMonsters().find((mm) => !already.has(mm) && distToBody(mm, x, y) < 7);
               return m ? { x: m.sprite.x, y: m.sprite.y, obj: m } : null;
             },
             onHit: (hit) => { const m = hit.obj as MonsterEntity; hitSetLocal.add(m); dealt += this.resolveHit(m, desc, caster.x);
@@ -266,7 +283,7 @@ export class SkillRunner {
         if (desc.damagePct > 0) {
           const minX = Math.min(fromX, caster.x) - 20, maxX = Math.max(fromX, caster.x) + 20;
           for (const m of this.aliveMonsters()) {
-            if (m.sprite.x >= minX && m.sprite.x <= maxX && Math.abs(m.sprite.y - fromY) < 70) dealt += this.resolveHit(m, desc, fromX);
+            if (bodyOverlaps(m, minX, fromY - 70, maxX, fromY + 10)) dealt += this.resolveHit(m, desc, fromX);
           }
         }
         break;
@@ -289,7 +306,7 @@ export class SkillRunner {
               x: rx, y: caster.y - 260, vx: 0, vy: 340, gravity: 260, color: desc.vfx?.color ?? '#88ccff', style: desc.vfx?.style ?? 'ice',
               radius: 10, life: 1800, bounds: this.ctx.bounds,
               queryHit: (x, y, already) => {
-                const m = this.aliveMonsters().find((mm) => !already.has(mm) && Phaser.Math.Distance.Between(x, y, mm.sprite.x, mm.sprite.y - mm.sprite.displayHeight / 2) < 20);
+                const m = this.aliveMonsters().find((mm) => !already.has(mm) && distToBody(mm, x, y) < 7);
                 return m ? { x: m.sprite.x, y: m.sprite.y, obj: m } : null;
               },
               onHit: (hit) => { dealt += this.resolveHit(hit.obj as MonsterEntity, desc, caster.x); },
@@ -344,7 +361,7 @@ export class SkillRunner {
           x: turret.x, y: turret.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, color: desc.vfx?.color ?? '#ffaa33',
           style: desc.vfx?.style ?? 'bullet', radius: 8, life: 1500, bounds: this.ctx.bounds,
           queryHit: (px, py, already) => {
-            const m = this.aliveMonsters().find((mm) => !already.has(mm) && Phaser.Math.Distance.Between(px, py, mm.sprite.x, mm.sprite.y - mm.sprite.displayHeight / 2) < 16);
+            const m = this.aliveMonsters().find((mm) => !already.has(mm) && distToBody(mm, px, py) < 7);
             return m ? { x: m.sprite.x, y: m.sprite.y, obj: m } : null;
           },
           onHit: (hit) => { this.resolveHit(hit.obj as MonsterEntity, desc, turret.x); },

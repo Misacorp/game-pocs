@@ -26,6 +26,7 @@ import { createSettingsWindow, applyStoredUiScale } from './windows/settings';
 import { createMenuWindow } from './windows/menu';
 import { createHelpWindow } from './windows/help';
 import { uiState } from './state';
+import { hideTooltip } from './tooltip';
 
 let root: HTMLElement;
 let gameLayer: HTMLElement | null = null;
@@ -44,6 +45,7 @@ export function initUI(rootEl: HTMLElement): void {
  */
 export function showTitleScreen(backend: Backend, onEnter: (characterId: string) => void): void {
   root.innerHTML = '';
+  hideTooltip();
   buildTitleScreen(root, backend, onEnter);
 }
 
@@ -116,6 +118,7 @@ export function hideGameUI(): void {
   for (const fn of cleanupFns) { try { fn(); } catch { /* ignore */ } }
   cleanupFns = [];
   settingsListening = null;
+  hideTooltip();
   if (root) root.innerHTML = '';
   gameLayer = null;
 }

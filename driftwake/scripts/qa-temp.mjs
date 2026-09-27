@@ -509,6 +509,8 @@ try {
   await cheat(`
     cur.level = 16; cur.xp = 0;
     cur.quests['jq_vanguard'] = { state: 'active', progress: [12, 6], acceptedAt: Date.now() };
+    const slot = cur.inventory.etc.findIndex((x) => x === null);
+    cur.inventory.etc[slot] = { uid: 'cheat_badge', itemId: 'mat_raider_badge', qty: 6 };
   `);
   await openDialogue('npc_hale');
   await shot('hale-root');
@@ -603,6 +605,9 @@ try {
   await page.evaluate(() => { const b = Array.from(document.querySelectorAll('button')).find((x) => x.textContent === 'Save & Quit to Title'); b?.click(); });
   await wait(1200);
   await shot('back-at-title');
+  await page.mouse.click(640, 426); // Play (title menu -> character select)
+  await wait(500);
+  await shot('char-select-after-quit');
   // re-enter: click first character card's Play button
   const cardsInfo = await page.evaluate(() => document.querySelectorAll('.dw-charcard').length);
   console.log('character cards on select screen:', cardsInfo);

@@ -8,6 +8,7 @@ import { bus } from '../../events';
 export class InputController {
   private held = new Set<string>();
   private pressedFrame = new Set<string>();
+  private releasedFrame = new Set<string>();
   private capture = false;
   private offCapture: () => void;
 

@@ -137,4 +137,17 @@ export class LocalBackend implements Backend {
 
   /** Flush pending save (e.g. on page unload). */
   flush() { if (this.current) this.persist(this.current); }
+
+  /**
+   * DEV/QA ONLY: mutate the authoritative local character directly (e.g. set level, grant items).
+   * Returns the new state; callers should pass it to session.applyState(). Not part of Backend.
+   */
+  devMutate(fn: (s: CharacterState) => void): CharacterState | null {
+    if (!this.current) return null;
+    const next = structuredClone(this.current);
+    fn(next);
+    this.current = next;
+    this.schedulePersist();
+    return structuredClone(next);
+  }
 }

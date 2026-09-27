@@ -733,6 +733,151 @@ const LANTERNREEF_QUESTS: QuestDef[] = [
     ],
     rewards: { xp: qxp(29), gold: qgold(29), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }], chooseOne: [{ itemId: 'eq_sword_coralbright' }, { itemId: 'eq_wand_coralbright' }, { itemId: 'eq_gun_coralbright' }, { itemId: 'eq_knives_coralbright' }] },
   },
+  {
+    id: 'sq_lanternreef_fennas_warning',
+    name: "Fenna's Warning",
+    type: 'side',
+    giver: 'npc_fenna',
+    turnIn: 'npc_nell',
+    level: 25,
+    reqs: [{ type: 'level', min: 24 }],
+    summary: "Carry Fenna's warning from Finreach to Diver Nell in Lanternreef.",
+    offer:
+      "Fenna scribbles a note in a hurry. \"Traders passing through mentioned trouble out on the reef — wrecks, drownings, more than usual. Nell should know before it gets worse. Would you carry word to her?\"",
+    progress: "\"Find Nell out on the reef, whenever you're passing through.\"",
+    complete: "Nell reads the note twice, frowning. \"Fenna's not wrong to worry. Thanks for carrying this all this way — means we can get ahead of it, maybe.\"",
+    objectives: [{ type: 'talk', npcId: 'npc_nell', desc: "Deliver Fenna's warning" }],
+    rewards: { xp: qxp(25, 0.28), gold: qgold(25, 10), items: [{ itemId: 'use_return_scroll', qty: 2 }] },
+  },
+  {
+    id: 'sq_lanternreef_glimmerfish_roe',
+    name: 'The Glimmerfish Roe',
+    type: 'side',
+    giver: 'npc_nell',
+    level: 26,
+    reqs: [{ type: 'level', min: 25 }],
+    summary: 'Decide how much to harvest during the glimmerfish spawning season.',
+    offer:
+      "\"Spawning season,\" Nell says, watching the shallows glow brighter than usual. \"Glimmerfish roe sells for an obscene amount right now. Also, if we take too much, there might not be a next spawning season. Your call how hard we hit it.\"",
+    progress: "\"Glimmerfish, thick in the shallows right now. However many you're comfortable with.\"",
+    complete: 'The catch is heavy in your net, glowing faintly. It\'s your call what happens next.',
+    objectives: [{ type: 'kill', monsterId: 'glimmerfish', count: 10 }],
+    rewards: { xp: qxp(26, 0.2), gold: qgold(26, 8) },
+    choices: [
+      {
+        id: 'roe_harvest',
+        label: 'Harvest everything you can',
+        description: 'Maximize the catch. The season will recover. Probably.',
+        completeText:
+          'The haul is enormous, and the coin is better. Nell counts it out without quite meeting your eyes. "Hope there\'s a next season," she mutters.',
+        rewards: { xp: qxp(26, 0.15), gold: qgold(26, 25), flags: { glimmerfish_overharvested: true } },
+      },
+      {
+        id: 'roe_sustainable',
+        label: 'Take only what the reef can spare',
+        description: 'Leave enough for the shallows to recover.',
+        completeText: '"Good call," Nell says, quieter than usual. "Divers here for the long haul. Nice to be reminded someone else is too."',
+        rewards: {
+          xp: qxp(26, 0.2),
+          gold: qgold(26, 10),
+          flags: { glimmerfish_overharvested: false },
+          items: [{ itemId: 'eq_amulet_glimmerscale', qty: 1 }],
+          title: 'Reef Steward',
+        },
+      },
+    ],
+  },
+  {
+    id: 'sq_lanternreef_wreckers_bounty',
+    name: 'Wreckers on the Reef',
+    type: 'side',
+    giver: 'npc_nell',
+    level: 27,
+    reqs: [{ type: 'level', min: 26 }],
+    summary: "Investigate whether the reef's drowned are victims of deliberate wrecking.",
+    offer:
+      "Nell's usual grin is gone. \"Too many wrecks out past the shallows lately, and not from storms. Someone's luring ships onto the reef on purpose — the drowned you'll find are proof enough. Clear the wreck site, and you'll likely find whoever's signaling the ships in.\"",
+    progress: "\"The drowned, out past the wreck routes. Careful — there are a lot of them.\"",
+    complete: 'Among the wreckage you find a signal lantern, rigged to flash exactly wrong. Someone built this on purpose.',
+    objectives: [{ type: 'kill', monsterId: 'drowned_sailor', count: 15 }],
+    onAccept: [{ type: 'giveItem', itemId: 'qi_wreckers_signal_lantern', qty: 1 }],
+    rewards: { xp: qxp(27, 0.2), gold: qgold(27, 8) },
+    choices: [
+      {
+        id: 'wreckers_expose',
+        label: 'Report it to the Outpost',
+        description: 'Expose the wrecking scheme and let it be shut down properly.',
+        completeText:
+          'Word travels fast once the lantern reaches the right hands. Within days, the false signals stop. Nell claps you on the shoulder. "Divers everywhere owe you, even the ones who\'ll never know it."',
+        rewards: {
+          xp: qxp(27, 0.15),
+          gold: qgold(27, 6),
+          flags: { wreckers_exposed: true },
+          chooseOne: [
+            { itemId: 'eq_sword_galewrought' },
+            { itemId: 'eq_staff_galewrought' },
+            { itemId: 'eq_bow_galewrought' },
+            { itemId: 'eq_dagger_galewrought' },
+          ],
+        },
+      },
+      {
+        id: 'wreckers_quiet',
+        label: 'Sell the salvage rights',
+        description: 'Someone will pay well to keep salvaging that wreck site quietly.',
+        completeText: "The coin is good. The ships will probably keep wrecking, somewhere, eventually. Nell doesn't ask, and you don't offer.",
+        rewards: { xp: qxp(27, 0.15), gold: qgold(27, 24), flags: { wreckers_exposed: false } },
+      },
+    ],
+  },
+  {
+    id: 'sq_lanternreef_wreckers_aftermath',
+    name: 'Clearing the Wreck Site',
+    type: 'side',
+    giver: 'npc_nell',
+    level: 28,
+    reqs: [{ type: 'flag', flag: 'wreckers_exposed', value: true }],
+    summary: 'Finish clearing the wreck site now that the wrecking scheme is exposed.',
+    offer:
+      "\"Now that word's out, I want that wreck site properly cleared — for the divers' sake, and so nothing else washes up unexpected,\" Nell says.",
+    progress: "\"More of the drowned, unfortunately. Nearly done, though.\"",
+    complete:
+      "\"Site's clear. That's the last of it, I think — or at least, the last of it we can do anything about.\" Nell looks tired, but relieved.",
+    objectives: [{ type: 'kill', monsterId: 'drowned_sailor', count: 10 }],
+    rewards: {
+      xp: qxp(28, 0.3),
+      gold: qgold(28, 16),
+      items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }],
+      chooseOne: [{ itemId: 'eq_armor_coralguard' }, { itemId: 'eq_armor_pearlsilk' }, { itemId: 'eq_armor_glowhide' }],
+    },
+  },
+  {
+    id: 'sq_lanternreef_abyss_watch',
+    name: 'Watch in the Abyss',
+    type: 'side',
+    giver: 'npc_nell',
+    level: 29,
+    reqs: [{ type: 'level', min: 28 }],
+    summary: 'Clear aggressive abyss eels from the deeper dive routes before the Hollow.',
+    offer:
+      "\"Abyss eels have gotten bolder the deeper you go,\" Nell says, checking a lantern's oil level. \"Before you head into the Hollow, help me clear the deep routes. Selfishly, I'd also like my divers to keep all their limbs.\"",
+    progress: "\"Abyss eels, in the deeps. Mind the dark down there.\"",
+    complete: "\"Routes are clear. You're going to do just fine wherever you're headed next, you know that?\"",
+    objectives: [
+      { type: 'kill', monsterId: 'abyss_eel', count: 10 },
+      { type: 'visit', mapId: 'lantern_deeps' },
+    ],
+    rewards: {
+      xp: qxp(29, 0.3),
+      gold: qgold(29, 15),
+      chooseOne: [
+        { itemId: 'eq_sword_coralbright' },
+        { itemId: 'eq_staff_coralbright' },
+        { itemId: 'eq_bow_coralbright' },
+        { itemId: 'eq_dagger_coralbright' },
+      ],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -849,6 +994,97 @@ const HOLLOW_QUESTS: QuestDef[] = [
       chooseOne: [{ itemId: 'eq_sword_voidforged' }, { itemId: 'eq_staff_voidforged' }, { itemId: 'eq_gun_voidforged' }, { itemId: 'eq_amulet_bloomthorn' }],
     },
   },
+  {
+    id: 'sq_hollow_sentinel_vigil',
+    name: "The Sentinels' Vigil",
+    type: 'side',
+    giver: 'npc_first_singer',
+    level: 31,
+    reqs: [{ type: 'level', min: 30 }],
+    summary: "Clear aggressive sentinels and blighted bats from the Veins' outer watch.",
+    offer:
+      "\"The old sentinels were never meant to be violent,\" the Echo says, sorrowful. \"The Blight has twisted their old purpose into something aggressive. Clear enough of them, along with the bats nesting in their ruins, and the passage will finally be safe to cross.\"",
+    progress: "\"Sentinels and bats, both aggressive, both blighted. Take care.\"",
+    complete: "\"The passage holds quiet again, for now.\" The Echo's light flickers gratefully.",
+    objectives: [
+      { type: 'kill', monsterId: 'hollow_sentinel', count: 10 },
+      { type: 'kill', monsterId: 'blighted_bat', count: 8 },
+    ],
+    rewards: {
+      xp: qxp(31, 0.3),
+      gold: qgold(31, 15),
+      items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }],
+      chooseOne: [{ itemId: 'eq_armor_coralguard' }, { itemId: 'eq_armor_pearlsilk' }, { itemId: 'eq_armor_glowhide' }],
+    },
+  },
+  {
+    id: 'sq_hollow_wraith_containment',
+    name: 'Containing the Chorus',
+    type: 'side',
+    giver: 'npc_first_singer',
+    level: 33,
+    reqs: [{ type: 'level', min: 32 }],
+    summary: "Contain the whisper wraiths' spreading chorus before it grows further.",
+    offer:
+      "\"The chorus grows louder every day,\" the Echo says, uneasy. \"More wraiths join it than fade from it. If we don't thin them, they'll spread through the whole of the Veins before long.\"",
+    progress: "\"Wraiths, as many as you can manage. Slow the spread, if nothing else.\"",
+    complete: '"That should hold them back a while longer." The Echo does not sound entirely certain, but sounds grateful all the same.',
+    objectives: [{ type: 'kill', monsterId: 'whisper_wraith', count: 15 }],
+    rewards: {
+      xp: qxp(33, 0.3),
+      gold: qgold(33, 15),
+      items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }],
+      chooseOne: [
+        { itemId: 'eq_sword_voidforged' },
+        { itemId: 'eq_staff_voidforged' },
+        { itemId: 'eq_bow_voidforged' },
+        { itemId: 'eq_dagger_voidforged' },
+      ],
+    },
+  },
+  {
+    id: 'sq_hollow_chorus_of_whispers',
+    name: 'The Chorus of Whispers',
+    type: 'side',
+    giver: 'npc_first_singer',
+    level: 34,
+    reqs: [{ type: 'level', min: 33 }],
+    summary: 'Quiet the wraiths\' collective chorus in the Blighted Veins — or let them keep singing.',
+    offer:
+      "\"Do you hear it? Not one voice — many, tangled together,\" the Echo says, listening to something you can barely perceive. \"The whisper wraiths sing as a chorus down here, mourning in unison. Weaken enough of them, and I can perform a rite to still it. Or... we could simply let grief be grief, and leave them be.\"",
+    progress: "\"The chorus, wherever the wraiths gather thickest.\"",
+    complete: 'The chorus falters, thinned but not yet silent. The choice of what comes next is still yours.',
+    objectives: [{ type: 'kill', monsterId: 'whisper_wraith', count: 20 }],
+    rewards: { xp: qxp(34, 0.2), gold: qgold(34, 10) },
+    choices: [
+      {
+        id: 'chorus_silence',
+        label: 'Perform the silencing rite',
+        description: 'Quiet the chorus for good. Cleaner. Colder, maybe.',
+        completeText:
+          'The Echo sings a single, sharp note, and the chorus folds into silence all at once. The quiet that follows feels less like peace and more like absence. "It is done," the Echo says, and says nothing else for a while.',
+        rewards: {
+          xp: qxp(34, 0.3),
+          gold: qgold(34, 12),
+          flags: { hollow_chorus_silenced: true },
+          chooseOne: [
+            { itemId: 'eq_sword_voidforged' },
+            { itemId: 'eq_staff_voidforged' },
+            { itemId: 'eq_bow_voidforged' },
+            { itemId: 'eq_dagger_voidforged' },
+          ],
+        },
+      },
+      {
+        id: 'chorus_leave',
+        label: 'Let them keep singing',
+        description: 'Grief deserves to be heard, even in the dark.',
+        completeText:
+          'The Echo simply nods, and the chorus drifts on behind you, mournful and unresolved. "Perhaps that is kinder," the Echo says. "Not every wound needs closing by our hand."',
+        rewards: { xp: qxp(34, 0.3), gold: qgold(34, 8), flags: { hollow_chorus_silenced: false }, items: [{ itemId: 'eq_ring_blightglass', qty: 1 }] },
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -964,6 +1200,41 @@ const DAILY_QUESTS: QuestDef[] = [
       { type: 'kill', monsterId: 'hollow_sentinel', count: 6 },
     ],
     rewards: { xp: qxp(31, 0.15), gold: qgold(31, 18), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+    repeatable: { cooldownMs: 20 * 3600 * 1000 },
+  },
+  {
+    id: 'dq_hollow_whispers_bounty',
+    name: 'Bounty: Silence the Chorus',
+    type: 'daily',
+    giver: 'npc_first_singer',
+    level: 33,
+    reqs: [{ type: 'level', min: 32 }],
+    summary: 'Standing task: thin whisper wraiths and blighted bats in the Veins.',
+    offer:
+      '"The chorus never truly stops growing," the Echo says. "Wraiths and bats both, thicker in the Veins than anywhere else. A standing task, I\'m afraid — there\'s no clearing it for good."',
+    progress: '"Wraiths and bats. The usual, unfortunately."',
+    complete: '"Quieter, for now. Thank you — truly, every time."',
+    objectives: [
+      { type: 'kill', monsterId: 'whisper_wraith', count: 10 },
+      { type: 'kill', monsterId: 'blighted_bat', count: 8 },
+    ],
+    rewards: { xp: qxp(33, 0.15), gold: qgold(33, 18), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
+    repeatable: { cooldownMs: 20 * 3600 * 1000 },
+  },
+  {
+    id: 'dq_hollow_foraging_bounty',
+    name: 'Bounty: Blightthorn Bloom',
+    type: 'daily',
+    giver: 'npc_rook_prospector',
+    level: 33,
+    reqs: [{ type: 'level', min: 31 }],
+    summary: 'Standing task: gather blightthorn from the deep Hollow for Dusty Fen.',
+    offer:
+      "\"Blightthorn's the strangest thing I've ever asked anyone to pick for me,\" Dusty Fen admits. \"Dangerous ground for it, too. Standing order, if you're brave enough to keep making the trip.\"",
+    progress: '"Blightthorn, from wherever it\'s still blooming down there."',
+    complete: '"Every bit as unsettling as the last batch. Much obliged."',
+    objectives: [{ type: 'gather', nodeId: 'node_blightthorn', count: 6 }],
+    rewards: { xp: qxp(33, 0.15), gold: qgold(33, 18), items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }] },
     repeatable: { cooldownMs: 20 * 3600 * 1000 },
   },
   {

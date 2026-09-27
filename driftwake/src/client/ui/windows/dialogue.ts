@@ -21,7 +21,12 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
   const top = el('div', { class: 'dw-dlg-top' }, portrait, el('div', { style: { flex: '1' } }, nameEl, titleEl, textEl));
   const body = el('div', {}, top, optionsEl);
 
-  const ctrl = createWindow(wm, { panel: 'dialogue', title: 'Conversation', width: 560, className: 'dw-dialogue-window' }, body);
+  const ctrl = createWindow(wm, {
+    panel: 'dialogue', title: 'Conversation', width: 560, className: 'dw-dialogue-window',
+    // "At the trainer" only applies for the duration of the conversation — closing it (Goodbye/Esc)
+    // means the player has to talk to a trainer NPC again before learning/unlearning/buying recipes.
+    onClose: () => { uiState.trainerNpcId = null; uiState.trainerProfessionId = null; },
+  }, body);
 
   let npcId = '';
   let typingCancel: (() => void) | null = null;
@@ -256,6 +261,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
   }
 
   bus.on('ui:dialogue', ({ npcId: id }) => {
+    if (npcId !== id) { uiState.trainerNpcId = null; uiState.trainerProfessionId = null; }
     npcId = id;
     session.dispatch({ type: 'talk', npcId: id });
     ctrl.open();

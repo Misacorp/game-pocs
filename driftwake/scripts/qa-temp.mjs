@@ -325,7 +325,15 @@ try {
   console.log('hotbar slot 2 rect:', JSON.stringify(slot2Rect));
   if (slot2Rect) await page.mouse.click(slot2Rect.x, slot2Rect.y);
   await wait(500);
-  console.log('cooldowns after click-activate:', await page.evaluate(() => JSON.stringify(window.__session.cooldowns)));
+  console.log('cooldowns after mouse.click:', await page.evaluate(() => JSON.stringify(window.__session.cooldowns)));
+  const directDomClick = await page.evaluate(() => {
+    const slot = document.querySelectorAll('.dw-hotbar .dw-slot')[2];
+    if (!slot) return 'no slot';
+    slot.click();
+    return 'clicked el directly';
+  });
+  await wait(500);
+  console.log(directDomClick, '-> cooldowns:', await page.evaluate(() => JSON.stringify(window.__session.cooldowns)));
   await shot('hotbar-after-activate');
   console.log('player state before direct bus emit:', await page.evaluate(() => {
     const w = window.__game.scene.getScene('World');

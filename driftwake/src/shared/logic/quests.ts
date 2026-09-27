@@ -10,3 +10,7 @@ export function questsInProgressAt(_state: CharacterState, _npcId: string): Ques
 export function isQuestReady(_state: CharacterState, _questId: string): boolean { return false; }
 /** NPC marker for overhead icon: '!' available, '?' ready to turn in, '…' in progress, null none. STUB. */
 export function npcQuestMarker(_state: CharacterState, _npcId: string): '!' | '?' | '…' | null { return null; }
+
+export interface ObjectiveView { text: string; current: number; target: number; done: boolean }
+/** Human-readable objective progress for the quest log / tracker. STUB. */
+export function questObjectiveProgress(_state: CharacterState, _questId: string): ObjectiveView[] { return []; }

@@ -303,3 +303,44 @@ Placement guide: tier-1 nodes in meadows/hills/grotto; tier 2 in kelpwood; tier 
 - Kraelith choice: `eq_amulet_storm_heart` (take the heart), `eq_ring_roc_feather` (free the spirit).
 - Captain Rook choice: `eq_amulet_rook_harpoon` (claim the harpoon), `eq_ring_lamplight` (lay her to rest).
 - Finale (legendary): `eq_amulet_ember_harvest` (harvest), `eq_amulet_oma_purified` (purify), `eq_ring_songbound` (sing together).
+
+## 12. Integration conventions (binding)
+
+**Ownership** (only edit your own files; others work concurrently in the same tree):
+| Area | Owner files |
+|---|---|
+| Engine | `src/client/scenes/**`, `src/client/entities/**`, `src/client/combat/**`, `src/client/dev/**`, `src/client/main.ts` |
+| Graphics | `src/client/gfx/**`, `gallery.html` |
+| Audio | `src/client/audio/**` |
+| UI | `src/client/ui/**` |
+| Logic | `src/shared/logic/**`, `tests/**`, `scripts/validate-data.ts` |
+| Classes | `src/shared/data/classes.ts`, `src/shared/data/skills/**` |
+| World | `src/shared/data/maps/**`, `src/shared/data/monsters.ts`, `src/shared/data/npcs.ts` |
+| Items | `src/shared/data/items/{equipment,consumables,materials}.ts`, `recipes.ts`, `professions.ts`, `gathering.ts`, `shops.ts`, `sets.ts` |
+| Story quests | `src/shared/data/quests/{main,job,faction}.ts`, `src/shared/data/items/questItems.ts`, `src/shared/data/dialogues/story.ts` |
+| Side quests | `src/shared/data/quests/{side,profession}.ts`, `src/shared/data/items/sideQuestItems.ts`, `src/shared/data/dialogues/town.ts` |
+| Lead | `src/shared/types.ts`, `protocol.ts`, `constants.ts`, `rng.ts`, `src/client/{session,events}.ts`, `src/client/net/**`, `src/client/input/**`, `DESIGN.md` |
+
+**NPC interaction flow** (UI implements, content authors rely on it):
+1. Player presses ↑/Z near an NPC or clicks it → engine emits `ui:dialogue {npcId}`.
+2. UI opens the dialogue window and dispatches `{type:'talk', npcId}` (advances talk objectives).
+3. The window shows the NPC's dialogue **start node** text (from `NpcDef.dialogue`, else `NpcDef.greeting`), then options in this order:
+   quests ready to turn in (✔), quests offered (!), quests in progress (…), the start node's own `options`,
+   role buttons (Shop if `shopId`, Crafting/Learn profession if `profession`), then "Goodbye".
+4. Quest offer → shows `offer` text + objectives + rewards → Accept / Decline. Turn-in → `complete` text,
+   choice cards if `choices` (showing label + description; condition gating not supported on choices — use separate quests
+   for gated endings or put gating in QuestChoice description) and a chooseOne reward picker.
+5. Dialogue tree actions: UI-only actions (`openShop`, `openCrafting`, `close`) are handled by UI; all others are sent as
+   `{type:'dialogueAction', npcId, action}` and the reducer only executes an action if it literally appears in that NPC's
+   dialogue tree (anti-cheat).
+6. NPC dialogue ids follow `dlg_<npc id without the npc_ prefix>` (e.g. `npc_pell` → `dlg_pell`). Every NPC gets one.
+
+**Map changes** always flow through the reducer: portal → `changeMap`, return scroll → `useItem`, ferry → `dialogueAction teleport`,
+death → `respawn`. The engine performs the actual scene transition when it receives a `mapChanged` or `respawned` GameEvent
+(x/y of -1 means "use the target portal position, or the map spawnPoint").
+
+**Physics budget for level design:** gravity 900 px/s², jump velocity 330 px/s → max jump height ≈ 60 px, so vertical gaps
+between stacked platforms must be ≤ 52 px (else add a rope/ladder). Base run speed 110 px/s; horizontal jump reach ≈ 80 px.
+Ground platforms: `type:'ground'`, spanning the map bottom (y ≈ height − 48). One-way platforms: `type:'oneway'` (jump up through,
+↓+Space to drop). Ropes: `{x, top, bottom}` where top is ~8 px above the upper platform and bottom touches the lower surface.
+Portals sit on a platform surface (y = platform top). Monster spawns need platforms ≥ 64 px wide inside the spawn x-range.

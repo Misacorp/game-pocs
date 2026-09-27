@@ -142,7 +142,7 @@ class MonstersScene extends Phaser.Scene {
     this.cameras.main.setOrigin(0, 0).setZoom(1.6);
     this.add.rectangle(0, 0, 4000, 3000, 0x161a26).setOrigin(0);
     const list = MONSTER_LIST.length ? MONSTER_LIST : FALLBACK_MONSTERS;
-    let x = 40, y = 40, rowH = 0;
+    let x = 40, y = 130, rowH = 0;
     for (const def of list) {
       const info = getMonsterSprite(this, def);
       if (x + info.frameWidth > 2200) { x = 40; y += rowH + 30; rowH = 0; }
@@ -215,12 +215,15 @@ class VfxScene extends Phaser.Scene {
     this.cameras.main.setOrigin(0, 0).setZoom(1.4);
     this.add.rectangle(0, 0, 2400, 1400, 0x10141e).setOrigin(0);
     const styles: VfxStyle[] = ['slash', 'heavySlash', 'thrust', 'spin', 'arc', 'bolt', 'orb', 'arrow', 'bullet', 'shuriken', 'dagger', 'explosion', 'lightning', 'ice', 'water', 'wave', 'wind', 'fire', 'shadow', 'holy', 'poison', 'heal', 'buff', 'shield', 'smoke', 'spark', 'bubble'];
-    let x = 40, y = 40;
+    let x = 40, y = 40, i = 0;
     for (const style of styles) {
       const px = x, py = y;
       this.add.text(px, py + 20, style, { fontSize: '8px', color: '#9fb2ff' }).setOrigin(0.5, 0);
-      this.time.addEvent({ delay: 900, loop: true, callback: () => spawnVfx(this, style, px, py, { color: '#ffcc55', color2: '#ff6a3a', scale: 1.2, width: 24, height: 24 }) });
-      x += 90;
+      const fire = () => spawnVfx(this, style, px, py, { color: '#ffcc55', color2: '#ff6a3a', scale: 1.2, width: 24, height: 24, durationMs: 900 });
+      // stagger so effects overlap in time (a screenshot at any moment shows several mid-flight)
+      this.time.delayedCall(i * 90, fire);
+      this.time.addEvent({ delay: 1400 + (i % 5) * 130, loop: true, callback: fire });
+      x += 90; i++;
       if (x > 2300) { x = 40; y += 90; }
     }
     // projectiles

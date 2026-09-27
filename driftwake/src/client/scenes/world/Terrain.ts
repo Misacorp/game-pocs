@@ -8,6 +8,12 @@ import { getPlatformTextures, getDecorTexture, type PlatformTextures } from '../
 
 interface Rect { x: number; y: number; w: number; h: number; type: PlatformType }
 
+/** World-px of extra room below the map's nominal height that ground platforms extend into (and
+ *  the camera/physics bounds allow scrolling into) so the DOM HUD never covers bare void — the
+ *  camera gets slack to sit the player higher on screen, above the bottom HUD. Shared with
+ *  WorldScene, which sizes the camera/physics world bounds by the same amount. */
+export const CAMERA_BOTTOM_SLACK = 130;
+
 export interface Terrain {
   solidGroup: Phaser.Physics.Arcade.StaticGroup;
   onewayGroup: Phaser.Physics.Arcade.StaticGroup;
@@ -35,7 +41,7 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef): Terrain {
   const visuals: Phaser.GameObjects.GameObject[] = [];
 
   for (const p of map.platforms) {
-    const h = p.h ?? (p.type === 'ground' ? Math.max(48, map.height - p.y) : p.type === 'oneway' ? 12 : 16);
+    const h = p.h ?? (p.type === 'ground' ? Math.max(48, map.height + CAMERA_BOTTOM_SLACK - p.y) : p.type === 'oneway' ? 12 : 16);
     rects.push({ x: p.x, y: p.y, w: p.w, h, type: p.type });
     if (p.type === 'ground') {
       const topH = Math.min(16, h);
@@ -86,7 +92,14 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef): Terrain {
 
   return {
     solidGroup, onewayGroup, ropes: map.ropes, groundYAt, ropeAt, platformSegmentAt,
-    destroy() { for (const v of visuals) v.destroy(); solidGroup.clear(true, true); onewayGroup.clear(true, true); },
+    destroy() {
+      for (const v of visuals) { try { v.destroy(); } catch { /* already gone */ } }
+      // Arcade's own scene/world shutdown may have already torn these groups down (e.g. on a
+      // fast scene.restart()) — guard the internal children Set before clearing.
+      for (const g of [solidGroup, onewayGroup]) {
+        try { if (g && (g as unknown as { children?: unknown }).children) g.clear(true, true); } catch { /* already gone */ }
+      }
+    },
   };
 }
 

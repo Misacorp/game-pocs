@@ -22,19 +22,26 @@ export class Presence {
     this.offLeft = session.backend.on('playerLeft', ({ id }) => this.onLeft(id));
   }
 
+  /** Guards against bot/backend events still arriving after this scene instance has moved on
+   *  (scene.restart reuses the same Scene object, so a stale closure could otherwise touch it). */
+  private isLive(): boolean {
+    return !!this.scene.sys && this.scene.sys.isActive();
+  }
+
   private onJoined(p: RemotePlayer): void {
-    if (p.mapId !== this.mapId || this.players.has(p.id)) return;
+    if (!this.isLive() || p.mapId !== this.mapId || this.players.has(p.id)) return;
     this.players.set(p.id, new RemotePlayerEntity(this.scene, p));
   }
 
   private onMoved(id: string, p: PresenceUpdate): void {
+    if (!this.isLive()) return;
     if (p.mapId !== this.mapId) { this.onLeft(id); return; }
     this.players.get(id)?.applyMove(p);
   }
 
   private onLeft(id: string): void {
     const e = this.players.get(id);
-    if (e) { e.destroy(); this.players.delete(id); }
+    if (e) { try { e.destroy(); } catch { /* ignore */ } this.players.delete(id); }
   }
 
   update(dtMs: number, playerX: number, playerY: number, vx: number, vy: number, facing: 1 | -1, anim: string): void {
@@ -50,8 +57,10 @@ export class Presence {
   positions(): { x: number; y: number }[] { return [...this.players.values()].map((e) => ({ x: e.sprite.x, y: e.sprite.y })); }
 
   destroy(): void {
-    this.offJoined(); this.offMoved(); this.offLeft();
-    for (const e of this.players.values()) e.destroy();
+    try { this.offJoined(); } catch { /* ignore */ }
+    try { this.offMoved(); } catch { /* ignore */ }
+    try { this.offLeft(); } catch { /* ignore */ }
+    for (const e of this.players.values()) { try { e.destroy(); } catch { /* ignore */ } }
     this.players.clear();
   }
 }

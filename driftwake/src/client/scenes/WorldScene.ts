@@ -22,7 +22,7 @@ import { ProjectileManager } from '../entities/Projectile';
 import { DamageTextPool } from '../combat/DamageText';
 import { BuffManager } from '../combat/Buffs';
 import { SkillRunner, buildBasicAttackDescriptor, buildSkillDescriptor, evalScalarMods, type SkillRunnerCtx } from '../combat/SkillRunner';
-import { buildTerrain, onewayProcess, type Terrain } from './world/Terrain';
+import { buildTerrain, onewayProcess, CAMERA_BOTTOM_SLACK, type Terrain } from './world/Terrain';
 import { InputController } from './world/InputController';
 import { Spawner } from './world/Spawner';
 import { PortalManager } from './world/PortalManager';
@@ -33,6 +33,10 @@ import { DarkOverlay } from './world/DarkOverlay';
 export interface WorldSceneData { mapId: string; portalId?: string; x?: number; y?: number }
 
 const INTERACT_RANGE = 42;
+const NPC_TITLE_RANGE = 100;
+/** Shifts the follow target down so the player sits ~60% down the screen instead of dead-center,
+ *  leaving headroom above and keeping the ground clear of the bottom HUD. */
+const CAMERA_FOLLOW_OFFSET_Y = 40;
 const HINT_NONE = null as { text: string } | null;
 
 export class WorldScene extends Phaser.Scene {
@@ -70,7 +74,7 @@ export class WorldScene extends Phaser.Scene {
     this.hitstopUntil = 0;
     this.map = getMapDefOrFallback(data.mapId);
 
-    this.physics.world.setBounds(0, 0, this.map.width, this.map.height);
+    this.physics.world.setBounds(0, 0, this.map.width, this.map.height + CAMERA_BOTTOM_SLACK);
     this.terrain = buildTerrain(this, this.map);
 
     this.parallax = createParallax(this, this.map.theme, this.map.width, this.map.height);
@@ -137,8 +141,8 @@ export class WorldScene extends Phaser.Scene {
     this.physics.add.collider(this.player.sprite, this.terrain.onewayGroup, undefined, onewayProcess(() => this.dropThroughUntil));
 
     this.cameras.main.setZoom(2);
-    this.cameras.main.setBounds(0, 0, this.map.width, this.map.height);
-    this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
+    this.cameras.main.setBounds(0, 0, this.map.width, this.map.height + CAMERA_BOTTOM_SLACK);
+    this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12, 0, CAMERA_FOLLOW_OFFSET_Y);
     this.cameras.main.setDeadzone(60, 36);
     this.cameras.main.setBackgroundColor(0x0b1020);
 
@@ -203,7 +207,10 @@ export class WorldScene extends Phaser.Scene {
     const pickups = this.drops.update(dt, this.player.x, this.player.y, this.input2.isDown('interact'));
     for (const id of pickups) session.dispatch({ type: 'pickup', dropId: id });
 
-    for (const n of this.npcs) n.update(now);
+    for (const n of this.npcs) {
+      n.update(now);
+      n.setNear(Phaser.Math.Distance.Between(this.player.x, this.player.y, n.x, n.y) <= NPC_TITLE_RANGE);
+    }
 
     this.parallax.update(this.cameras.main);
     this.weatherFx.update(this.cameras.main, dt);
@@ -401,22 +408,32 @@ export class WorldScene extends Phaser.Scene {
     session.dispatch({ type: 'changeMap', mapId, portalId });
   }
 
+  private torndown = false;
+
+  /**
+   * Idempotent, best-effort teardown: runs on every subsystem regardless of whether an earlier
+   * one throws (a Phaser scene restart/stop can tear down physics groups on its own timing, so a
+   * subsystem's own destroy() may run against already-gone internals — never let that abort the
+   * rest of cleanup, e.g. Presence's bus listeners, or they leak into the next scene instance).
+   */
   private teardown(): void {
-    for (const off of this.busOffs) off();
-    this.busOffs = [];
-    this.input2?.destroy();
-    this.terrain?.destroy();
-    this.parallax?.destroy();
-    this.weatherFx?.destroy();
-    this.darkOverlay?.destroy();
-    this.spawner?.destroy();
-    for (const n of this.npcs) n.destroy();
-    this.npcs = [];
-    this.gatherMgr?.destroy();
-    this.portalMgr?.destroy();
-    this.drops?.destroy();
-    this.projectiles?.destroy();
-    this.presence?.destroy();
-    this.player?.destroy();
+    if (this.torndown) return;
+    this.torndown = true;
+    const safely = (label: string, fn: () => void) => { try { fn(); } catch (e) { console.warn(`[WorldScene] teardown step "${label}" failed (ignored)`, e); } };
+
+    safely('busOffs', () => { for (const off of this.busOffs) off(); this.busOffs = []; });
+    safely('input2', () => this.input2?.destroy());
+    safely('terrain', () => this.terrain?.destroy());
+    safely('parallax', () => this.parallax?.destroy());
+    safely('weatherFx', () => this.weatherFx?.destroy());
+    safely('darkOverlay', () => this.darkOverlay?.destroy());
+    safely('spawner', () => this.spawner?.destroy());
+    safely('npcs', () => { for (const n of this.npcs) n.destroy(); this.npcs = []; });
+    safely('gatherMgr', () => this.gatherMgr?.destroy());
+    safely('portalMgr', () => this.portalMgr?.destroy());
+    safely('drops', () => this.drops?.destroy());
+    safely('projectiles', () => this.projectiles?.destroy());
+    safely('presence', () => this.presence?.destroy());
+    safely('player', () => this.player?.destroy());
   }
 }

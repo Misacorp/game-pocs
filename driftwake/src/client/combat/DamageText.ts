@@ -32,6 +32,7 @@ export class DamageTextPool {
     let p = this.pool.find((e) => !e.inUse);
     if (!p) {
       const text = this.scene.add.text(0, 0, '', { fontFamily: 'monospace', fontStyle: 'bold' }).setOrigin(0.5).setDepth(120);
+      text.setResolution(3);
       p = { text, inUse: false };
       this.pool.push(p);
     }

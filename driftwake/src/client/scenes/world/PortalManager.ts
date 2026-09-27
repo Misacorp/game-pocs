@@ -8,6 +8,7 @@ import { checkConditions } from '@shared/logic';
 import { session } from '../../session';
 import { bus } from '../../events';
 import { getPortalSprite } from '../../gfx';
+import { makeCrispLabel } from '../../entities/spriteUtil';
 
 interface PortalEntry { def: PortalDef; sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text }
 
@@ -19,9 +20,8 @@ export class PortalManager {
     for (const p of map.portals) {
       const sprite = scene.add.sprite(p.x, p.y, info.key, 0).setOrigin(0.5, 1).setDepth(3);
       if (info.anims.idle) sprite.play(info.anims.idle);
-      const label = scene.add.text(p.x, p.y - info.frameHeight - 6, p.label ?? p.to, {
-        fontFamily: 'monospace', fontSize: '10px', color: '#bfe9ff', stroke: '#000', strokeThickness: 3,
-      }).setOrigin(0.5, 1).setDepth(3.1);
+      const label = makeCrispLabel(scene, p.x, p.y - info.frameHeight - 4, p.label ?? p.to, { color: '#bfe9ff' })
+        .setOrigin(0.5, 1).setDepth(3.1);
       this.entries.push({ def: p, sprite, label });
     }
   }

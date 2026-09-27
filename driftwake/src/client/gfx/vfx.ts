@@ -123,7 +123,16 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       scene.tweens.add({ targets: r, scale: scale * 1.4, alpha: 0, angle: 200, duration: dur + 100, onComplete: () => r.destroy() });
       break;
     }
-    case 'bolt': case 'bullet': case 'arrow': case 'shuriken': case 'dagger': {
+    case 'bolt': {
+      const core = img(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.8 });
+      scene.tweens.add({ targets: core, scale: scale * 1.2, alpha: 0, duration: 180, onComplete: () => core.destroy() });
+      for (let i = 0; i < 3; i++) {
+        const line2 = img(scene, 'vfx_line', x, y, { ...opts, width: 10 + i * 4, height: 2, rotation: (Math.random() - 0.5) * 1.2 });
+        scene.tweens.add({ targets: line2, alpha: 0, scaleX: 1.6, duration: 150, onComplete: () => line2.destroy() });
+      }
+      break;
+    }
+    case 'bullet': case 'arrow': case 'shuriken': case 'dagger': {
       const s = img(scene, 'vfx_dot', x, y, { ...opts, width: 6, height: 6 });
       fadeOut(scene, s, 150);
       break;

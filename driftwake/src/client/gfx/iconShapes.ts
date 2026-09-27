@@ -27,13 +27,13 @@ export function drawItemIcon(ctx: CanvasRenderingContext2D, shape: IconShape, co
   const [c1 = '#cccccc', c2 = shade(c1, -0.3), c3 = shade(c1, 0.3)] = colors;
   switch (shape) {
     case 'sword': rect(ctx, 7, 2, 2, 3, c2); rect(ctx, 5, 5, 6, 1, c3); rect(ctx, 7, 6, 2, 8, c1); poly(ctx, [[7, 14], [9, 14], [8, 16]], c1); break;
-    case 'axe': rect(ctx, 7, 3, 2, 11, c2); poly(ctx, [[8, 3], [14, 5], [12, 9], [8, 8]], c1); break;
+    case 'axe': rect(ctx, 7, 6, 2, 9, c2); poly(ctx, [[8, 2], [14, 3], [15, 6], [13, 9], [8, 8]], c1); poly(ctx, [[8, 2], [14, 3], [8, 5]], shade(c1, 0.25)); break;
     case 'staff': rect(ctx, 7, 4, 2, 11, c2); circle(ctx, 8, 3, 3, c3); circle(ctx, 8, 3, 1.4, '#fff'); break;
     case 'wand': rect(ctx, 7, 7, 2, 8, c2); circle(ctx, 8, 5, 2.6, c1); break;
     case 'bow': ctx.strokeStyle = c1; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(6, 8, 6.5, -0.9, 0.9); ctx.stroke(); ctx.strokeStyle = c3; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(6 + Math.cos(-0.9) * 6.5, 8 + Math.sin(-0.9) * 6.5); ctx.lineTo(6 + Math.cos(0.9) * 6.5, 8 + Math.sin(0.9) * 6.5); ctx.stroke(); break;
     case 'gun': rect(ctx, 3, 6, 10, 3, c1); rect(ctx, 4, 9, 3, 5, c2); rect(ctx, 12, 6, 2, 1.4, c3); break;
     case 'dagger': rect(ctx, 6, 3, 3, 3, c2); poly(ctx, [[7, 6], [9, 6], [8.5, 14], [7.5, 14]], c1); break;
-    case 'knives': poly(ctx, [[4, 4], [9, 6], [4, 8]], c1); poly(ctx, [[7, 9], [12, 11], [7, 13]], c3); break;
+    case 'knives': rect(ctx, 3.4, 3, 1.6, 3, c2); poly(ctx, [[4.2, 6], [7.5, 9.5], [4.2, 13]], c1); rect(ctx, 11, 3, 1.6, 3, c2); poly(ctx, [[11.8, 6], [8.5, 9.5], [11.8, 13]], c3); break;
     case 'helmet': poly(ctx, [[4, 9], [4, 6], [8, 3], [12, 6], [12, 9]], c1); rect(ctx, 4, 9, 8, 2, c2); rect(ctx, 6, 9, 4, 2, '#2a241f'); break;
     case 'armor': poly(ctx, [[5, 4], [11, 4], [12, 7], [11, 13], [5, 13], [4, 7]], c1); rect(ctx, 5, 6, 6, 1.4, c3); break;
     case 'gloves': ellipse(ctx, 8, 9, 4, 5, c1); for (let i = 0; i < 3; i++) rect(ctx, 5 + i * 2, 3, 1.4, 4, c1); break;

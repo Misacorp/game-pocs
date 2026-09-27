@@ -20,6 +20,13 @@ const POS_KEY = 'driftwake:winpos';
 function loadPos(): Record<string, { x: number; y: number }> { return store.get(POS_KEY, {}); }
 function savePos(all: Record<string, { x: number; y: number }>) { store.set(POS_KEY, all); }
 
+/** Deterministic cascade so first-run windows fan out instead of stacking exactly on each other. */
+let cascadeN = 0;
+function nextCascadePos(): { x: number; y: number } {
+  const n = cascadeN++;
+  return { x: 90 + (n % 6) * 34, y: 54 + (n % 6) * 28 };
+}
+
 export class WindowManager {
   private stack: WindowController[] = [];
   private registry = new Map<string, WindowController>();
@@ -105,7 +112,7 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
   wm.container.appendChild(root);
 
   const positions = loadPos();
-  const saved = positions[opts.panel as string] ?? opts.defaultPos ?? { x: 80 + Math.random() * 60, y: 60 + Math.random() * 40 };
+  const saved = positions[opts.panel as string] ?? opts.defaultPos ?? nextCascadePos();
   root.style.left = `${saved.x}px`;
   root.style.top = `${saved.y}px`;
 

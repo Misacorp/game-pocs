@@ -35,6 +35,8 @@ export class PortalManager {
     return best;
   }
 
+  positions(): { x: number; y: number }[] { return this.entries.map((e) => ({ x: e.def.x, y: e.def.y })); }
+
   use(p: PortalDef): void {
     if (!checkConditions(session.state, p.reqs)) {
       bus.emit('ui:toast', { text: p.lockedText ?? 'This way is locked.', kind: 'warn' });

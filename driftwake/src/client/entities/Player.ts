@@ -12,6 +12,7 @@ import { getCharacterSprite, spawnVfx, type CharacterLook, type SpriteInfo } fro
 import { audio } from '../audio';
 import { session } from '../session';
 import { getSkillDef } from '../dev/fixtures';
+import { isGodmode } from '../dev/debug';
 import type { DamageTextPool } from '../combat/DamageText';
 import type { PlayerHandle } from '../combat/SkillRunner';
 import { applyBodyBottomAligned, playAnim, invulnAlpha } from './spriteUtil';
@@ -260,7 +261,7 @@ export class Player implements PlayerHandle {
   // ---- damage / death -------------------------------------------------------
   takeDamage(amount: number, knockbackDirX: number): void {
     const now = performance.now();
-    if (this.dead || now < this.invulnUntil) return;
+    if (this.dead || now < this.invulnUntil || isGodmode()) return;
     this.invulnUntil = now + PLAYER_INVULN_MS;
     this.lastDamageAt = now;
     session.setVitals(session.hp - amount, session.mp);

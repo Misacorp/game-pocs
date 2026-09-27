@@ -25,6 +25,7 @@ export class InputController {
     const action = actionForCode(e.code);
     if (!action) return;
     this.held.delete(action);
+    this.releasedFrame.add(action);
   };
 
   constructor() {
@@ -42,9 +43,10 @@ export class InputController {
 
   isDown(action: string): boolean { return this.held.has(action); }
   justPressed(action: string): boolean { return this.pressedFrame.has(action); }
+  justReleased(action: string): boolean { return this.releasedFrame.has(action); }
 
-  /** Call once per scene update, after all systems read this frame's justPressed(). */
-  endFrame(): void { this.pressedFrame.clear(); }
+  /** Call once per scene update, after all systems read this frame's justPressed()/justReleased(). */
+  endFrame(): void { this.pressedFrame.clear(); this.releasedFrame.clear(); }
 
   destroy(): void {
     window.removeEventListener('keydown', this.handleKeyDown);

@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { TitleScene } from './scenes/TitleScene';
 import { WorldScene } from './scenes/WorldScene';
 import { createBackend } from './net';
 import { GameSession, setSession } from './session';
 import { initUI, showTitleScreen, showGameUI, hideGameUI } from './ui';
 import { audio } from './audio';
 import { bus } from './events';
+import { installDevHandle } from './dev/debug';
 
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
@@ -27,12 +29,13 @@ async function main() {
     roundPixels: true,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 900 }, debug: false } },
-    scene: [BootScene, WorldScene],
+    scene: [BootScene, TitleScene, WorldScene],
     input: { keyboard: true, mouse: true },
     audio: { noAudio: true },
   });
   (window as any).__game = game;
   (window as any).__session = session;
+  installDevHandle(game);
 
   const unlockAudio = () => audio.init();
   window.addEventListener('pointerdown', unlockAudio);
@@ -41,9 +44,12 @@ async function main() {
   const toTitle = () => {
     hideGameUI();
     audio.playMusic('title');
+    if (game.scene.isActive('World')) game.scene.stop('World');
+    if (!game.scene.isActive('Title')) game.scene.start('Title');
     showTitleScreen(backend, async (characterId) => {
       await session.enter(characterId);
       showGameUI(session);
+      game.scene.stop('Title');
       game.scene.start('World', { mapId: session.state.mapId });
     });
   };

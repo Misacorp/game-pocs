@@ -47,6 +47,8 @@ export class Presence {
     }
   }
 
+  positions(): { x: number; y: number }[] { return [...this.players.values()].map((e) => ({ x: e.sprite.x, y: e.sprite.y })); }
+
   destroy(): void {
     this.offJoined(); this.offMoved(); this.offLeft();
     for (const e of this.players.values()) e.destroy();

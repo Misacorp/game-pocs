@@ -116,7 +116,7 @@ const DRIFTMOOR_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.35, respawnMs: 8000,
   },
   {
-    id: 'king_barnacle', name: 'King Barnacle', level: 11, hp: 17880, attack: 46, defense: 22, xp: 1870, gold: [220, 400],
+    id: 'king_barnacle', name: 'King Barnacle', level: 11, hp: 44700, attack: 46, defense: 22, xp: 1870, gold: [220, 400],
     speed: 30, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Barnacled King',
     attacks: [
       { id: 'kb_pincer_slam', kind: 'slam', damageMult: 1.3, cooldownMs: 4200, range: 220, telegraphMs: 800, radius: 140, vfx: 'explosion', color: '#c98a4a' },
@@ -188,7 +188,7 @@ const FINREACH_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.25, respawnMs: 8000,
   },
   {
-    id: 'old_tangle', name: 'Old Tangle', level: 17, hp: 36832, attack: 62, defense: 30, xp: 3618, gold: [400, 700],
+    id: 'old_tangle', name: 'Old Tangle', level: 17, hp: 92100, attack: 62, defense: 30, xp: 3618, gold: [400, 700],
     speed: 25, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Ancient Root',
     attacks: [
       { id: 'ot_root_slam', kind: 'slam', damageMult: 1.3, cooldownMs: 4200, range: 240, telegraphMs: 800, radius: 150, vfx: 'wave', color: '#3a6b30' },
@@ -257,7 +257,7 @@ const STORMBREAK_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.2, respawnMs: 8500,
   },
   {
-    id: 'kraelith', name: 'Kraelith, the Storm Roc', level: 24, hp: 66300, attack: 85, defense: 40, xp: 6213, gold: [700, 1100],
+    id: 'kraelith', name: 'Kraelith, the Storm Roc', level: 24, hp: 165800, attack: 85, defense: 40, xp: 6213, gold: [700, 1100],
     speed: 45, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Storm Roc',
     attacks: [
       { id: 'kr_wing_slam', kind: 'slam', damageMult: 1.3, cooldownMs: 4000, range: 240, telegraphMs: 750, radius: 160, vfx: 'wind', color: '#c9d8f0' },
@@ -326,7 +326,7 @@ const LANTERNREEF_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.25, respawnMs: 8500,
   },
   {
-    id: 'captain_rook', name: 'Captain Vashti Rook', level: 30, hp: 98892, attack: 104, defense: 48, xp: 9000, gold: [1100, 1600],
+    id: 'captain_rook', name: 'Captain Vashti Rook', level: 30, hp: 247200, attack: 104, defense: 48, xp: 9000, gold: [1100, 1600],
     speed: 40, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Ghost of the Sunken Galleon',
     attacks: [
       { id: 'cr_cutlass_slam', kind: 'slam', damageMult: 1.3, cooldownMs: 3800, range: 220, telegraphMs: 700, radius: 140, vfx: 'heavySlash', color: '#8affea' },
@@ -405,7 +405,7 @@ const HOLLOW_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.4, respawnMs: 6000,
   },
   {
-    id: 'blight_heart', name: 'The Blight Heart', level: 36, hp: 145480, attack: 123, defense: 55, xp: 11680, gold: [1600, 2200],
+    id: 'blight_heart', name: 'The Blight Heart', level: 36, hp: 363700, attack: 123, defense: 55, xp: 11680, gold: [1600, 2200],
     speed: 0, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Ancient Wound',
     attacks: [
       { id: 'bh_pulse_shockwave', kind: 'shockwave', damageMult: 1.3, cooldownMs: 4500, range: 9999, telegraphMs: 800, vfx: 'poison', color: '#9a4ae0' },

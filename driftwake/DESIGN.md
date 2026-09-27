@@ -137,7 +137,7 @@ Max skill level: 10 (ultimates 5, passives 5–10). SP: 3 per level (constants.t
 | `blight_tendril` | Blight Tendril | 33 | plant | stationary | summoned by blight_heart |
 
 Bosses: 3–4 attacks each, 2–3 phases, telegraphed (use slam/shockwave/rain/beam/projectile/summon/leap/charge).
-Boss HP ≈ 25–40× a normal mob of its level. Bosses drop boss-exclusive gear + a quest item.
+Boss HP ≈ 60–100× a normal mob of its level (≈60s fights for a well-built solo player). Bosses drop boss-exclusive gear + a quest item.
 
 ## 5. NPC registry (ids are binding)
 

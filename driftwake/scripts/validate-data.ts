@@ -79,7 +79,7 @@ for (const m of Object.values(MONSTERS)) {
   // them instead of the tight ±50% band used for normal mobs.
   const sx = suggestedMonsterXp(m.level), sh = suggestedMonsterHp(m.level);
   if (m.isBoss) {
-    if (m.hp < sh * 18 || m.hp > sh * 45) warn('balance', `${where}: boss hp ${m.hp} is outside the expected ~18-45x normal-mob range (${sh}) for level ${m.level}`);
+    if (m.hp < sh * 45 || m.hp > sh * 115) warn('balance', `${where}: boss hp ${m.hp} is outside the expected ~45-115x normal-mob range (${sh}) for level ${m.level}`);
     if (m.xp < sx * 8 || m.xp > sx * 28) warn('balance', `${where}: boss xp ${m.xp} is outside the expected ~8-28x normal-mob range (${sx}) for level ${m.level}`);
   } else {
     if (Math.abs(m.xp - sx) / sx > 0.5) warn('balance', `${where}: xp ${m.xp} is more than 50% off the suggested ${sx} for level ${m.level}`);

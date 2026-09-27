@@ -5,6 +5,7 @@
 import { el, clamp, store } from './dom';
 import type { PanelId } from '../events';
 import { audio } from '../audio';
+import { hideTooltip } from './tooltip';
 
 export interface WindowController {
   panel: PanelId | string;
@@ -122,6 +123,7 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
     root,
     isOpen: () => open,
     open() {
+      hideTooltip();
       if (open) { wm.bringToFront(ctrl); return; }
       open = true;
       root.style.display = 'flex';
@@ -131,6 +133,7 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
       opts.onOpen?.();
     },
     close() {
+      hideTooltip();
       if (!open) return;
       open = false;
       root.classList.add('dw-closing');

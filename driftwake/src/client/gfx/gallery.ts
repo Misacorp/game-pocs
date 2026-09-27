@@ -187,7 +187,7 @@ class WorldScene extends Phaser.Scene {
     this.children.removeAll();
     this.parallax?.destroy(); this.weather?.destroy();
     this.parallax = createParallax(this, theme, 640, 360);
-    this.weather = createWeather(this, THEMES.includes(theme) ? (require0(theme)) : 'none');
+    this.weather = createWeather(this, THEME_PALETTES[theme].weather);
     const tex = getPlatformTextures(this, theme);
     for (let x = 0; x < 640; x += tex.tile) {
       this.add.image(x, 300, tex.groundTop).setOrigin(0).setDepth(1);
@@ -208,9 +208,6 @@ class WorldScene extends Phaser.Scene {
   }
   update() { this.parallax?.update(this.cameras.main); this.weather?.update(this.cameras.main, 16); }
 }
-function require0<T>(_x: unknown): T { return THEMES_WEATHER as unknown as T; }
-let THEMES_WEATHER: any;
-
 class VfxScene extends Phaser.Scene {
   constructor() { super('vfx'); }
   create() {

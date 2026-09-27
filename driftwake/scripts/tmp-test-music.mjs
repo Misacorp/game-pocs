@@ -61,6 +61,7 @@ console.log('expected step count in 4s:', (4 / expectedStepDur).toFixed(1));
 console.log('actual distinct step count in 4s:', events.length);
 
 console.log('storm: bpm from switch event:', eventsAfterSwitch[0]?.bpm);
+console.log('same-id playMusic call while already playing added new events (should be false):', result.noopAddedEvents);
 
 console.log('final volumes:', JSON.stringify(volumes));
 console.log('--- page logs ---');

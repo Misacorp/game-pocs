@@ -280,6 +280,7 @@ const game = new Phaser.Game({
   roundPixels: true,
   scene: [CharactersScene, MonstersScene, NpcsScene, WorldScene, VfxScene],
 });
+(window as any).__game = game;
 
 const tabs = document.getElementById('tabs')!;
 const themebar = document.getElementById('themebar')!;

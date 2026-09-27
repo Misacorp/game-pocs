@@ -96,6 +96,7 @@ export function createHud(session: GameSession): { root: HTMLElement; cleanup: (
     }
   }
   offs.push(bus.on('state', renderHotbar));
+  offs.push(bus.on('keybinds:changed', renderHotbar));
   renderHotbar();
 
   // click / right-click / drag-drop

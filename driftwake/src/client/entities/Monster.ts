@@ -93,6 +93,7 @@ export class MonsterEntity {
   private info() { return this.sprite.getData('info'); }
 
   setPatrolRange(minX: number, maxX: number): void { this.patrolMinX = minX; this.patrolMaxX = maxX; }
+  setAggro(v: boolean): void { this.aggro = v; }
 
   private publishBossBar(): void {
     bus.emit('ui:bossBar', this.dead ? null : { name: this.def.name, title: this.def.title, hp: Math.max(0, this.hp), maxHp: this.maxHp });

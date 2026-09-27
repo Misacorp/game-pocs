@@ -23,7 +23,15 @@ function savePos(all: Record<string, { x: number; y: number }>) { store.set(POS_
 export class WindowManager {
   private stack: WindowController[] = [];
   private registry = new Map<string, WindowController>();
+  /** window-level listeners (drag mousemove/mouseup) registered by createWindow, removed on dispose(). */
+  windowListeners: [string, EventListenerOrEventListenerObject][] = [];
   constructor(private layer: HTMLElement) {}
+
+  /** Detach global (window-level) listeners created for this manager's windows. Call when tearing down the game UI. */
+  dispose() {
+    for (const [type, fn] of this.windowListeners) window.removeEventListener(type, fn);
+    this.windowListeners = [];
+  }
 
   register(ctrl: WindowController) { this.registry.set(ctrl.panel, ctrl); }
   get(panel: string): WindowController | undefined { return this.registry.get(panel); }
@@ -139,20 +147,23 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
     origX = root.offsetLeft; origY = root.offsetTop;
     e.preventDefault();
   });
-  window.addEventListener('mousemove', (e) => {
+  const onMove = (e: MouseEvent) => {
     if (!dragging) return;
     const nx = clamp(origX + (e.clientX - startX), -root.offsetWidth + 60, window.innerWidth - 40);
     const ny = clamp(origY + (e.clientY - startY), 0, window.innerHeight - 30);
     root.style.left = `${nx}px`;
     root.style.top = `${ny}px`;
-  });
-  window.addEventListener('mouseup', () => {
+  };
+  const onUp = () => {
     if (!dragging) return;
     dragging = false;
     const all = loadPos();
     all[opts.panel as string] = { x: root.offsetLeft, y: root.offsetTop };
     savePos(all);
-  });
+  };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  wm.windowListeners.push(['mousemove', onMove as EventListener], ['mouseup', onUp as EventListener]);
 
   wm.register(ctrl);
   return ctrl;

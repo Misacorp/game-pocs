@@ -12,10 +12,10 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   const node = document.createElement(tag);
   if (props) {
     for (const k in props) {
-      if (k === 'class') node.className = props[k];
+      if (k === 'class') node.className = (props[k] as string) ?? '';
       else if (k === 'style' && typeof props[k] === 'object') Object.assign(node.style, props[k]);
-      else if (k.startsWith('on') && typeof props[k] === 'function') node.addEventListener(k.slice(2).toLowerCase(), props[k]);
-      else if (k === 'html') node.innerHTML = props[k];
+      else if (k.startsWith('on') && typeof props[k] === 'function') node.addEventListener(k.slice(2).toLowerCase(), props[k] as EventListener);
+      else if (k === 'html') node.innerHTML = props[k] as string;
       else if (props[k] === false || props[k] === null || props[k] === undefined) { /* skip */ }
       else if (k in node) (node as any)[k] = props[k];
       else node.setAttribute(k, String(props[k]));

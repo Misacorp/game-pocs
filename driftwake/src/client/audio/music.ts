@@ -1001,6 +1001,9 @@ function scheduleStep(song: Song, ctx: AudioContext): void {
   const hatEv = (useAlt ? song.events.hat.alt : song.events.hat.base).get(step);
   if (hatEv) triggerHat(song, hatEv, time);
 
+  // TEMP-DEBUG-HOOK: records {step, time} for the headless timing sanity check; removed after verification.
+  if ((window as any).__musicDebug) (window as any).__musicDebug.push({ step, time, bpm: song.def.bpm });
+
   song.stepIndex++;
   if (song.stepIndex % song.totalSteps === 0) song.loopCount++;
   song.nextStepTime += song.stepDur;

@@ -1,0 +1,109 @@
+/**
+ * Builds a map's static physics terrain (ground/oneway/solid platforms), ropes/ladders, and decor
+ * from a MapDef, and exposes small spatial queries used by movement, monster AI and boss attacks.
+ */
+import Phaser from 'phaser';
+import type { MapDef, PlatformType, RopeDef } from '@shared/types';
+import { getPlatformTextures, getDecorTexture, type PlatformTextures } from '../../gfx';
+
+interface Rect { x: number; y: number; w: number; h: number; type: PlatformType }
+
+export interface Terrain {
+  solidGroup: Phaser.Physics.Arcade.StaticGroup;
+  onewayGroup: Phaser.Physics.Arcade.StaticGroup;
+  ropes: RopeDef[];
+  /** Topmost platform surface y at x, at or below fromY (used to land drops / query ground level). */
+  groundYAt(x: number, fromY: number): number;
+  /** Rope/ladder overlapping (x,y), or null. */
+  ropeAt(x: number, y: number): RopeDef | null;
+  /** The x-range of the platform under x (for monster patrol bounds), padded inward a little. */
+  platformSegmentAt(x: number): { minX: number; maxX: number };
+  destroy(): void;
+}
+
+function addBody(scene: Phaser.Scene, group: Phaser.Physics.Arcade.StaticGroup, x: number, y: number, w: number, h: number): void {
+  const rect = scene.add.rectangle(x + w / 2, y + h / 2, w, h, 0x000000, 0);
+  scene.physics.add.existing(rect, true);
+  group.add(rect);
+}
+
+export function buildTerrain(scene: Phaser.Scene, map: MapDef): Terrain {
+  const textures: PlatformTextures = getPlatformTextures(scene, map.theme);
+  const solidGroup = scene.physics.add.staticGroup();
+  const onewayGroup = scene.physics.add.staticGroup();
+  const rects: Rect[] = [];
+  const visuals: Phaser.GameObjects.GameObject[] = [];
+
+  for (const p of map.platforms) {
+    const h = p.h ?? (p.type === 'ground' ? Math.max(48, map.height - p.y) : p.type === 'oneway' ? 12 : 16);
+    rects.push({ x: p.x, y: p.y, w: p.w, h, type: p.type });
+    if (p.type === 'ground') {
+      const topH = Math.min(16, h);
+      visuals.push(scene.add.tileSprite(p.x, p.y, p.w, topH, textures.groundTop).setOrigin(0, 0).setDepth(1));
+      if (h > topH) visuals.push(scene.add.tileSprite(p.x, p.y + topH, p.w, h - topH, textures.groundFill).setOrigin(0, 0).setDepth(0.9));
+      addBody(scene, solidGroup, p.x, p.y, p.w, h);
+    } else if (p.type === 'oneway') {
+      visuals.push(scene.add.tileSprite(p.x, p.y, p.w, h, textures.oneway).setOrigin(0, 0).setDepth(1));
+      addBody(scene, onewayGroup, p.x, p.y, p.w, h);
+    } else {
+      visuals.push(scene.add.tileSprite(p.x, p.y, p.w, h, textures.solid).setOrigin(0, 0).setDepth(1));
+      addBody(scene, solidGroup, p.x, p.y, p.w, h);
+    }
+  }
+
+  for (const r of map.ropes) {
+    const key = r.kind === 'ladder' ? textures.ladder : textures.rope;
+    visuals.push(scene.add.tileSprite(r.x - 4, r.top, 8, r.bottom - r.top, key).setOrigin(0, 0).setDepth(2));
+  }
+
+  for (const d of map.decor) {
+    const tex = getDecorTexture(scene, d.kind, map.theme);
+    const img = scene.add.image(d.x, d.y, tex.key).setOrigin(0.5, 1).setScale(d.scale ?? 1).setFlipX(!!d.flip);
+    img.setDepth(d.front ? 60 : -10);
+    visuals.push(img);
+  }
+
+  function platformsAtX(x: number): Rect[] {
+    return rects.filter((r) => x >= r.x && x <= r.x + r.w);
+  }
+
+  function groundYAt(x: number, fromY: number): number {
+    let best = map.height;
+    for (const r of platformsAtX(x)) if (r.y >= fromY - 1 && r.y < best) best = r.y;
+    return best;
+  }
+
+  function ropeAt(x: number, y: number): RopeDef | null {
+    for (const r of map.ropes) if (Math.abs(x - r.x) < 12 && y >= r.top - 6 && y <= r.bottom + 8) return r;
+    return null;
+  }
+
+  function platformSegmentAt(x: number): { minX: number; maxX: number } {
+    const here = platformsAtX(x).sort((a, b) => a.y - b.y)[0];
+    if (!here) return { minX: x - 70, maxX: x + 70 };
+    return { minX: here.x + 14, maxX: here.x + here.w - 14 };
+  }
+
+  return {
+    solidGroup, onewayGroup, ropes: map.ropes, groundYAt, ropeAt, platformSegmentAt,
+    destroy() { for (const v of visuals) v.destroy(); solidGroup.clear(true, true); onewayGroup.clear(true, true); },
+  };
+}
+
+/**
+ * Arcade collider "process" callback implementing the one-way platform rule: only collide when the
+ * body approached from above (was at/above the platform top last frame) and isn't currently dropping
+ * through, and never while moving upward.
+ */
+export function onewayProcess(dropThroughUntil: () => number) {
+  return (obj1: unknown, obj2: unknown): boolean => {
+    const playerObj = obj1 as Phaser.Physics.Arcade.Sprite;
+    const platformObj = obj2 as Phaser.GameObjects.Rectangle & { body: Phaser.Physics.Arcade.StaticBody };
+    const body = playerObj.body as Phaser.Physics.Arcade.Body;
+    if (performance.now() < dropThroughUntil()) return false;
+    if (body.velocity.y < -10) return false;
+    const platformTop = platformObj.body.y;
+    const prevBottom = body.prev.y + body.height;
+    return prevBottom <= platformTop + 3;
+  };
+}

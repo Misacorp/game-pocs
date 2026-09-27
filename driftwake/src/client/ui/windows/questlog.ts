@@ -97,7 +97,7 @@ export function createQuestLogWindow(wm: WindowManager, session: GameSession) {
   const tabs = makeTabs([{ id: 'active', label: 'Active' }, { id: 'completed', label: 'Completed' }], (id) => { mode = id as any; selected = null; renderList(); renderDetail(); });
   tabsHost.appendChild(tabs.root);
 
-  bus.on('state', () => { renderList(); renderDetail(); });
+  wm.track(bus.on('state', () => { renderList(); renderDetail(); }));
   renderList();
   renderDetail();
   return ctrl;

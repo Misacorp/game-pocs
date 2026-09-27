@@ -95,6 +95,20 @@ export function placeInInventory(state: CharacterState, inst: ItemInstance, tab:
   return { ok: true };
 }
 
+/**
+ * Shallow-clone just the inventory tabs (slot objects copied too, since addItem/removeItem
+ * mutate `slot.qty` in place). Used to dry-run a batch of grants/removals against a scratch
+ * copy of the inventory before committing them to real state, so a caller can check "will this
+ * all fit?" without ever risking losing an item to a full inventory.
+ */
+export function cloneInventory(inv: CharacterState['inventory']): CharacterState['inventory'] {
+  return {
+    equip: inv.equip.map((s) => (s ? { ...s } : null)),
+    use: inv.use.map((s) => (s ? { ...s } : null)),
+    etc: inv.etc.map((s) => (s ? { ...s } : null)),
+  };
+}
+
 export interface AddItemOpts { bonus?: StatMods; stars?: number; rarity?: Rarity; crafter?: string }
 
 /**

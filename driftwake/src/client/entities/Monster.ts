@@ -130,9 +130,16 @@ export class MonsterEntity {
     (this.sprite.body as Phaser.Physics.Arcade.Body).enable = false;
     this.hpBar?.bg.destroy(); this.hpBar?.fill.destroy(); this.hpBar?.label?.destroy();
     if (this.isBoss) { bus.emit('ui:bossBar', null); audio.playSfx('bossRoar'); }
+    // Fire onDeath (loot/XP dispatch, respawn scheduling) right away rather than waiting for the
+    // fade-out tween to complete: a map transition (portal dash right after a killing blow, or a
+    // boss's last hit landing during a scene restart) tears the scene down mid-tween, and Phaser
+    // cancels tweens on shutdown without ever calling onComplete — so a deferred dispatch here would
+    // silently drop the kill's loot/XP/quest credit.
+    this.onDeath?.(this);
+    this.onDeath = undefined;
     this.scene.tweens.add({
       targets: this.sprite, alpha: 0, y: this.sprite.y - 10, duration: 600, ease: 'Quad.easeOut',
-      onComplete: () => { this.onDeath?.(this); this.sprite.destroy(); },
+      onComplete: () => { this.sprite.destroy(); },
     });
   }
 

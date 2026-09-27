@@ -216,21 +216,21 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
     content.appendChild(goBtn);
   }
 
-  bus.on('ui:crafting', ({ professionId }) => {
+  wm.track(bus.on('ui:crafting', ({ professionId }) => {
     if (professionId) selectedProfession = professionId as CraftingProfessionId;
     tab = 'overview'; tabs.select('overview');
     ctrl.open();
     render();
-  });
-  bus.on('state', render);
+  }));
+  wm.track(bus.on('state', render));
 
   let lastResultAt = 0;
-  bus.on('game', (ev) => {
+  wm.track(bus.on('game', (ev) => {
     if (ev.type === 'enhanceResult' && Date.now() - lastResultAt > 10) {
       lastResultAt = Date.now();
       bus.emit('ui:toast', { text: ev.success ? `Enhance success! +${ev.stars} ★` : ev.destroyed ? 'Enhance failed — item destroyed!' : 'Enhance failed.', kind: ev.success ? 'good' : 'error' });
     }
-  });
+  }));
 
   render();
   return ctrl;

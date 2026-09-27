@@ -106,7 +106,7 @@ export function createInventoryWindow(wm: WindowManager, session: GameSession) {
     showContextMenu(e.clientX, e.clientY, items);
   }
 
-  bus.on('state', render);
+  wm.track(bus.on('state', render));
   render();
   return ctrl;
 }

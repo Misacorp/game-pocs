@@ -77,12 +77,12 @@ export function showGameUI(session: GameSession): void {
   const tips = createTipLayer(session);
 
   gameLayer.appendChild(hud.root);
-  gameLayer.appendChild(minimap);
+  gameLayer.appendChild(minimap.root);
   gameLayer.appendChild(tracker.root);
   gameLayer.appendChild(notif.root);
   gameLayer.appendChild(chat.root);
   gameLayer.appendChild(tips.root);
-  cleanupFns.push(hud.cleanup, tracker.cleanup, notif.cleanup, chat.cleanup, tips.cleanup, () => wm.dispose());
+  cleanupFns.push(hud.cleanup, minimap.cleanup, tracker.cleanup, notif.cleanup, chat.cleanup, tips.cleanup, () => wm.dispose());
 
   createInventoryWindow(wm, session);
   createCharacterWindow(wm, session);

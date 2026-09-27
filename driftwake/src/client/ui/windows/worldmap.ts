@@ -38,7 +38,7 @@ export function createWorldMapWindow(wm: WindowManager, session: GameSession) {
     }
   }
 
-  bus.on('state', render);
+  wm.track(bus.on('state', render));
   render();
   return ctrl;
 }

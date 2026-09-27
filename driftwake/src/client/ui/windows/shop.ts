@@ -84,14 +84,14 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   ctrl.root.addEventListener('dragover', (e) => e.preventDefault());
   ctrl.root.addEventListener('drop', () => { mode = 'sell'; tabs.select('sell'); render(); });
 
-  bus.on('ui:shop', ({ shopId: id }) => {
+  wm.track(bus.on('ui:shop', ({ shopId: id }) => {
     shopId = id;
     uiState.openShopId = id;
     shopNameEl.textContent = SHOPS[id]?.name ?? 'Shop';
     mode = 'buy'; tabs.select('buy');
     ctrl.open();
     render();
-  });
-  bus.on('state', render);
+  }));
+  wm.track(bus.on('state', render));
   return ctrl;
 }

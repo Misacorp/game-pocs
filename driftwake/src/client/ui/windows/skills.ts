@@ -101,7 +101,7 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
     return el('div', { style: { fontSize: '11px', color: '#e8c477' } }, text);
   }
 
-  bus.on('state', () => { renderTabs(); renderList(); });
+  wm.track(bus.on('state', () => { renderTabs(); renderList(); }));
   renderTabs();
   renderList();
   return ctrl;

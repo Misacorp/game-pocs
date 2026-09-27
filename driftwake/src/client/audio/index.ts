@@ -114,8 +114,9 @@ export const audio = {
         return;
       }
 
-      if (volumes.muted) return; // Don't start music while muted
-
+      // Always switch tracks even while muted (mute is enforced via masterGain, below) — otherwise
+      // a map/boss change that happens while muted never registers, and unmuting later resumes
+      // whatever track was already loaded instead of the current map's.
       playMusicTrack(id);
     } catch (err) {
       console.warn(`Error playing music '${id}'`, err);

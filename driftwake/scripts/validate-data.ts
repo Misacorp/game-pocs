@@ -276,6 +276,12 @@ for (const q of Object.values(QUESTS)) {
   };
   checkReward('base', q.rewards);
 
+  if (q.choices && q.choices.length && q.rewards.chooseOne && q.rewards.chooseOne.length) {
+    // completeQuest's `action.chooseIndex` selects into whichever of these is present; a quest
+    // can't use both without the reducer confusing a choice pick for a chooseOne reward pick.
+    err('quests', `${where}: has both a quest choice and a chooseOne reward — 'chooseIndex' would be ambiguous`);
+  }
+
   if (q.choices) {
     for (const c of q.choices) {
       checkReward(`choice '${c.id}'`, c.rewards);

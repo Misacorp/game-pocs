@@ -28,9 +28,17 @@ export class InputController {
     this.releasedFrame.add(action);
   };
 
+  /** Alt-tabbing or otherwise losing window focus never delivers the matching keyup, so without
+   *  this a held movement/attack key gets "stuck" down until the same physical key happens to be
+   *  pressed and released again — release everything the moment focus leaves. */
+  private handleBlur = () => {
+    this.held.clear();
+  };
+
   constructor() {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
+    window.addEventListener('blur', this.handleBlur);
     this.offCapture = bus.on('input:capture', (v) => { this.capture = v; if (v) this.held.clear(); });
   }
 
@@ -51,6 +59,7 @@ export class InputController {
   destroy(): void {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+    window.removeEventListener('blur', this.handleBlur);
     this.offCapture();
   }
 }

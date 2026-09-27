@@ -47,7 +47,7 @@ export function createBestiaryWindow(wm: WindowManager, session: GameSession) {
     return nodes;
   }
 
-  bus.on('state', render);
+  wm.track(bus.on('state', render));
   render();
   return ctrl;
 }

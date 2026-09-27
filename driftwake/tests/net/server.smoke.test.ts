@@ -107,6 +107,28 @@ describe('driftwake server (smoke)', () => {
     if (acted.t !== 'actionResult') throw new Error('unreachable');
     expect(acted.result.ok).toBe(true);
 
+    // Regression: deleteCharacter must be scoped to the calling account. A second, unrelated
+    // connection/token must not be able to delete this character just by knowing its id (IDOR).
+    const ws2 = new WebSocket(`ws://localhost:${PORT}`);
+    await new Promise<void>((resolve, reject) => {
+      ws2.on('open', () => resolve());
+      ws2.on('error', reject);
+    });
+    sendMsg(ws2, { t: 'hello', token: `${token}-other-account`, protocol: PROTOCOL_VERSION });
+    await once(ws2, (m) => m.t === 'welcome');
+
+    sendMsg(ws2, { t: 'deleteCharacter', rid: 1, id: character.id });
+    const deleteAttempt = await once(ws2, (m) => m.t === 'reply' && m.rid === 1);
+    if (deleteAttempt.t !== 'reply') throw new Error('unreachable');
+    expect(deleteAttempt.ok).toBe(false);
+    ws2.close();
+
+    sendMsg(ws, { t: 'listCharacters', rid: 4 });
+    const list = await once(ws, (m) => m.t === 'reply' && m.rid === 4);
+    if (list.t !== 'reply') throw new Error('unreachable');
+    expect(list.ok).toBe(true);
+    expect((list.data as { id: string }[]).map((c) => c.id)).toContain(character.id);
+
     ws.close();
   }, 20000);
 });

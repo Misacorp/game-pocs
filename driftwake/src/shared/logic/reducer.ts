@@ -15,6 +15,7 @@ import { computeStats } from './stats';
 import { checkConditions, getQuestState } from './conditions';
 import {
   addItem, removeItem, findInstance, canEquip, countItem, enhanceChance, maxStarsFor, rarityOf, placeInInventory,
+  cloneInventory,
 } from './items';
 import { skillLearnCheck } from './skills';
 import { applyXp, applyReward } from './rewards';
@@ -25,6 +26,13 @@ export interface ReducerResult { ok: boolean; error?: string; state: CharacterSt
 // ---------------------------------------------------------------------------
 // Small shared helpers
 // ---------------------------------------------------------------------------
+
+/** A client-supplied quantity/index must be a plain, finite, positive integer — never NaN, a
+ * fraction, Infinity or a negative number smuggled in over the wire (JSON numbers aren't
+ * statically typed at runtime, so ClientAction's `number` fields are not to be trusted). */
+function isPosInt(n: unknown): n is number {
+  return typeof n === 'number' && Number.isInteger(n) && n > 0;
+}
 
 function objectiveTarget(obj: Objective): number {
   switch (obj.type) {
@@ -92,6 +100,7 @@ function grantProfessionXp(s: CharacterState, events: GameEvent[], professionId:
 }
 
 function tryLearnProfession(s: CharacterState, professionId: CraftingProfessionId): { ok: boolean; error?: string } {
+  if (PROFESSIONS[professionId]?.kind !== 'crafting') return { ok: false, error: 'Unknown profession' };
   if (s.professions[professionId]) return { ok: false, error: 'Already learned' };
   const craftingCount = Object.keys(s.professions).filter((p) => PROFESSIONS[p]?.kind === 'crafting').length;
   if (craftingCount >= MAX_CRAFTING_PROFESSIONS) return { ok: false, error: `You can only know ${MAX_CRAFTING_PROFESSIONS} crafting professions at once` };
@@ -113,12 +122,24 @@ function performJobAdvanceImpl(s: CharacterState, jobId: string): { ok: boolean;
   return { ok: true };
 }
 
+/** Would every `giveItem` in a quest's onAccept actions fit in the inventory right now? Dry-run
+ * only (no mutation) — used to refuse accepting a quest outright rather than silently losing the
+ * item(s) it hands over (which, for a delivery-style quest, could softlock it forever). */
+function onAcceptItemsFit(s: CharacterState, actions: DialogueAction[] | undefined): boolean {
+  if (!actions) return true;
+  const fake = { inventory: cloneInventory(s.inventory) } as CharacterState;
+  for (const a of actions) {
+    if (a.type === 'giveItem' && !addItem(fake, a.itemId, a.qty ?? 1, () => 'dry').ok) return false;
+  }
+  return true;
+}
+
 function applyDialogueActions(s: CharacterState, events: GameEvent[], actions: DialogueAction[], ctx: ServerContext) {
   for (const a of actions) {
     switch (a.type) {
       case 'acceptQuest': {
         const def = QUESTS[a.questId];
-        if (def && getQuestState(s, a.questId) === 'notStarted' && checkConditions(s, def.reqs)) {
+        if (def && getQuestState(s, a.questId) === 'notStarted' && checkConditions(s, def.reqs) && onAcceptItemsFit(s, def.onAccept)) {
           s.quests[a.questId] = { state: 'active', progress: def.objectives.map(() => 0), acceptedAt: ctx.now };
           if (def.onAccept) applyDialogueActions(s, events, def.onAccept, ctx);
           events.push({ type: 'questAccepted', questId: a.questId });
@@ -368,6 +389,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       const map = MAPS[action.mapId];
       if (!monster) return err('Unknown monster');
       if (!map) return err('Unknown map');
+      if (s.mapId !== action.mapId) return err('You are not on that map.');
       const onMap =
         (map.spawns ?? []).some((sp) => sp.monsterId === action.monsterId) ||
         map.boss?.monsterId === action.monsterId ||
@@ -444,6 +466,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       if (!node) return err('Unknown gather node.');
       const map = MAPS[action.mapId];
       if (!map) return err('Unknown map.');
+      if (s.mapId !== action.mapId) return err('You are not on that map.');
       if (!(map.gather ?? []).some((g) => g.nodeId === action.nodeId)) return err('That node is not here.');
       const prof = s.professions[node.profession];
       const profLevel = prof?.level ?? 0;
@@ -627,6 +650,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       if (!inst) return err('Item not found.');
       const def = ITEMS[inst.itemId];
       if (def?.quest) return err('Quest items cannot be discarded.');
+      if (action.qty !== undefined && !isPosInt(action.qty)) return err('Invalid quantity.');
       const res = removeItem(s, { uid: action.uid, qty: action.qty ?? inst.qty });
       if (!res.ok) return err(res.error ?? 'Cannot discard that.');
       events.push({ type: 'itemRemoved', itemId: inst.itemId, qty: res.removedQty });
@@ -639,7 +663,10 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
 
     case 'moveItem': {
       const tab = s.inventory[action.tab];
-      if (!tab || action.from < 0 || action.from >= tab.length || action.to < 0 || action.to >= tab.length) return err('Invalid inventory slot.');
+      if (!tab || !Number.isInteger(action.from) || !Number.isInteger(action.to)
+        || action.from < 0 || action.from >= tab.length || action.to < 0 || action.to >= tab.length) {
+        return err('Invalid inventory slot.');
+      }
       const tmp = tab[action.from];
       tab[action.from] = tab[action.to];
       tab[action.to] = tmp;
@@ -662,7 +689,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
 
     // ------------------------------------------------------------------ progression
     case 'allocateStat': {
-      if (action.amount <= 0) return err('Invalid amount.');
+      if (!isPosInt(action.amount)) return err('Invalid amount.');
       if (s.ap < action.amount) return err('Not enough AP.');
       s.ap -= action.amount;
       s.baseStats[action.stat] += action.amount;
@@ -681,7 +708,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
     }
 
     case 'setHotbar': {
-      if (action.index < 0 || action.index >= s.hotbar.length) return err('Invalid hotbar slot.');
+      if (!Number.isInteger(action.index) || action.index < 0 || action.index >= s.hotbar.length) return err('Invalid hotbar slot.');
       s.hotbar[action.index] = action.entry;
       break;
     }
@@ -713,6 +740,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
         if (qp && ctx.now - (qp.completedAt ?? 0) < def.repeatable.cooldownMs) return err('That quest is not ready to repeat yet.');
       }
       if (!checkConditions(s, def.reqs)) return err('You do not meet the requirements for that quest.');
+      if (!onAcceptItemsFit(s, def.onAccept)) return err('Not enough inventory space to accept that quest.');
       const prevTimes = s.quests[action.questId]?.timesCompleted;
       s.quests[action.questId] = { state: 'active', progress: def.objectives.map(() => 0), acceptedAt: ctx.now, timesCompleted: prevTimes };
       if (def.onAccept) applyDialogueActions(s, events, def.onAccept, ctx);
@@ -743,19 +771,43 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
         if (choice.reqs && !checkConditions(s, choice.reqs)) return err(choice.lockedHint ?? 'You cannot choose that.');
       }
 
+      let chooseOnePick: { itemId: string; qty: number } | undefined;
+      if (def.rewards.chooseOne && def.rewards.chooseOne.length) {
+        if (action.chooseIndex === undefined) return err('A reward choice is required.');
+        const picked = def.rewards.chooseOne[action.chooseIndex];
+        if (!picked) return err('Invalid reward choice.');
+        chooseOnePick = { itemId: picked.itemId, qty: picked.qty ?? 1 };
+      }
+
+      // Dry-run every item this turn-in will grant against a scratch copy of the inventory —
+      // *after* simulating the collect-objective consumption it does first (which may itself
+      // free up the room the rewards need) — so a full inventory is rejected up front instead of
+      // silently swallowing hard-won quest rewards.
+      {
+        const fake = { inventory: cloneInventory(s.inventory) } as CharacterState;
+        for (const obj of def.objectives) {
+          if (obj.type === 'collect' && obj.consume !== false) removeItem(fake, { itemId: obj.itemId, qty: obj.count });
+        }
+        const grants: { itemId: string; qty: number }[] = [];
+        for (const it of def.rewards.items ?? []) grants.push({ itemId: it.itemId, qty: it.qty ?? 1 });
+        if (choice) for (const it of choice.rewards.items ?? []) grants.push({ itemId: it.itemId, qty: it.qty ?? 1 });
+        if (chooseOnePick) grants.push(chooseOnePick);
+        for (const g of grants) {
+          if (!addItem(fake, g.itemId, g.qty, () => 'dry').ok) {
+            return err('Not enough inventory space for the quest rewards. Make room and try again.');
+          }
+        }
+      }
+
       for (const obj of def.objectives) {
         if (obj.type === 'collect' && obj.consume !== false) removeItem(s, { itemId: obj.itemId, qty: obj.count });
       }
 
       applyReward(s, events, def.rewards, ctx);
 
-      if (def.rewards.chooseOne && def.rewards.chooseOne.length) {
-        if (action.chooseIndex === undefined) return err('A reward choice is required.');
-        const picked = def.rewards.chooseOne[action.chooseIndex];
-        if (!picked) return err('Invalid reward choice.');
-        const qty = picked.qty ?? 1;
-        const r = addItem(s, picked.itemId, qty, ctx.uid);
-        if (r.ok) events.push({ type: 'itemAdded', itemId: picked.itemId, qty });
+      if (chooseOnePick) {
+        const r = addItem(s, chooseOnePick.itemId, chooseOnePick.qty, ctx.uid);
+        if (r.ok) events.push({ type: 'itemAdded', itemId: chooseOnePick.itemId, qty: chooseOnePick.qty });
       }
 
       if (choice) {
@@ -811,7 +863,8 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       if (!checkConditions(s, entry.reqs)) return err('That is not available to you yet.');
       const def = ITEMS[action.itemId];
       if (!def) return err('Unknown item.');
-      const qty = Math.max(1, action.qty);
+      if (!isPosInt(action.qty)) return err('Invalid quantity.');
+      const qty = action.qty;
       const price = entry.price ?? def.buyPrice ?? 0;
       const total = price * qty;
       if (s.gold < total) return err('Not enough gold.');
@@ -829,6 +882,7 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       const def = ITEMS[inst.itemId];
       if (!def) return err('Unknown item.');
       if (def.quest) return err('Quest items cannot be sold.');
+      if (action.qty !== undefined && !isPosInt(action.qty)) return err('Invalid quantity.');
       const qty = Math.min(inst.qty, action.qty ?? inst.qty);
       const total = def.sellPrice * qty;
       const res = removeItem(s, { uid: action.uid, qty });
@@ -871,6 +925,9 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
 
     case 'unlearnProfession': {
       if (!s.professions[action.professionId]) return err('That profession is not known.');
+      // Only crafting professions can be dropped to make room for another (see DESIGN.md §7);
+      // Mining/Foraging are permanent and have no relearn path, so allowing this would softlock them.
+      if (PROFESSIONS[action.professionId]?.kind !== 'crafting') return err('That profession cannot be unlearned.');
       delete s.professions[action.professionId];
       s.knownRecipes = s.knownRecipes.filter((rid) => RECIPES[rid]?.profession !== action.professionId);
       break;
@@ -883,13 +940,20 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       const prof = s.professions[recipe.profession];
       if (!prof) return err('Profession not learned.');
       if (prof.level < recipe.level) return err(`Requires ${recipe.profession} level ${recipe.level}.`);
-      const qty = Math.max(1, action.qty ?? 1);
+      if (action.qty !== undefined && !isPosInt(action.qty)) return err('Invalid quantity.');
+      const qty = action.qty ?? 1;
       for (const inp of recipe.inputs) if (countItem(s, inp.itemId) < inp.qty * qty) return err('Missing materials.');
       if (recipe.goldCost && s.gold < recipe.goldCost * qty) return err('Not enough gold.');
       const outDef = ITEMS[recipe.output.itemId];
-      if (outDef?.equip) {
-        const free = s.inventory[outDef.category].filter((x) => x === null).length;
-        if (free < qty) return err('Not enough inventory space to craft that many.');
+      // Dry-run the output grant against a scratch copy of the inventory first: equipment never
+      // stacks (1 slot per instance) and stackable output can still overflow the tab, so both
+      // paths must be checked up front — crafted goods must never be silently discarded.
+      if (outDef) {
+        const fake = { inventory: cloneInventory(s.inventory) } as CharacterState;
+        const outputQty = outDef.equip ? qty : recipe.output.qty * qty;
+        if (!addItem(fake, recipe.output.itemId, outputQty, () => 'dry').ok) {
+          return err('Not enough inventory space to craft that many.');
+        }
       }
 
       for (const inp of recipe.inputs) removeItem(s, { itemId: inp.itemId, qty: inp.qty * qty });
@@ -931,7 +995,11 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
       const def = ITEMS[inst.itemId];
       if (!def?.equip) return err('Only equipment can be salvaged.');
       const mats = def.salvage ?? computeSalvage(def, rarityOf(inst));
-      removeItem(s, { uid: action.uid, qty: 1 });
+      // removeItem only searches the inventory tabs, not `state.equipment` — an equipped item's
+      // uid must be rejected here (unequip it first), or salvaging it would grant materials for
+      // free while leaving the item equipped and fully intact (item duplication).
+      const rm = removeItem(s, { uid: action.uid, qty: 1 });
+      if (!rm.ok) return err('Unequip that item before salvaging it.');
       for (const m of mats) {
         const r = addItem(s, m.itemId, m.qty, ctx.uid);
         if (r.ok) events.push({ type: 'itemAdded', itemId: m.itemId, qty: m.qty });

@@ -74,6 +74,12 @@ export class WorldScene extends Phaser.Scene {
   create(data: WorldSceneData): void {
     this.transitioning = false;
     this.hitstopUntil = 0;
+    // Phaser reuses this same Scene instance for every future start (map change, or a full
+    // quit-to-title + re-enter) — teardown()'s guard must reset here too, or the very next
+    // 'shutdown' after the first one this instance ever sees becomes a silent no-op, leaking this
+    // session's busOffs/input2/terrain/etc. forever (visible as bus subscriptions piling up across
+    // repeated quit-to-title cycles).
+    this.torndown = false;
     this.map = getMapDefOrFallback(data.mapId);
 
     this.physics.world.setBounds(0, 0, this.map.width, this.map.height + CAMERA_BOTTOM_SLACK);
@@ -144,7 +150,14 @@ export class WorldScene extends Phaser.Scene {
     this.physics.add.collider(this.player.sprite, this.terrain.onewayGroup, undefined, onewayProcess(() => this.dropThroughUntil));
 
     this.cameras.main.setZoom(2);
-    this.cameras.main.setBounds(0, 0, this.map.width, this.map.height + CAMERA_BOTTOM_SLACK);
+    // Camera bounds must never be smaller than the viewport (in world px, i.e. camera size / zoom) —
+    // a map authored (or a dev/fixture map) smaller than that would otherwise hand Phaser bounds it
+    // can't clamp scroll into cleanly, showing void past the edges instead of centering the map.
+    const viewW = this.cameras.main.width / this.cameras.main.zoom;
+    const viewH = this.cameras.main.height / this.cameras.main.zoom;
+    const boundsW = Math.max(this.map.width, viewW);
+    const boundsH = Math.max(this.map.height + CAMERA_BOTTOM_SLACK, viewH);
+    this.cameras.main.setBounds(0, 0, boundsW, boundsH);
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12, 0, CAMERA_FOLLOW_OFFSET_Y);
     this.cameras.main.setDeadzone(60, 36);
     this.cameras.main.setBackgroundColor(0x0b1020);

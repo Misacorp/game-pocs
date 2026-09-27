@@ -153,7 +153,7 @@ export function createCharacterWindow(wm: WindowManager, session: GameSession) {
     countersBlock.appendChild(el('div', null, `Gold earned: ${fmtNum(c.goldEarned)}  ·  Playtime: ${fmtPlaytime(c.playTimeMs)}`));
   }
 
-  bus.on('state', render);
+  wm.track(bus.on('state', render));
   render();
   return ctrl;
 }

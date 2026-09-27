@@ -33,12 +33,21 @@ export class WindowManager {
   private registry = new Map<string, WindowController>();
   /** window-level listeners (drag mousemove/mouseup) registered by createWindow, removed on dispose(). */
   windowListeners: [string, EventListenerOrEventListenerObject][] = [];
+  /** bus.on() unsubscribe functions registered by this manager's windows via track(), removed on dispose(). */
+  private busOffs: (() => void)[] = [];
   constructor(private layer: HTMLElement) {}
+
+  /** Register a bus.on() unsubscribe (or any other teardown callback) to run on dispose(). Window
+   *  creators should route their bus subscriptions through this instead of leaving them bare, or
+   *  they pile up (still firing against a torn-down window) every quit-to-title / re-enter cycle. */
+  track(off: () => void): void { this.busOffs.push(off); }
 
   /** Detach global (window-level) listeners created for this manager's windows. Call when tearing down the game UI. */
   dispose() {
     for (const [type, fn] of this.windowListeners) window.removeEventListener(type, fn);
     this.windowListeners = [];
+    for (const off of this.busOffs) { try { off(); } catch { /* ignore */ } }
+    this.busOffs = [];
   }
 
   register(ctrl: WindowController) { this.registry.set(ctrl.panel, ctrl); }
@@ -118,6 +127,17 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
   root.style.top = `${saved.y}px`;
 
   let open = false;
+  /** Keeps the window's saved/cascaded position on-screen — a position saved (or defaulted) at one
+   *  viewport size can otherwise sit fully off the visible area after the browser window shrinks,
+   *  with no way to drag it back since its titlebar is off-screen too. Only touches position while
+   *  visible: while closed, offsetWidth/Height read 0 (display:none) and would clamp to garbage. */
+  const clampToViewport = () => {
+    if (!open) return;
+    const nx = clamp(root.offsetLeft, -root.offsetWidth + 60, window.innerWidth - 40);
+    const ny = clamp(root.offsetTop, 0, window.innerHeight - 30);
+    if (nx !== root.offsetLeft) root.style.left = `${nx}px`;
+    if (ny !== root.offsetTop) root.style.top = `${ny}px`;
+  };
   const ctrl: WindowController = {
     panel: opts.panel,
     root,
@@ -128,6 +148,7 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
       open = true;
       root.style.display = 'flex';
       root.classList.remove('dw-closing');
+      clampToViewport();
       wm.notifyOpened(ctrl);
       audio.playSfx('uiOpen');
       opts.onOpen?.();
@@ -173,7 +194,8 @@ export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElem
   };
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
-  wm.windowListeners.push(['mousemove', onMove as EventListener], ['mouseup', onUp as EventListener]);
+  window.addEventListener('resize', clampToViewport);
+  wm.windowListeners.push(['mousemove', onMove as EventListener], ['mouseup', onUp as EventListener], ['resize', clampToViewport as EventListener]);
 
   wm.register(ctrl);
   return ctrl;

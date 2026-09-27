@@ -4,7 +4,9 @@ import { MAPS } from '@shared/data';
 
 const W = 190, H = 110;
 
-export function createMinimap(): HTMLElement {
+export interface MinimapHandle { root: HTMLElement; cleanup: () => void }
+
+export function createMinimap(): MinimapHandle {
   const nameEl = el('div', { class: 'dw-minimap-name' }, 'Unknown');
   const canvas = el('canvas', { width: W, height: H }) as HTMLCanvasElement;
   const root = el('div', { class: 'dw-panel dw-minimap' }, nameEl, canvas);
@@ -43,8 +45,7 @@ export function createMinimap(): HTMLElement {
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
     ctx.strokeRect(tx(m.player.x) - 4, ty(m.player.y) - 4, 8, 8);
   });
-  (root as any)._cleanup = off;
-  return root;
+  return { root, cleanup: off };
 }
 
 function prettyMapName(id: string): string {

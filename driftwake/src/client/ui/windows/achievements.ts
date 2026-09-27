@@ -76,8 +76,8 @@ export function createAchievementsWindow(wm: WindowManager, session: GameSession
     if (!defs.length) list.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Nothing here yet.'));
   }
 
-  bus.on('state', render);
-  bus.on('game', (ev) => { if (ev.type === 'achievementUnlocked') render(); });
+  wm.track(bus.on('state', render));
+  wm.track(bus.on('game', (ev) => { if (ev.type === 'achievementUnlocked') render(); }));
   render();
   return ctrl;
 }

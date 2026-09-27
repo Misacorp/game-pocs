@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { CharacterState } from '@shared/types';
-import { JOBS, ITEMS, MONSTERS, MAPS, QUESTS, RECIPES, SHOPS, SKILLS } from '@shared/data';
+import type { CharacterState, ItemInstance } from '@shared/types';
+import { JOBS, ITEMS, MONSTERS, MAPS, QUESTS, RECIPES, SHOPS, SKILLS, PROFESSIONS, GATHER_NODES } from '@shared/data';
 import { createCharacter, handleAction, createSession, computeStats, type ServerContext } from '@shared/logic';
 import { mulberry32 } from '@shared/rng';
 
@@ -310,5 +310,224 @@ describe('death penalty', () => {
     expect(res.ok).toBe(true);
     expect(res.state.mapId).toBe(c.townMapId);
     expect(res.state.hp).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bug hunt regressions
+// ---------------------------------------------------------------------------
+
+describe('client-supplied quantities are validated (NaN/negative/fractional exploits)', () => {
+  it('buy rejects NaN qty instead of corrupting gold to NaN', () => {
+    const c = newChar();
+    const goldBefore = c.gold;
+    const res = handleAction(c, { type: 'buy', shopId: 'shop_brina', itemId: 'use_whetstone_1', qty: NaN }, ctx());
+    expect(res.ok).toBe(false);
+    expect(res.state.gold).toBe(goldBefore);
+    expect(Number.isFinite(res.state.gold)).toBe(true);
+  });
+
+  it('buy rejects negative and fractional qty', () => {
+    const c = newChar();
+    for (const qty of [-5, 1.5, Infinity]) {
+      const res = handleAction(c, { type: 'buy', shopId: 'shop_brina', itemId: 'use_whetstone_1', qty }, ctx());
+      expect(res.ok).toBe(false);
+      expect(res.state.gold).toBe(c.gold);
+    }
+  });
+
+  it('sell rejects a non-integer/NaN qty', () => {
+    let c = newChar();
+    c.gold = 1000;
+    const buyRes = handleAction(c, { type: 'buy', shopId: 'shop_brina', itemId: 'use_whetstone_1', qty: 2 }, ctx());
+    expect(buyRes.ok).toBe(true);
+    c = buyRes.state;
+    const uid = c.inventory.use.find((s) => s?.itemId === 'use_whetstone_1')!.uid;
+    for (const qty of [NaN, -1, 1.5]) {
+      const res = handleAction(c, { type: 'sell', uid, qty: qty as any }, ctx());
+      expect(res.ok).toBe(false);
+    }
+  });
+
+  it('discardItem rejects a non-integer/NaN qty', () => {
+    let c = newChar();
+    const uid = c.inventory.use.find((s) => s?.itemId === 'use_hp_potion_s')?.uid;
+    if (!uid) return;
+    for (const qty of [NaN, -1, 1.5]) {
+      const res = handleAction(c, { type: 'discardItem', uid, qty: qty as any }, ctx());
+      expect(res.ok).toBe(false);
+    }
+  });
+
+  it('allocateStat rejects a NaN/fractional amount instead of corrupting AP and base stats', () => {
+    let c = newChar();
+    c.ap = 10;
+    const apBefore = c.ap;
+    const statBefore = c.baseStats.str;
+    for (const amount of [NaN, 1.5, -3, Infinity]) {
+      const res = handleAction(c, { type: 'allocateStat', stat: 'str', amount }, ctx());
+      expect(res.ok).toBe(false);
+      expect(res.state.ap).toBe(apBefore);
+      expect(res.state.baseStats.str).toBe(statBefore);
+    }
+  });
+
+  it('craft rejects a non-integer/NaN qty', () => {
+    const recipeId = Object.keys(RECIPES)[0];
+    if (!recipeId) return;
+    const recipe = RECIPES[recipeId];
+    let c = newChar();
+    c.professions[recipe.profession] = { level: recipe.level, xp: 0 };
+    c.knownRecipes.push(recipeId);
+    let slot = 0;
+    for (const inp of recipe.inputs) c.inventory.etc[slot++] = { uid: `mat${slot}`, itemId: inp.itemId, qty: inp.qty * 10 };
+    c.gold = Math.max(c.gold, (recipe.goldCost ?? 0) * 10);
+    for (const qty of [NaN, -1, 1.5]) {
+      const res = handleAction(c, { type: 'craft', recipeId, qty: qty as any }, ctx());
+      expect(res.ok).toBe(false);
+    }
+  });
+
+  it('moveItem rejects non-integer/NaN slot indices', () => {
+    const c = newChar();
+    const res = handleAction(c, { type: 'moveItem', tab: 'etc', from: NaN as any, to: 0 }, ctx());
+    expect(res.ok).toBe(false);
+  });
+});
+
+describe('salvage refuses to touch equipped items (was a free item-duplication exploit)', () => {
+  it('rejects salvaging a currently-equipped item and grants nothing', () => {
+    const c = newChar();
+    const equipped = Object.entries(c.equipment).find(([, v]) => !!v) as [string, ItemInstance] | undefined;
+    if (!equipped) return;
+    const [slot, inst] = equipped;
+    const res = handleAction(c, { type: 'salvage', uid: inst.uid }, ctx());
+    expect(res.ok).toBe(false);
+    // must still be equipped, unchanged, with no salvage materials silently granted
+    expect(res.state.equipment[slot as keyof CharacterState['equipment']]?.uid).toBe(inst.uid);
+  });
+
+  it('salvages the same item fine once unequipped', () => {
+    let c = newChar();
+    const equipped = Object.entries(c.equipment).find(([, v]) => !!v) as [string, ItemInstance] | undefined;
+    if (!equipped) return;
+    const [slot, inst] = equipped;
+    const unequipRes = handleAction(c, { type: 'unequip', slot: slot as any }, ctx());
+    expect(unequipRes.ok).toBe(true);
+    const res = handleAction(unequipRes.state, { type: 'salvage', uid: inst.uid }, ctx());
+    expect(res.ok).toBe(true);
+  });
+});
+
+describe('inventory-full protections (rewards/crafted goods must never be silently lost)', () => {
+  function fillTab(c: CharacterState, tab: 'equip' | 'use' | 'etc') {
+    for (let i = 0; i < c.inventory[tab].length; i++) {
+      if (!c.inventory[tab][i]) c.inventory[tab][i] = { uid: `filler_${tab}_${i}`, itemId: '__test_filler__', qty: 1 };
+    }
+  }
+
+  it('rejects crafting an output that has nowhere to go, refunding nothing because nothing was consumed', () => {
+    const recipeId = Object.keys(RECIPES).find((id) => !ITEMS[RECIPES[id].output.itemId]?.equip);
+    if (!recipeId) return;
+    const recipe = RECIPES[recipeId];
+    const outDef = ITEMS[recipe.output.itemId];
+    let c = newChar();
+    c.professions[recipe.profession] = { level: recipe.level, xp: 0 };
+    c.knownRecipes.push(recipeId);
+    let slot = 0;
+    for (const inp of recipe.inputs) c.inventory[ITEMS[inp.itemId].category][slot++] = { uid: `mat${slot}`, itemId: inp.itemId, qty: inp.qty };
+    c.gold = Math.max(c.gold, recipe.goldCost ?? 0) + 1000;
+    const goldBefore = c.gold;
+    fillTab(c, outDef.category);
+    const res = handleAction(c, { type: 'craft', recipeId }, ctx());
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/inventory space/i);
+    expect(res.state.gold).toBe(goldBefore);
+    for (const inp of recipe.inputs) expect(countItemHelper(res.state, inp.itemId)).toBeGreaterThanOrEqual(inp.qty);
+  });
+
+  it('rejects turning in a quest whose item reward has nowhere to fit, without consuming collect items or completing it', () => {
+    const def = QUESTS['mq_02_tremors'];
+    if (!def || !def.rewards.items?.length) return;
+    let c = newChar();
+    c.level = Math.max(c.level, def.level);
+    c.quests['mq_02_tremors'] = { state: 'active', progress: [8, 0], acceptedAt: Date.now() };
+    c.inventory.etc[0] = { uid: 'fluff', itemId: 'mat_puffmoss_fluff', qty: 5 };
+    // top off the starter potion stack so the reward can't just merge into it, then fill every
+    // other 'use' slot too — the potion reward (category 'use') has nowhere to stack/land.
+    const rewardItemId = def.rewards.items![0].itemId;
+    const rewardStack = ITEMS[rewardItemId]?.stack ?? 1;
+    for (const slot of c.inventory.use) if (slot?.itemId === rewardItemId) slot.qty = rewardStack;
+    fillTab(c, 'use');
+    const res = handleAction(c, { type: 'completeQuest', questId: 'mq_02_tremors' }, ctx());
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/inventory space/i);
+    expect(res.state.quests['mq_02_tremors']?.state).toBe('active');
+    expect(countItemHelper(res.state, 'mat_puffmoss_fluff')).toBe(5); // not consumed
+
+    // once there's room, the same turn-in succeeds and consumes/grants correctly
+    const c2 = structuredClone(c);
+    c2.inventory.use[0] = null;
+    const res2 = handleAction(c2, { type: 'completeQuest', questId: 'mq_02_tremors' }, ctx());
+    expect(res2.ok).toBe(true);
+    expect(res2.state.quests['mq_02_tremors']?.state).toBe('completed');
+    expect(countItemHelper(res2.state, 'mat_puffmoss_fluff')).toBe(0);
+    expect(countItemHelper(res2.state, 'use_hp_potion_s')).toBeGreaterThan(0);
+  });
+
+  function countItemHelper(state: CharacterState, itemId: string): number {
+    let n = 0;
+    for (const tab of Object.values(state.inventory)) for (const s of tab) if (s?.itemId === itemId) n += s.qty;
+    return n;
+  }
+});
+
+describe('professions: crafting-only learn/unlearn', () => {
+  it('rejects learning an unknown or gathering profession id', () => {
+    const c = newChar();
+    for (const bogus of ['not_a_real_profession', 'mining']) {
+      const res = handleAction(c, { type: 'learnProfession', professionId: bogus as any }, ctx());
+      expect(res.ok).toBe(false);
+    }
+  });
+
+  it('rejects unlearning a permanent gathering profession (mining/foraging have no relearn path)', () => {
+    const c = newChar();
+    expect(c.professions.mining).toBeDefined();
+    const res = handleAction(c, { type: 'unlearnProfession', professionId: 'mining' as any }, ctx());
+    expect(res.ok).toBe(false);
+    expect(res.state.professions.mining).toBeDefined();
+  });
+
+  it('allows unlearning a known crafting profession', () => {
+    let c = newChar();
+    const craftingId = Object.values(PROFESSIONS).find((p) => p.kind === 'crafting')!.id;
+    c.professions[craftingId] = { level: 1, xp: 0 };
+    const res = handleAction(c, { type: 'unlearnProfession', professionId: craftingId as any }, ctx());
+    expect(res.ok).toBe(true);
+    expect(res.state.professions[craftingId]).toBeUndefined();
+  });
+});
+
+describe('killMonster / gather require the player to actually be on the claimed map', () => {
+  it('rejects killMonster when the action map does not match the character map', () => {
+    const c = newChar();
+    const map = Object.values(MAPS).find((m) => m.spawns.length > 0);
+    const otherMap = Object.values(MAPS).find((m) => m.spawns.length > 0 && m.id !== map?.id);
+    if (!map || !otherMap) return;
+    c.mapId = otherMap.id;
+    const res = handleAction(c, { type: 'killMonster', monsterId: map.spawns[0].monsterId, mapId: map.id, x: 0, y: 0 }, ctx());
+    expect(res.ok).toBe(false);
+  });
+
+  it('rejects gather when the action map does not match the character map', () => {
+    const c = newChar();
+    const nodeId = Object.keys(GATHER_NODES)[0];
+    const map = Object.values(MAPS).find((m) => (m.gather ?? []).some((g) => g.nodeId === nodeId));
+    const otherMap = Object.values(MAPS).find((m) => m.id !== map?.id);
+    if (!map || !otherMap) return;
+    c.mapId = otherMap.id;
+    const res = handleAction(c, { type: 'gather', nodeId, mapId: map.id }, ctx());
+    expect(res.ok).toBe(false);
   });
 });

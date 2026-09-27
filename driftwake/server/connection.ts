@@ -144,6 +144,8 @@ export class Connection {
   private async onDeleteCharacter(rid: number, id: string): Promise<void> {
     const token = this.requireToken(rid);
     if (!token) return;
+    const ids = await this.store.getAccountCharacterIds(token);
+    if (!ids.includes(id)) return this.reply(rid, false, undefined, 'Character not found');
     await this.store.deleteCharacter(id);
     await this.store.removeCharacterFromAccount(token, id);
     this.reply(rid, true);

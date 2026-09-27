@@ -23,9 +23,13 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
 
   const ctrl = createWindow(wm, {
     panel: 'dialogue', title: 'Conversation', width: 560, className: 'dw-dialogue-window',
+    // Talking to an NPC must block movement/attack/skill input the same way typing in chat does —
+    // otherwise the player can walk off, swing weapons or fire skills at monsters while the
+    // conversation window sits on top (see ClientEventMap['input:capture']'s own doc comment).
+    onOpen: () => bus.emit('input:capture', true),
     // "At the trainer" only applies for the duration of the conversation — closing it (Goodbye/Esc)
     // means the player has to talk to a trainer NPC again before learning/unlearning/buying recipes.
-    onClose: () => { uiState.trainerNpcId = null; uiState.trainerProfessionId = null; },
+    onClose: () => { uiState.trainerNpcId = null; uiState.trainerProfessionId = null; bus.emit('input:capture', false); },
   }, body);
 
   let npcId = '';
@@ -260,13 +264,13 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     }
   }
 
-  bus.on('ui:dialogue', ({ npcId: id }) => {
+  wm.track(bus.on('ui:dialogue', ({ npcId: id }) => {
     if (npcId !== id) { uiState.trainerNpcId = null; uiState.trainerProfessionId = null; }
     npcId = id;
     session.dispatch({ type: 'talk', npcId: id });
     ctrl.open();
     renderRoot();
-  });
+  }));
 
   return ctrl;
 }

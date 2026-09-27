@@ -400,7 +400,13 @@ function craftOnce(recipeId: string, depth: number): boolean {
     if (def.goldCost) ensureGold(def.goldCost);
     const outDef = ITEMS[def.output.itemId];
     if (outDef?.equip) freeInventorySpace(); // crafted equipment needs an empty slot
-    const res = dispatch({ type: 'craft', recipeId }, recipeId);
+    let res = dispatch({ type: 'craft', recipeId }, recipeId);
+    if (!res.ok && /inventory space/i.test(res.error ?? '')) {
+      // Stackable output can still overflow a full tab; the reducer refuses rather than losing
+      // the crafted goods, so make room and retry once (same pattern as pickupDrops).
+      freeInventorySpace();
+      res = dispatch({ type: 'craft', recipeId }, recipeId);
+    }
     if (!res.ok) { blocker(`craft '${recipeId}' failed: ${res.error}`); return false; }
     timeMs += 5000;
     maintainAfterAction();
@@ -853,7 +859,12 @@ function processQuest(questId: string): boolean {
     const giverMap = npcMapId[def.giver];
     if (!giverMap) { blocker(`Quest giver '${def.giver}' for '${def.id}' is not placed on any map.`); attemptedQuests.add(questId); return false; }
     if (!navigateTo(giverMap)) { attemptedQuests.add(questId); return false; }
-    const acc = dispatch({ type: 'acceptQuest', questId }, def.id);
+    let acc = dispatch({ type: 'acceptQuest', questId }, def.id);
+    if (!acc.ok && /inventory space/i.test(acc.error ?? '')) {
+      // Some quests hand over an item on accept; the reducer refuses rather than losing it.
+      freeInventorySpace();
+      acc = dispatch({ type: 'acceptQuest', questId }, def.id);
+    }
     if (!acc.ok) { blocker(`acceptQuest '${def.id}' failed: ${acc.error}`); attemptedQuests.add(questId); return false; }
   }
 
@@ -874,7 +885,13 @@ function processQuest(questId: string): boolean {
   if (turnInMap) navigateTo(turnInMap);
   const choiceId = choiceIdFor(def);
   const chooseIndex = !choiceId && def.rewards.chooseOne ? pickChooseOne(def.rewards.chooseOne) : undefined;
-  const res = dispatch({ type: 'completeQuest', questId, choiceId, chooseIndex }, def.id);
+  let res = dispatch({ type: 'completeQuest', questId, choiceId, chooseIndex }, def.id);
+  if (!res.ok && /inventory space/i.test(res.error ?? '')) {
+    // The reducer now refuses to turn in a quest whose rewards wouldn't fit rather than losing
+    // them; make room and retry once (same pattern as pickupDrops / craftOnce).
+    freeInventorySpace();
+    res = dispatch({ type: 'completeQuest', questId, choiceId, chooseIndex }, def.id);
+  }
   if (!res.ok) { blocker(`completeQuest '${def.id}' failed: ${res.error}`); attemptedQuests.add(questId); return false; }
   timeMs += 25_000;
   maintainAfterAction();

@@ -3,7 +3,7 @@
  */
 import Phaser from 'phaser';
 import type { DecorKind, ThemeId } from '@shared/types';
-import { makeCanvas, ctx2d, outlined, rect, rrect, circle, ellipse, line, poly, registerCanvasTexture, shade, hashStr, seedRandom } from './canvasKit';
+import { makeCanvas, ctx2d, outlined, rect, rrect, circle, ellipse, line, poly, registerCanvasTexture, shade, mix, hashStr, seedRandom } from './canvasKit';
 import { THEMES, OUTLINE } from './palette';
 
 type DrawFn = (ctx: CanvasRenderingContext2D, w: number, h: number, theme: ThemeId) => void;
@@ -60,9 +60,9 @@ const DRAW: Record<DecorKind, DrawFn> = {
     const c = organicColor(theme);
     if (theme === 'kelpwood') { line(ctx, w / 2, h, w / 2, h * 0.15, 3, c.secondary); for (let i = 0; i < 5; i++) ellipse(ctx, w / 2 + (i % 2 ? 6 : -6), h * 0.2 + i * h * 0.12, 8, 4, c.primary); }
     else if (theme === 'hollow' || theme === 'heart') { line(ctx, w / 2, h, w / 2, h * 0.3, 3, '#3a1f40'); for (const s of [-1, 1]) line(ctx, w / 2, h * 0.5, w / 2 + s * 10, h * 0.2, 2, '#3a1f40'); circle(ctx, w / 2, h * 0.18, 6, c.accent); }
-    else { rect(ctx, w / 2 - 2, h * 0.45, 4, h * 0.55, '#6b5438'); circle(ctx, w / 2, h * 0.32, w * 0.42, c.primary); circle(ctx, w * 0.3, h * 0.45, w * 0.28, shade(c.primary, -0.1)); circle(ctx, w * 0.68, h * 0.42, w * 0.3, shade(c.primary, 0.08)); }
+    else { const leaf = mix('#4f9e3d', THEMES[theme].groundAccent, 0.2); rect(ctx, w / 2 - 2, h * 0.45, 4, h * 0.55, '#6b5438'); circle(ctx, w / 2, h * 0.32, w * 0.42, leaf); circle(ctx, w * 0.3, h * 0.45, w * 0.28, shade(leaf, -0.12)); circle(ctx, w * 0.68, h * 0.42, w * 0.3, shade(leaf, 0.1)); }
   },
-  bush: (ctx, w, h, theme) => { const c = organicColor(theme); circle(ctx, w * 0.3, h * 0.6, h * 0.5, c.primary); circle(ctx, w * 0.7, h * 0.5, h * 0.55, shade(c.primary, -0.08)); },
+  bush: (ctx, w, h, theme) => { const leaf = mix('#4f9e3d', THEMES[theme].groundAccent, 0.2); circle(ctx, w * 0.3, h * 0.6, h * 0.5, leaf); circle(ctx, w * 0.7, h * 0.5, h * 0.55, shade(leaf, -0.08)); },
   flower: (ctx, w, h, theme) => { const c = organicColor(theme); line(ctx, w / 2, h, w / 2, h * 0.4, 1, '#4a7a3a'); circle(ctx, w / 2, h * 0.25, 3, c.accent); },
   grass: (ctx, w, h, theme) => { const c = organicColor(theme); for (let i = 0; i < 4; i++) line(ctx, i * 3 + 1, h, i * 3 - 1 + (i % 2) * 2, h * 0.1, 1.4, c.primary); },
   rock: (ctx, w, h, theme) => { poly(ctx, [[0, h], [2, h * 0.3], [w * 0.5, 0], [w - 2, h * 0.4], [w, h]], shade(THEMES[theme].groundFill, 0.1)); },

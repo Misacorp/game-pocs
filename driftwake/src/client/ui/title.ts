@@ -1,7 +1,7 @@
 /**
  * Title screen: logo, character select and character creation.
  */
-import { el, clamp } from './dom';
+import { el } from './dom';
 import type { Backend } from '../net';
 import { JOBS } from '@shared/data';
 import type { Appearance, ClassId, CharacterSummary } from '@shared/types';

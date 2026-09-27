@@ -101,19 +101,24 @@ export class SkillRunner {
 
   private now() { return performance.now(); }
 
+  /** HP-cost skills (Reaver) may never reduce the player below 1 HP via their own cost. */
+  private hpCostOf(desc: CastDescriptor): number {
+    return desc.hpCostPct > 0 ? Math.round(session.stats.maxHp * desc.hpCostPct) : 0;
+  }
+
   isReady(desc: CastDescriptor): boolean {
     if (desc.cooldownMs > 0 && !session.isReady(`skill:${desc.id}`)) return false;
     if (desc.mpCost > 0 && session.mp < desc.mpCost) return false;
-    if (desc.hpCostPct > 0 && session.hp <= 1) return false;
+    if (desc.hpCostPct > 0 && session.hp - this.hpCostOf(desc) < 1) return false;
     return true;
   }
 
-  cast(desc: CastDescriptor, caster: PlayerHandle): boolean {
+  cast(desc: CastDescriptor, caster: PlayerHandle, opts: { silent?: boolean } = {}): boolean {
     if (!this.isReady(desc)) {
-      if (desc.mpCost > 0 && session.mp < desc.mpCost) bus.emit('ui:toast', { text: 'Not enough MP', kind: 'warn' });
+      if (!opts.silent && desc.mpCost > 0 && session.mp < desc.mpCost) bus.emit('ui:toast', { text: 'Not enough MP', kind: 'warn' });
       return false;
     }
-    const hpCost = desc.hpCostPct > 0 ? Math.round(session.stats.maxHp * desc.hpCostPct) : 0;
+    const hpCost = this.hpCostOf(desc);
     if (hpCost > 0 || desc.mpCost > 0) session.setVitals(session.hp - hpCost, session.mp - desc.mpCost);
     if (desc.cooldownMs > 0) session.setCooldown(`skill:${desc.id}`, desc.cooldownMs);
     caster.playCastAnim(desc.anim, desc.castTimeMs);
@@ -251,7 +256,14 @@ export class SkillRunner {
         break;
       }
       case 'teleport': {
+        const fromX = caster.x, fromY = caster.y;
         caster.blink(effect.distance);
+        if (desc.damagePct > 0) {
+          const minX = Math.min(fromX, caster.x) - 20, maxX = Math.max(fromX, caster.x) + 20;
+          for (const m of this.aliveMonsters()) {
+            if (m.sprite.x >= minX && m.sprite.x <= maxX && Math.abs(m.sprite.y - fromY) < 70) dealt += this.resolveHit(m, desc, fromX);
+          }
+        }
         break;
       }
       case 'doubleJump': {

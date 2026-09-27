@@ -117,7 +117,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
         }
         card.appendChild(inputsRow);
         const btnRow = el('div', { style: { display: 'flex', gap: '6px' } });
-        for (const qty of [1, 5]) btnRow.appendChild(el('button', { class: 'dw-btn dw-btn-sm', disabled: !check.canCraft, onclick: () => session.dispatch({ type: 'craft', recipeId: r.id, qty }) }, `x${qty}`));
+        for (const qty of [1, 5]) btnRow.appendChild(el('button', { class: 'dw-btn dw-btn-sm', disabled: check.maxQty < qty, onclick: () => session.dispatch({ type: 'craft', recipeId: r.id, qty }) }, `x${qty}`));
         btnRow.appendChild(el('button', { class: 'dw-btn dw-btn-sm', disabled: check.maxQty <= 0, onclick: () => session.dispatch({ type: 'craft', recipeId: r.id, qty: check.maxQty }) }, `Max (${check.maxQty})`));
         card.appendChild(btnRow);
         if (!check.canCraft && check.reason) card.appendChild(el('div', { class: 'dw-tt-unmet', style: { fontSize: '11px' } }, check.reason));

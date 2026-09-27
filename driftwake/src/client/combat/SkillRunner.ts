@@ -125,7 +125,12 @@ export class SkillRunner {
     if (desc.sfx) audio.playSfx(desc.sfx);
 
     let totalDealt = 0;
-    for (let i = 0; i < Math.max(1, desc.hits); i++) totalDealt += this.runEffect(desc, caster);
+    try {
+      for (let i = 0; i < Math.max(1, desc.hits); i++) totalDealt += this.runEffect(desc, caster);
+    } catch (e) {
+      // A single malformed/edge-case skill effect must never freeze the game loop — log and move on.
+      console.error(`[SkillRunner] effect for "${desc.id}" threw`, e);
+    }
     if (desc.lifesteal > 0 && totalDealt > 0) caster.heal(totalDealt * desc.lifesteal);
 
     if (desc.buff) {

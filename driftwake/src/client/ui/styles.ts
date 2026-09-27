@@ -263,7 +263,7 @@ input.dw-input:focus, select.dw-select:focus { border-color: var(--dw-gold); box
 .dw-death-box h2 { margin:0 0 8px; color: var(--dw-red); font-size: 26px; letter-spacing:0.1em; }
 
 /* ---------- Chat ---------- */
-.dw-chat { position:absolute; left: 14px; bottom: 14px; width: 340px; display:flex; flex-direction:column; pointer-events:auto; }
+.dw-chat { position:absolute; left: 14px; bottom: 14px; width: 260px; display:flex; flex-direction:column; pointer-events:auto; }
 .dw-chat-log { max-height: 120px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding: 6px 8px; font-size:12px; }
 .dw-chat-log div { line-height:1.4; }
 .dw-chat-log .dw-chat-system { color: var(--dw-text-dim); font-style:italic; }

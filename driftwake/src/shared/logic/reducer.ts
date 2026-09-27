@@ -430,6 +430,10 @@ export function handleAction(state: CharacterState, action: ClientAction, ctx: S
         map.boss?.monsterId === action.monsterId ||
         (map.boss ? (MONSTERS[map.boss.monsterId]?.attacks ?? []).some((a) => a.kind === 'summon' && a.summonId === action.monsterId) : false);
       if (!onMap) return err('That monster is not here.');
+      // Bosses (and their summons) only exist while their spawn conditions hold.
+      if (map.boss?.monsterId === action.monsterId && !checkConditions(s, map.boss.reqs)) {
+        return err('That monster is not here.');
+      }
 
       const stats = computeStats(s, ctx.now);
       const diff = monster.level - s.level;

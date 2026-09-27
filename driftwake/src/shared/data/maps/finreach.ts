@@ -165,7 +165,7 @@ function tangleHeart(): MapDef {
       ...decorRow(['kelp', 'vine', 'pod'], 30, 1770, groundY, { step: 70 }),
       ...decorRow(['kelp', 'vine'], 100, 1450, 460, { step: 150, front: true }),
     ],
-    boss: { monsterId: 'old_tangle', x: 1650, y: groundY, respawnMs: 160000 },
+    boss: { monsterId: 'old_tangle', x: 1650, y: groundY, respawnMs: 160000 , reqs: [{ type: 'quest', questId: 'mq_10_old_tangle', state: ['active', 'ready', 'completed'] }] },
     weather: 'spores',
     subtitle: 'The Tangle Heart — ancient roots coil around a sleeping horror.',
   };

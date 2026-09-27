@@ -163,7 +163,7 @@ function sunkenGalleon(): MapDef {
       ...decorRow(['mast', 'barrel', 'chest', 'anchor', 'bones'], 30, 1970, groundY, { step: 70 }),
       ...decorRow(['mast', 'barrel'], 100, 1450, 520, { step: 150, front: true }),
     ],
-    boss: { monsterId: 'captain_rook', x: 1850, y: groundY, respawnMs: 180000 },
+    boss: { monsterId: 'captain_rook', x: 1850, y: groundY, respawnMs: 180000 , reqs: [{ type: 'quest', questId: 'mq_16_captain', state: ['active', 'ready', 'completed'] }] },
     weather: 'fireflies',
     dark: true,
     subtitle: 'The Sunken Galleon — Captain Rook still walks her decks.',

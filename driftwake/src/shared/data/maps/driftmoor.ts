@@ -269,7 +269,7 @@ function grottoDepths(): MapDef {
       ...decorRow(['barnacle', 'crystal', 'rock', 'bones'], 30, 1970, groundY, { step: 70 }),
       ...decorRow(['crystal', 'barnacle', 'rock'], 100, 1750, 500, { step: 150, front: true }),
     ],
-    boss: { monsterId: 'king_barnacle', x: 1850, y: groundY, respawnMs: 150000 },
+    boss: { monsterId: 'king_barnacle', x: 1850, y: groundY, respawnMs: 150000 , reqs: [{ type: 'quest', questId: 'mq_05_king_barnacle', state: ['active', 'ready', 'completed'] }] },
     weather: 'none',
     dark: true,
     subtitle: 'Grotto Depths — where the King Barnacle broods.',

@@ -9,6 +9,10 @@ import { bus } from '../events';
 import { makeCrispLabel } from './spriteUtil';
 
 export class NpcEntity {
+  /** Global (map-wide) bark rate limit so at most one NPC talks at a time, ~12s apart. */
+  private static nextGlobalBarkAt = 0;
+  private static activeBarker: NpcEntity | null = null;
+
   readonly id: string;
   sprite: Phaser.GameObjects.Sprite;
   nameTag: Phaser.GameObjects.Text;
@@ -16,7 +20,6 @@ export class NpcEntity {
   marker: Phaser.GameObjects.Text;
   barkText?: Phaser.GameObjects.Text;
   barkBg?: Phaser.GameObjects.Rectangle;
-  private nextBarkAt: number;
   private barkExpiresAt = 0;
   private curMarker: '!' | '?' | '…' | null = null;
   private near = false;
@@ -40,8 +43,6 @@ export class NpcEntity {
 
     this.marker = makeCrispLabel(scene, x, (def.title ? titleY : nameY) - 11, '', { fontSize: '13px', color: '#ffe066', strokeThickness: 3 })
       .setOrigin(0.5, 1).setDepth(11);
-
-    this.nextBarkAt = performance.now() + Phaser.Math.Between(4000, 12000);
   }
 
   /** Toggle the (dimmer) title line — only shown once the player is close, to reduce clutter. */
@@ -60,28 +61,46 @@ export class NpcEntity {
     else this.scene.tweens.killTweensOf(this.marker);
   }
 
+  private clearBark(): void {
+    if (this.barkText) { this.barkText.destroy(); this.barkText = undefined; }
+    if (this.barkBg) { this.barkBg.destroy(); this.barkBg = undefined; }
+    this.barkExpiresAt = 0;
+    if (NpcEntity.activeBarker === this) NpcEntity.activeBarker = null;
+  }
+
   update(now: number): void {
-    if (!this.def.barks || this.def.barks.length === 0) return;
-    if (this.barkExpiresAt && now > this.barkExpiresAt) {
-      this.barkText?.destroy(); this.barkBg?.destroy();
-      this.barkText = undefined; this.barkBg = undefined;
-      this.barkExpiresAt = 0;
-    }
-    if (!this.barkText && now > this.nextBarkAt) {
-      const line = Phaser.Utils.Array.GetRandom(this.def.barks);
-      const y = (this.titleTag ?? this.nameTag).y - 10;
-      this.barkText = makeCrispLabel(this.scene, this.x, y, line, { color: '#222', strokeThickness: 0, wordWrap: { width: 140 } })
-        .setOrigin(0.5, 1).setDepth(12);
-      const b = this.barkText.getBounds();
-      this.barkBg = this.scene.add.rectangle(this.x, y - b.height / 2, b.width + 12, b.height + 8, 0xfff6e0, 0.92)
-        .setStrokeStyle(1, 0x333333).setDepth(11.5).setOrigin(0.5, 0.5);
-      this.barkExpiresAt = now + 3200;
-      this.nextBarkAt = now + Phaser.Math.Between(8000, 18000);
-    }
+    if (this.barkExpiresAt && now > this.barkExpiresAt) this.fadeOutBark();
+    if (!this.def.barks || this.def.barks.length === 0 || this.barkText) return;
+    if (!this.near || NpcEntity.activeBarker || now < NpcEntity.nextGlobalBarkAt) return;
+
+    const line = Phaser.Utils.Array.GetRandom(this.def.barks);
+    const y = (this.titleTag ?? this.nameTag).y - 9;
+    this.barkText = makeCrispLabel(this.scene, this.x, y, line, { color: '#222', strokeThickness: 0, wordWrap: { width: 140 } })
+      .setOrigin(0.5, 1).setDepth(12).setAlpha(0);
+    const b = this.barkText.getBounds();
+    this.barkBg = this.scene.add.rectangle(this.x, y - b.height / 2, b.width + 10, b.height + 6, 0xfff6e0, 0.92)
+      .setStrokeStyle(1, 0x333333).setDepth(11.5).setOrigin(0.5, 0.5).setAlpha(0);
+    this.scene.tweens.add({ targets: this.barkText, alpha: { from: 0, to: 1 }, duration: 180 });
+    this.scene.tweens.add({ targets: this.barkBg, alpha: { from: 0, to: 0.92 }, duration: 180 });
+
+    NpcEntity.activeBarker = this;
+    this.barkExpiresAt = now + 3000;
+    NpcEntity.nextGlobalBarkAt = now + 12000;
+  }
+
+  private fadeOutBark(): void {
+    const targets = [this.barkText, this.barkBg].filter(Boolean) as Phaser.GameObjects.GameObject[];
+    this.barkExpiresAt = 0;
+    if (NpcEntity.activeBarker === this) NpcEntity.activeBarker = null;
+    if (targets.length === 0) return;
+    this.scene.tweens.add({
+      targets, alpha: 0, duration: 220,
+      onComplete: () => { this.barkText?.destroy(); this.barkBg?.destroy(); this.barkText = undefined; this.barkBg = undefined; },
+    });
   }
 
   destroy(): void {
     this.sprite.destroy(); this.nameTag.destroy(); this.titleTag?.destroy(); this.marker.destroy();
-    this.barkText?.destroy(); this.barkBg?.destroy();
+    this.clearBark();
   }
 }

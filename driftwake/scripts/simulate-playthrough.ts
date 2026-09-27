@@ -10,7 +10,7 @@
  *   classId: vanguard | stormcaller | windrunner | shade (default: vanguard)
  */
 import type {
-  CharacterState, ClassId, Condition, EquipSlot, ItemInstance, MapDef, QuestChoice, QuestDef,
+  CharacterState, ClassId, Condition, EquipSlot, ItemDef, ItemInstance, MapDef, QuestChoice, QuestDef,
 } from '../src/shared/types';
 import { EQUIP_SLOTS } from '../src/shared/types';
 import type { ClientAction, ActionResult, GameEvent } from '../src/shared/protocol';
@@ -392,16 +392,22 @@ function craftOnce(recipeId: string, depth: number): boolean {
   const def = RECIPES[recipeId];
   if (!def) return false;
   if (!ensureRecipeKnown(recipeId, depth)) return false;
-  for (const inp of def.inputs) if (!ensureItemQty(inp.itemId, inp.qty, depth + 1)) return false;
-  if (def.goldCost) ensureGold(def.goldCost);
-  const outDef = ITEMS[def.output.itemId];
-  if (outDef?.equip) freeInventorySpace(); // crafted equipment needs an empty slot
-  const res = dispatch({ type: 'craft', recipeId }, recipeId);
-  if (!res.ok) { blocker(`craft '${recipeId}' failed: ${res.error}`); return false; }
-  timeMs += 5000;
-  state.counters.crafted; // no-op touch
-  maintainAfterAction();
-  return true;
+  // Protect every input for the whole acquisition window: gathering input B must not let
+  // maintenance sell off input A, which was already sitting in the bag waiting to be used.
+  for (const inp of def.inputs) protect(inp.itemId);
+  try {
+    for (const inp of def.inputs) if (!ensureItemQty(inp.itemId, inp.qty, depth + 1)) return false;
+    if (def.goldCost) ensureGold(def.goldCost);
+    const outDef = ITEMS[def.output.itemId];
+    if (outDef?.equip) freeInventorySpace(); // crafted equipment needs an empty slot
+    const res = dispatch({ type: 'craft', recipeId }, recipeId);
+    if (!res.ok) { blocker(`craft '${recipeId}' failed: ${res.error}`); return false; }
+    timeMs += 5000;
+    maintainAfterAction();
+    return true;
+  } finally {
+    for (const inp of def.inputs) unprotect(inp.itemId);
+  }
 }
 
 function gatherOnce(nodeId: string, mapId: string): boolean {
@@ -412,13 +418,44 @@ function gatherOnce(nodeId: string, mapId: string): boolean {
   return true;
 }
 
+// Inventory-maintenance protection: items we are actively trying to accumulate (mid-ensureItemQty,
+// or a recipe's inputs mid-craft) must never be auto-sold/discarded by trimTab, or we'd farm a
+// material and immediately sell it back away as "the cheapest thing in the bag" forever.
+const protectedItems = new Map<string, number>();
+function protect(itemId: string) { protectedItems.set(itemId, (protectedItems.get(itemId) ?? 0) + 1); }
+function unprotect(itemId: string) {
+  const n = (protectedItems.get(itemId) ?? 1) - 1;
+  if (n <= 0) protectedItems.delete(itemId); else protectedItems.set(itemId, n);
+}
+/** itemIds any currently-active quest still needs for an unmet 'collect' objective. */
+function activeQuestCollectItemIds(): Set<string> {
+  const out = new Set<string>();
+  for (const [qid, qp] of Object.entries(state.quests)) {
+    if (qp.state !== 'active') continue;
+    const def = QUESTS[qid];
+    if (!def) continue;
+    for (const obj of def.objectives) if (obj.type === 'collect' && countItem(state, obj.itemId) < obj.count) out.add(obj.itemId);
+  }
+  return out;
+}
+
 /** Central item-acquisition resolver: shop, then monster drop, then gather node, then craft. */
 const itemSourceFailNotes = new Set<string>();
+const DEBUG = !!process.env.SIM_DEBUG;
 function ensureItemQty(itemId: string, qty: number, depth = 0): boolean {
   if (countItem(state, itemId) >= qty) return true;
   if (depth > 6) return false;
+  if (DEBUG) console.log(`    [dbg] ensureItemQty(${itemId}, ${qty}) depth=${depth} have=${countItem(state, itemId)} mapId=${state.mapId}`);
   const def = ITEMS[itemId];
   if (!def) { blocker(`Item '${itemId}' does not exist in the item registry.`); return false; }
+  protect(itemId);
+  try {
+    return ensureItemQtyInner(itemId, qty, depth, def);
+  } finally {
+    unprotect(itemId);
+  }
+}
+function ensureItemQtyInner(itemId: string, qty: number, depth: number, def: ItemDef): boolean {
 
   // (a) buy from a shop
   for (const shop of Object.values(SHOPS)) {
@@ -439,8 +476,12 @@ function ensureItemQty(itemId: string, qty: number, depth = 0): boolean {
 
   // (b) monster drops (qi_ items only drop while the owning quest is active — this is exactly
   //     what we're testing when this is called from a quest's own 'collect' objective).
+  // Bosses are only usable as a farm source once the story has already legitimately defeated
+  // them once (state.bestiary has a kill) — otherwise a bot would sequence-break straight to an
+  // end-game boss for an item a much earlier quest needs, which a real player can't do.
   const dropSources = Object.values(MONSTERS)
     .filter((m) => m.drops.some((d) => d.itemId === itemId))
+    .filter((m) => !m.isBoss || (state.bestiary[m.id] ?? 0) > 0)
     .sort((a, b) => (b.drops.find((d) => d.itemId === itemId)!.chance) - (a.drops.find((d) => d.itemId === itemId)!.chance));
   for (const mon of dropSources) {
     const mapId = findKillMap(mon.id);
@@ -454,8 +495,10 @@ function ensureItemQty(itemId: string, qty: number, depth = 0): boolean {
   const nodeSources = Object.values(GATHER_NODES).filter((n) => n.drops.some((d) => d.itemId === itemId));
   for (const node of nodeSources) {
     const maps = (gatherMapIds[node.id] ?? []).filter(isReachable);
+    if (DEBUG) console.log(`      [dbg-gather] node=${node.id} allMaps=${JSON.stringify(gatherMapIds[node.id])} reachable=${JSON.stringify(maps)} profLevel=${state.professions[node.profession]?.level} needLevel=${node.level}`);
     if (!maps.length) continue;
-    if ((state.professions[node.profession]?.level ?? 0) < node.level) continue; // gathering profession level too low here
+    if ((state.professions[node.profession]?.level ?? 0) < node.level) raiseGatheringProfession(node.profession, node.level);
+    if ((state.professions[node.profession]?.level ?? 0) < node.level) continue; // still too low — no reachable lower-tier node to grind with
     let guard = 0;
     while (countItem(state, itemId) < qty && guard < qty * 30 + 30) {
       guard++;
@@ -540,23 +583,38 @@ function sellSpareEquip() {
   }
 }
 
+/** Free up at least `minFree` slots in a tab by fully selling (or discarding, for unsellable
+ * junk) the least valuable non-quest stacks — never touching quest items, which must be kept
+ * for active collect objectives. */
+function trimTab(tab: 'etc' | 'use', minFree: number) {
+  let guard = 0;
+  const untouchable = activeQuestCollectItemIds();
+  while (guard++ < 40) {
+    const arr = state.inventory[tab];
+    const free = arr.filter((s) => s === null).length;
+    if (DEBUG && tab === 'etc') console.log(`        [dbg-trim] tab=${tab} free=${free} minFree=${minFree}`);
+    if (free >= minFree) return;
+    let worstIdx = -1; let worstVal = Infinity;
+    arr.forEach((s, i) => {
+      if (!s) return;
+      const def = ITEMS[s.itemId];
+      if (def?.quest) return;
+      if (protectedItems.has(s.itemId) || untouchable.has(s.itemId)) return;
+      const v = (def?.sellPrice ?? 0) * s.qty;
+      if (v < worstVal) { worstVal = v; worstIdx = i; }
+    });
+    if (worstIdx < 0) return; // nothing left we're allowed to clear (all quest/protected items)
+    const slot = arr[worstIdx]!;
+    const def = ITEMS[slot.itemId];
+    if (def && def.sellPrice > 0) dispatch({ type: 'sell', uid: slot.uid }, 'trim-space');
+    else dispatch({ type: 'discardItem', uid: slot.uid, qty: slot.qty }, 'trim-space');
+  }
+}
+
 function freeInventorySpace() {
   sellSpareEquip();
-  // If 'etc'/'use' tabs are jammed with materials, trim the least valuable stack a little.
-  for (const tab of ['etc', 'use'] as const) {
-    const arr = state.inventory[tab];
-    if (arr.every((s) => s !== null)) {
-      let worstIdx = -1; let worstVal = Infinity;
-      arr.forEach((s, i) => {
-        if (!s) return;
-        const def = ITEMS[s.itemId];
-        if (def?.quest) return;
-        const v = (def?.sellPrice ?? 0) * s.qty;
-        if (v < worstVal) { worstVal = v; worstIdx = i; }
-      });
-      if (worstIdx >= 0) dispatch({ type: 'discardItem', uid: arr[worstIdx]!.uid, qty: Math.ceil(arr[worstIdx]!.qty / 2) }, 'free-space');
-    }
-  }
+  trimTab('etc', 4);
+  trimTab('use', 4);
 }
 
 function maintainAfterAction() {
@@ -578,6 +636,8 @@ function maintainAfterAction() {
     if (!learned) break;
   }
   maintainEquip();
+  trimTab('etc', 3);
+  trimTab('use', 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -635,16 +695,55 @@ function craftObjective(def: QuestDef, i: number, obj: Extract<QuestDef['objecti
   if (!objDone(def.id, i)) note(`Could not fully satisfy craft objective on quest '${def.id}' (profession '${professionId}' may be beyond the ${MAX_CRAFTING_PROFESSIONS}-profession cap this run) — skipping.`);
 }
 
+/** A real player passing through would have gathered easier nodes along the way; make sure the
+ * gathering profession is actually high enough level for the node(s) this objective needs before
+ * giving up on it. */
+function raiseGatheringProfession(profId: 'mining' | 'foraging', minLevel: number) {
+  let guard = 0;
+  while (((state.professions as any)[profId]?.level ?? 0) < minLevel && guard < 300) {
+    guard++;
+    const curLevel = (state.professions as any)[profId]?.level ?? 1;
+    const candidates = Object.values(GATHER_NODES)
+      .map((n) => ({ n, maps: (gatherMapIds[n.id] ?? []).filter(isReachable) }))
+      .filter(({ n, maps }) => n.profession === profId && n.level <= curLevel && maps.length > 0);
+    if (!candidates.length) break; // nothing reachable at all to grind profession xp with — give up quietly
+    let did = false;
+    for (const { n: node, maps } of candidates) {
+      for (const mapId of maps) {
+        navigateTo(mapId);
+        if (ctx.now < (ctx.session.nodeCooldowns[`${mapId}:${node.id}`] ?? 0)) continue;
+        did = gatherOnce(node.id, mapId) || did;
+        if (did) break;
+      }
+      if (did) break;
+    }
+    if (!did) {
+      // Every reachable candidate node is on cooldown right now — wait it out rather than giving up.
+      const minReady = Math.min(...candidates.flatMap(({ n, maps }) => maps.map((m) => ctx.session.nodeCooldowns[`${m}:${n.id}`] ?? ctx.now)));
+      ctx.now = Math.max(ctx.now, minReady);
+    }
+  }
+}
+
 function gatherObjective(def: QuestDef, i: number, obj: Extract<QuestDef['objectives'][number], { type: 'gather' }>) {
   const nodeIds = obj.nodeId ? [obj.nodeId] : Object.values(GATHER_NODES).filter((n) => n.profession === obj.professionId).map((n) => n.id);
+  const neededProfLevel = Math.min(...nodeIds.map((n) => GATHER_NODES[n]?.level ?? 0));
+  const profId = GATHER_NODES[nodeIds[0]]?.profession;
+  if (profId) raiseGatheringProfession(profId, neededProfLevel);
   let guard = 0;
   while (!objDone(def.id, i) && guard < obj.count * 30 + 60) {
     guard++;
     let did = false;
+    // Only nodes we can actually reach AND are high enough gathering-profession level for count
+    // as "eligible" — an untouched, never-on-cooldown node we simply can't use yet must not be
+    // confused with "ready right now" when we compute how long to wait below.
+    const eligible: { nid: string; maps: string[] }[] = [];
     for (const nid of nodeIds) {
       const maps = (gatherMapIds[nid] ?? []).filter(isReachable);
       const profOk = ((state.professions as any)[GATHER_NODES[nid]?.profession]?.level ?? 0) >= (GATHER_NODES[nid]?.level ?? 0);
+      if (DEBUG) console.log(`      [dbg-gatherObj] '${def.id}' nid=${nid} maps=${JSON.stringify(gatherMapIds[nid])} reach=${JSON.stringify(maps)} profOk=${profOk} mapId=${state.mapId}`);
       if (!maps.length || !profOk) continue;
+      eligible.push({ nid, maps });
       for (const mapId of maps) {
         navigateTo(mapId);
         const key = `${mapId}:${nid}`;
@@ -654,25 +753,32 @@ function gatherObjective(def: QuestDef, i: number, obj: Extract<QuestDef['object
       }
       if (did) break;
     }
+    if (!eligible.length) { blocker(`Quest '${def.id}': gather objective (node(s) ${nodeIds.join(',') || obj.professionId}) has no reachable/high-enough-level node at all.`); return; }
     if (!did) {
-      const readyTimes = nodeIds.flatMap((nid) => (gatherMapIds[nid] ?? []).filter(isReachable).map((m) => ctx.session.nodeCooldowns[`${m}:${nid}`] ?? ctx.now));
+      const readyTimes = eligible.flatMap(({ nid, maps }) => maps.map((m) => ctx.session.nodeCooldowns[`${m}:${nid}`] ?? 0));
       const minReady = readyTimes.length ? Math.min(...readyTimes) : Infinity;
-      if (!isFinite(minReady) || minReady <= ctx.now) { blocker(`Quest '${def.id}': gather objective (node(s) ${nodeIds.join(',') || obj.professionId}) has no reachable/usable node.`); return; }
-      ctx.now = minReady;
+      if (!isFinite(minReady)) { blocker(`Quest '${def.id}': gather objective (node(s) ${nodeIds.join(',')}) stalled for an unknown reason.`); return; }
+      ctx.now = Math.max(ctx.now, minReady);
     }
   }
+}
+
+function findLiveInstance(uid: string): ItemInstance | undefined {
+  for (const inst of Object.values(state.equipment)) if (inst?.uid === uid) return inst;
+  for (const tab of Object.values(state.inventory)) for (const s of tab) if (s?.uid === uid) return s;
+  return undefined;
 }
 
 function enhanceObjective(stars: number) {
   ensureItemQty('mat_enhance_stone_1', 5, 0);
   const candidates = [...Object.values(state.equipment), ...state.inventory.equip].filter((i): i is ItemInstance => !!i && !!ITEMS[i.itemId]?.equip);
-  const inst = candidates[0];
-  if (!inst) { blocker('Enhance objective: no equipment item available to enhance.'); return; }
+  const uid = candidates[0]?.uid;
+  if (!uid) { blocker('Enhance objective: no equipment item available to enhance.'); return; }
   let tries = 0;
-  while ((inst.stars ?? 0) < stars && tries < 60) {
+  while (((findLiveInstance(uid)?.stars) ?? 0) < stars && tries < 60) {
     tries++;
     if (countItem(state, 'mat_enhance_stone_1') < 1) ensureItemQty('mat_enhance_stone_1', 3, 0);
-    const res = dispatch({ type: 'enhance', uid: inst.uid, stoneItemId: 'mat_enhance_stone_1' }, inst.itemId);
+    const res = dispatch({ type: 'enhance', uid, stoneItemId: 'mat_enhance_stone_1' }, uid);
     if (!res.ok) { blocker(`enhance failed: ${res.error}`); return; }
   }
 }
@@ -701,6 +807,7 @@ function satisfyObjective(def: QuestDef, i: number) {
       break;
     }
     case 'kill': {
+      if (DEBUG) console.log(`    [dbg] kill-objective '${def.id}'[${i}] monster=${obj.monsterId} progressBefore=${state.quests[def.id]?.progress?.[i]}`);
       const mapId = findKillMap(obj.monsterId);
       if (!mapId) break;
       killLoop(obj.monsterId, mapId, () => objDone(def.id, i), obj.count * 40 + 40);
@@ -712,7 +819,10 @@ function satisfyObjective(def: QuestDef, i: number) {
     case 'gather': gatherObjective(def, i, obj); break;
     case 'enhance': enhanceObjective(obj.stars); break;
     case 'learnProfession': {
-      const profId = strategy.professions.find((p) => !(state.professions as any)[p]) ?? strategy.professions[0];
+      // Infer which profession this quest actually teaches from its giver NPC (e.g. npc_tobbin -> cooking),
+      // falling back to whichever of our two chosen crafting professions isn't learned yet.
+      const inferred = NPCS[def.giver]?.profession;
+      const profId = inferred ?? strategy.professions.find((p) => !(state.professions as any)[p]) ?? strategy.professions[0];
       ensureProfessionLearned(profId);
       break;
     }
@@ -792,6 +902,20 @@ function tryOpportunisticQuests() {
     if (st !== 'notStarted') continue;
     if (q.level > state.level + 3) continue; // don't chase content far above our level
     if (!checkConditions(state, q.reqs)) continue;
+    // Only pursue crafting-profession quests for the two professions this run actually picked
+    // (a real player who chose smithing+alchemy wouldn't also be doing jewelcrafting's intro quest)
+    // — but only skip when the quest itself actually needs that profession (a learnProfession or
+    // matching craft objective), not merely because its giver happens to also be a trainer NPC
+    // (e.g. pq_enhance_intro is about enhancing, not smithing, even though Brina hands it out).
+    if (q.type === 'profession') {
+      const needsProf = q.objectives.some((o) => o.type === 'learnProfession' || (o.type === 'craft' && o.professionId));
+      if (needsProf) {
+        const prof = q.objectives.find((o) => o.type === 'craft' && o.professionId)?.type === 'craft'
+          ? (q.objectives.find((o) => o.type === 'craft') as any)?.professionId
+          : NPCS[q.giver]?.profession;
+        if (prof && prof !== 'mining' && prof !== 'foraging' && !strategy.professions.includes(prof)) { attemptedQuests.add(q.id); continue; }
+      }
+    }
     processQuest(q.id);
   }
   // A daily each, once, for coverage.
@@ -805,6 +929,7 @@ function tryOpportunisticQuests() {
 }
 
 console.log(`=== Driftwake headless playthrough — class '${classId}' (${JSON.stringify(strategy)}) ===`);
+console.log('--- PHASE 1: main story only (this is what the 60-120 min / level ~34-36 target measures) ---');
 
 for (const qid of MAIN_ORDER) {
   const ok = processQuest(qid);
@@ -821,19 +946,30 @@ for (const qid of MAIN_ORDER) {
     if (ok2) { mainQuestLog.push({ id: 'mq_09b_jorys_fate', level: state.level, kills: totalKills, minutes: Math.round(timeMs / 6000) / 10 }); console.log(`  [OK] mq_09b_jorys_fate — level ${state.level}, kills ${totalKills}`); }
   }
 
-  // Job advancement, once eligible.
+  // Job advancement, once eligible — part of core progression (like a MapleStory 2nd job), not bonus content.
   if (state.level >= 15 && state.jobId === state.classId) {
     processQuest(`jq_${classId}_1`);
     processQuest(`jq_${classId}`);
   }
-
-  // Bonus content, bounded, so the reducer's non-main systems (crafting/gathering/enhance/dialogue
-  // choices/day quests) get exercised too.
-  try { tryOpportunisticQuests(); } catch (e) { blocker(`Exception while running opportunistic side content: ${(e as Error).message}`); }
 }
 
-// One last opportunistic pass at the final level.
-try { tryOpportunisticQuests(); } catch (e) { blocker(`Exception in final opportunistic pass: ${(e as Error).message}`); }
+const mainStoryTimeMs = timeMs;
+const mainStoryKills = totalKills;
+const mainStoryBlockerCount = blockers.length;
+
+// ---------------------------------------------------------------------------
+// PHASE 2: extended content pass — side/faction/profession/daily quests, purely for coverage /
+// blocker-hunting. Does NOT count toward the main-story pacing estimate above.
+// ---------------------------------------------------------------------------
+
+console.log('\n--- PHASE 2: extended content (side/faction/profession/daily quests — for coverage, not pacing) ---');
+for (let pass = 0; pass < 6; pass++) {
+  const before = Object.values(state.quests).filter((q) => q.state === 'completed').length;
+  try { tryOpportunisticQuests(); } catch (e) { blocker(`Exception while running opportunistic side content: ${(e as Error).message}`); }
+  const after = Object.values(state.quests).filter((q) => q.state === 'completed').length;
+  if (after === before) break;
+}
+const extendedTimeMs = timeMs - mainStoryTimeMs;
 
 // ---------------------------------------------------------------------------
 // Report
@@ -850,7 +986,7 @@ console.log('\n=== FINAL STATE ===');
 console.log(`class: ${classId} (job: ${state.jobId})`);
 console.log(`finished mq_19_heart: ${finishedMain}`);
 console.log(`final level: ${state.level}`);
-console.log(`total kills: ${totalKills}`);
+console.log(`total kills: ${totalKills} (main story: ${mainStoryKills}, extended content: ${totalKills - mainStoryKills})`);
 console.log(`gold: ${state.gold}`);
 console.log(`items held (slots used): ${itemCount}`);
 console.log(`professions: ${JSON.stringify(state.professions)}`);
@@ -858,13 +994,17 @@ console.log(`known recipes: ${state.knownRecipes.length}`);
 console.log(`titles: ${JSON.stringify(state.titles)}`);
 console.log(`ending flag: ${state.flags.ending ?? '(none)'}`);
 console.log(`faction flag: ${state.flags.faction ?? '(none)'} rep: ${JSON.stringify(state.reputation)}`);
-console.log(`estimated total playtime: ${(timeMs / 60000).toFixed(1)} minutes`);
+console.log(`estimated MAIN STORY playtime: ${(mainStoryTimeMs / 60000).toFixed(1)} minutes (target: 60-120 min, level ~34-36)`);
+console.log(`estimated EXTENDED (side/faction/profession/daily) playtime on top: ${(extendedTimeMs / 60000).toFixed(1)} minutes`);
+console.log(`estimated total playtime (main + extended): ${(timeMs / 60000).toFixed(1)} minutes`);
 console.log(`quests completed total: ${Object.values(state.quests).filter((q) => q.state === 'completed').length} / attempted ${attemptedQuests.size + mainQuestLog.length}`);
 
-console.log(`\n=== BLOCKERS (${blockers.length}) ===`);
-for (const b of blockers) console.log(`- ${b}`);
+console.log(`\n=== BLOCKERS found during MAIN STORY (${mainStoryBlockerCount}) ===`);
+for (const b of blockers.slice(0, mainStoryBlockerCount)) console.log(`- ${b}`);
+console.log(`\n=== BLOCKERS found during EXTENDED content (${blockers.length - mainStoryBlockerCount}) ===`);
+for (const b of blockers.slice(mainStoryBlockerCount)) console.log(`- ${b}`);
 console.log(`\n=== NOTES (${notes.length}) ===`);
 for (const n of notes) console.log(`- ${n}`);
 
 console.log('\n=== SUMMARY ===');
-console.log(`${classId}: ${finishedMain ? 'COMPLETED' : 'DID NOT COMPLETE'} main story. Final level ${state.level}. ${blockers.length} blocker(s). ~${(timeMs / 60000).toFixed(1)} min.`);
+console.log(`${classId}: ${finishedMain ? 'COMPLETED' : 'DID NOT COMPLETE'} main story. Final level ${state.level}. ${mainStoryBlockerCount} main-story blocker(s), ${blockers.length - mainStoryBlockerCount} extended-content blocker(s). ~${(mainStoryTimeMs / 60000).toFixed(1)} min main story (~${(timeMs / 60000).toFixed(1)} min total).`);

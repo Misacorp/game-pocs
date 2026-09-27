@@ -154,7 +154,7 @@ function heartChamber(): MapDef {
       ...decorRow(['tendril', 'pod', 'ruin', 'pillar', 'statue', 'bones'], 30, 1770, groundY, { step: 70 }),
       ...decorRow(['statue', 'pillar'], 100, 1450, 500, { step: 150, front: true }),
     ],
-    boss: { monsterId: 'blight_heart', x: 1600, y: groundY, respawnMs: 180000 },
+    boss: { monsterId: 'blight_heart', x: 1600, y: groundY, respawnMs: 180000 , reqs: [{ type: 'quest', questId: 'mq_19_heart', state: ['active', 'ready', 'completed'] }] },
     weather: 'embers',
     dark: true,
     subtitle: 'Heart of Oma — the ancient wound still beats.',

@@ -24,6 +24,7 @@ function ensureLightTexture(scene: Phaser.Scene, size: number): void {
 export class DarkOverlay {
   private rt: Phaser.GameObjects.RenderTexture;
   private radius: number;
+  private destroyed = false;
 
   constructor(private scene: Phaser.Scene, radius = 190, private darkness = 0.82) {
     this.radius = radius;
@@ -33,6 +34,7 @@ export class DarkOverlay {
   }
 
   update(cam: Phaser.Cameras.Scene2D.Camera, playerWorldX: number, playerWorldY: number): void {
+    if (this.destroyed) return;
     const w = this.scene.scale.width, h = this.scene.scale.height;
     if (this.rt.width !== w || this.rt.height !== h) this.rt.resize(w, h);
     this.rt.clear();
@@ -42,5 +44,5 @@ export class DarkOverlay {
     this.rt.erase(LIGHT_KEY, sx - this.radius, sy - this.radius - 20);
   }
 
-  destroy(): void { this.rt.destroy(); }
+  destroy(): void { this.destroyed = true; this.rt.destroy(); }
 }

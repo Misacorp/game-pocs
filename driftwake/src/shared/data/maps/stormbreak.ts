@@ -214,7 +214,7 @@ function rocNest(): MapDef {
       ...decorRow(['rock', 'crystal', 'pillar'], 30, 1870, groundY, { step: 70 }),
       ...decorRow(['pillar', 'rock'], 100, 1450, 520, { step: 150, front: true }),
     ],
-    boss: { monsterId: 'kraelith', x: 1750, y: groundY, respawnMs: 170000 },
+    boss: { monsterId: 'kraelith', x: 1750, y: groundY, respawnMs: 170000 , reqs: [{ type: 'quest', questId: 'mq_12_kraelith', state: ['active', 'ready', 'completed'] }] },
     weather: 'storm',
     subtitle: "Kraelith's Aerie — the storm roc rules the highest crag.",
   };

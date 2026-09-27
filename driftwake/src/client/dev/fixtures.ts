@@ -150,18 +150,6 @@ const FIXTURE_NPCS: Record<string, NpcDef> = {
 };
 
 // ---------------------------------------------------------------------------
-// Gather nodes
-// ---------------------------------------------------------------------------
-
-const FIXTURE_GATHER_NODES: Record<string, GatherNodeDef> = {
-  node_meadow_herb: {
-    id: 'node_meadow_herb', name: 'Meadow Herb', profession: 'foraging', level: 1, hits: 3,
-    drops: [{ itemId: 'mat_meadow_herb', chance: 1, min: 1, max: 2 }], xp: 5, respawnMs: 15000,
-    sprite: { base: 'herb', color: '#7fbf5f' },
-  },
-};
-
-// ---------------------------------------------------------------------------
 // Maps
 // ---------------------------------------------------------------------------
 
@@ -251,7 +239,7 @@ export function getMonsterDef(id: string): MonsterDef | undefined { return MONST
 export function getJobDef(id: string): JobDef | undefined { return JOBS[id] ?? FIXTURE_JOBS[id]; }
 export function getSkillDef(id: string): SkillDef | undefined { return SKILLS[id] ?? FIXTURE_SKILLS[id]; }
 export function getNpcDef(id: string): NpcDef | undefined { return NPCS[id] ?? FIXTURE_NPCS[id]; }
-export function getGatherNodeDef(id: string): GatherNodeDef | undefined { return GATHER_NODES[id] ?? FIXTURE_GATHER_NODES[id]; }
+export function getGatherNodeDef(id: string): GatherNodeDef | undefined { return GATHER_NODES[id]; }
 
 /** Fallback entry map id used when a character's saved mapId isn't known anywhere (very first boot). */
 export const FIXTURE_START_MAP = 'driftmoor_town';
@@ -262,5 +250,5 @@ export const FIXTURE_IDS = {
   jobs: Object.keys(FIXTURE_JOBS),
   skills: Object.keys(FIXTURE_SKILLS),
   npcs: Object.keys(FIXTURE_NPCS),
-  gatherNodes: Object.keys(FIXTURE_GATHER_NODES),
+  gatherNodes: [] as string[],
 };

@@ -16,13 +16,14 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   let mode: 'buy' | 'sell' = 'buy';
   const qtyState = new Map<string, number>();
 
+  const shopNameEl = el('div', { class: 'dw-caps', style: { color: '#e8c477', fontWeight: '700', fontSize: '12px', marginBottom: '4px' } }, 'Shop');
   const goldEl = el('div', { style: { fontWeight: '700', color: '#ffd24a', display: 'flex', alignItems: 'center', gap: '5px' } }, el('img', { src: goldIconUrl(16) }), '0');
   const tabsHost = el('div');
-  const grid = el('div', { class: 'dw-grid', style: { marginTop: '10px' } });
-  const body = el('div', { class: 'dw-body' }, goldEl, tabsHost, grid);
+  const grid = el('div', { style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '420px', overflowY: 'auto' } });
+  const body = el('div', { class: 'dw-body' }, shopNameEl, goldEl, tabsHost, grid);
   const invPos = wm.get('inventory')?.root;
   const ctrl = createWindow(wm, {
-    panel: 'shop', title: 'Shop', width: 340,
+    panel: 'shop', title: 'Shop', width: 360,
     defaultPos: invPos ? { x: invPos.offsetLeft + 330, y: invPos.offsetTop } : undefined,
     onClose: () => { uiState.openShopId = null; },
   }, body);
@@ -86,6 +87,7 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   bus.on('ui:shop', ({ shopId: id }) => {
     shopId = id;
     uiState.openShopId = id;
+    shopNameEl.textContent = SHOPS[id]?.name ?? 'Shop';
     mode = 'buy'; tabs.select('buy');
     ctrl.open();
     render();

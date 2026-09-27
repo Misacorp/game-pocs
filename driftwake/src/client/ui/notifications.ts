@@ -21,13 +21,38 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
 
   const offs: (() => void)[] = [];
 
+  function feedIcon(iconUrl?: string) {
+    return iconUrl ? el('img', { src: iconUrl, style: { width: '14px', height: '14px', verticalAlign: 'middle', marginRight: '5px', imageRendering: 'pixelated' } }) : null;
+  }
+  function fadeAndRemove(item: HTMLElement) {
+    item.style.transition = 'opacity .4s'; item.style.opacity = '0'; window.setTimeout(() => item.remove(), 420);
+  }
   function pushFeed(text: string, kind: string, iconUrl?: string, textColor?: string) {
-    const item = el('div', { class: `dw-feed-item dw-${kind}` },
-      iconUrl ? el('img', { src: iconUrl, style: { width: '14px', height: '14px', verticalAlign: 'middle', marginRight: '5px', imageRendering: 'pixelated' } }) : null,
-      el('span', { style: textColor ? { color: textColor } : undefined }, text));
+    const item = el('div', { class: `dw-feed-item dw-${kind}` }, feedIcon(iconUrl), el('span', { style: textColor ? { color: textColor } : undefined }, text));
     feed.appendChild(item);
     while (feed.children.length > 8) feed.removeChild(feed.firstChild!);
-    window.setTimeout(() => { item.style.transition = 'opacity .4s'; item.style.opacity = '0'; window.setTimeout(() => item.remove(), 420); }, 6500);
+    window.setTimeout(() => fadeAndRemove(item), 6500);
+  }
+
+  // Rapid repeats of the same kind of event (killing several monsters in a row, picking up a
+  // stack of the same material) collapse into one growing line instead of spamming the feed.
+  const GROUP_WINDOW_MS = 3000;
+  const groups = new Map<string, { item: HTMLElement; amount: number; timer: number; textSpan: HTMLElement }>();
+  function pushAggregated(groupKey: string, amount: number, kind: string, iconUrl: string | undefined, textColor: string | undefined, render: (n: number) => string) {
+    const g = groups.get(groupKey);
+    if (g) {
+      g.amount += amount;
+      g.textSpan.textContent = render(g.amount);
+      window.clearTimeout(g.timer);
+      g.timer = window.setTimeout(() => { groups.delete(groupKey); fadeAndRemove(g.item); }, GROUP_WINDOW_MS);
+      return;
+    }
+    const textSpan = el('span', { style: textColor ? { color: textColor } : undefined }, render(amount));
+    const item = el('div', { class: `dw-feed-item dw-${kind}` }, feedIcon(iconUrl), textSpan);
+    feed.appendChild(item);
+    while (feed.children.length > 8) feed.removeChild(feed.firstChild!);
+    const timer = window.setTimeout(() => { groups.delete(groupKey); fadeAndRemove(item); }, GROUP_WINDOW_MS);
+    groups.set(groupKey, { item, amount, timer, textSpan });
   }
 
   offs.push(bus.on('ui:toast', ({ text, kind }) => {
@@ -83,16 +108,16 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
       case 'itemAdded': {
         const def = ITEMS[ev.itemId];
         const color = ev.rarity ? RARITY_COLORS[ev.rarity as keyof typeof RARITY_COLORS] : def ? RARITY_COLORS[def.rarity] : '#e8e8e8';
-        pushFeed(`+${ev.qty} ${def?.name ?? '???'}`, 'loot', safeItemIcon(def), color);
+        pushAggregated(`item:${ev.itemId}`, ev.qty, 'loot', safeItemIcon(def), color, (n) => `+${n} ${def?.name ?? '???'}`);
         break;
       }
       case 'itemRemoved': {
         const def = ITEMS[ev.itemId];
-        pushFeed(`-${ev.qty} ${def?.name ?? '???'}`, 'warn');
+        pushAggregated(`itemRemoved:${ev.itemId}`, ev.qty, 'warn', undefined, undefined, (n) => `-${n} ${def?.name ?? '???'}`);
         break;
       }
-      case 'gold': if (ev.amount) pushFeed(`${ev.amount > 0 ? '+' : ''}${fmtNum(ev.amount)} Gold`, ev.amount > 0 ? 'good' : 'warn', goldIconUrl()); break;
-      case 'xp': if (ev.amount) pushFeed(`+${fmtNum(ev.amount)} XP`, 'good', xpIconUrl()); break;
+      case 'gold': if (ev.amount) pushAggregated('gold', ev.amount, ev.amount > 0 ? 'good' : 'warn', goldIconUrl(), undefined, (n) => `${n > 0 ? '+' : ''}${fmtNum(n)} Gold`); break;
+      case 'xp': if (ev.amount) pushAggregated('xp', ev.amount, 'good', xpIconUrl(), undefined, (n) => `+${fmtNum(n)} XP`); break;
       case 'questProgress': pushFeed(`Quest progress ${ev.value}/${ev.target}`, 'quest'); break;
       case 'questAccepted': pushFeed('Quest accepted', 'quest'); audio.playSfx('questAccept'); break;
       case 'questReady': pushFeed('Quest ready to turn in!', 'quest'); break;

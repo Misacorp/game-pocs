@@ -4,16 +4,16 @@
  * and all engine <-> UI event-bus wiring described in DESIGN.md §10/§12.
  */
 import Phaser from 'phaser';
-import type { DerivedStats, Rarity, StatMods } from '@shared/types';
+import type { DerivedStats, MonsterDef, Rarity, StatMods } from '@shared/types';
 import type { GameEvent } from '@shared/protocol';
 import { HOTBAR_SIZE } from '@shared/constants';
 import { npcQuestMarker } from '@shared/logic';
-import { ITEMS } from '@shared/data';
+import { ITEMS, MONSTERS } from '@shared/data';
 import { createParallax, createWeather, spawnVfx, type Parallax, type Weather } from '../gfx';
 import { audio } from '../audio';
 import { session } from '../session';
 import { bus } from '../events';
-import { getMapDefOrFallback, getJobDefOrFallback, getSkillDef, getNpcDef } from '../dev/fixtures';
+import { getMapDefOrFallback, getJobDefOrFallback, getSkillDef, getNpcDef, getMonsterDef } from '../dev/fixtures';
 import { Player, type PlayerInputState } from '../entities/Player';
 import { NpcEntity } from '../entities/Npc';
 import type { MonsterEntity } from '../entities/Monster';
@@ -79,6 +79,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.parallax = createParallax(this, this.map.theme, this.map.width, this.map.height);
     this.weatherFx = createWeather(this, this.map.weather ?? 'none');
+    this.darkOverlay = undefined;
     if (this.map.dark) this.darkOverlay = new DarkOverlay(this);
 
     this.damageText = new DamageTextPool(this);
@@ -195,12 +196,16 @@ export class WorldScene extends Phaser.Scene {
     if (input.down && input.jumpPressed && this.player.grounded) this.dropThroughUntil = now + 260;
 
     this.player.update(dt, input, this.effectiveStats);
-    for (const m of this.spawner.monsters) m.update(dt);
+    // A single monster's AI throwing (bad data, edge-case boss attack) must not freeze every other
+    // monster or the whole frame loop — isolate each one.
+    for (const m of this.spawner.monsters) {
+      try { m.update(dt); } catch (e) { console.error(`[WorldScene] monster "${m.def.id}" update threw`, e); }
+    }
     this.spawner.update();
     this.projectiles.update(dt);
     this.gatherMgr.update();
 
-    this.handleCombatInput(now);
+    try { this.handleCombatInput(now); } catch (e) { console.error('[WorldScene] combat input threw', e); }
     this.handlePanelKeys();
     this.handleInteraction(now);
 
@@ -214,7 +219,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.parallax.update(this.cameras.main);
     this.weatherFx.update(this.cameras.main, dt);
-    this.darkOverlay?.update(this.cameras.main, this.player.x, this.player.y);
+    try { this.darkOverlay?.update(this.cameras.main, this.player.x, this.player.y); } catch (e) { console.error('[WorldScene] dark overlay update threw', e); this.darkOverlay = undefined; }
 
     this.presence.update(dt, this.player.x, this.player.y, this.player.vx, this.player.vy, this.player.facing, this.currentAnimName());
 
@@ -404,8 +409,22 @@ export class WorldScene extends Phaser.Scene {
     this.spawner.spawnNear(monsterId, this.player.x + offsetX, this.player.y);
   }
 
-  devTeleport(mapId: string, portalId?: string): void {
-    session.dispatch({ type: 'changeMap', mapId, portalId });
+  /** Stationary, effectively unkillable target for testing skill visuals without it dying/fleeing. */
+  devSpawnDummy(offsetX = 60): void {
+    const base = getMonsterDef('shellsnail') ?? Object.values(MONSTERS)[0];
+    if (!base) return;
+    const dummy: MonsterDef = {
+      ...base, id: 'dev_dummy', name: 'Training Dummy', hp: 9_999_999, attack: 0, defense: 0, speed: 0,
+      behavior: 'stationary', aggressive: false, knockbackResist: 1, drops: [], attacks: undefined, phases: undefined, isBoss: false,
+    };
+    this.spawner.spawnOne(dummy, this.player.x + offsetX, this.player.y, false);
+  }
+
+  /** QA-only: jump straight to a map, bypassing portal adjacency/reqs entirely (never dispatched). */
+  devForceMap(mapId: string, x?: number, y?: number): void {
+    session.state.mapId = mapId;
+    session.state.position = { x: x ?? -1, y: y ?? -1 };
+    this.scene.restart({ mapId, x, y } satisfies WorldSceneData);
   }
 
   private torndown = false;
@@ -426,7 +445,7 @@ export class WorldScene extends Phaser.Scene {
     safely('terrain', () => this.terrain?.destroy());
     safely('parallax', () => this.parallax?.destroy());
     safely('weatherFx', () => this.weatherFx?.destroy());
-    safely('darkOverlay', () => this.darkOverlay?.destroy());
+    safely('darkOverlay', () => { this.darkOverlay?.destroy(); this.darkOverlay = undefined; });
     safely('spawner', () => this.spawner?.destroy());
     safely('npcs', () => { for (const n of this.npcs) n.destroy(); this.npcs = []; });
     safely('gatherMgr', () => this.gatherMgr?.destroy());

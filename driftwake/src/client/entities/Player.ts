@@ -142,7 +142,9 @@ export class Player implements PlayerHandle {
       } else {
         body.setAllowGravity(true);
         this.horizontalMovement(body, input, stats, dt);
-        this.jumpLogic(body, input, stats, now);
+        // Down+jump is the dedicated "drop through a one-way platform" command (WorldScene arms
+        // dropThroughUntil for this) — it must never also fire a normal upward jump.
+        if (!(input.down && this.grounded)) this.jumpLogic(body, input, stats, now);
       }
 
       if (input.dashPressed && now > this.dashCooldownUntil && !this.climbing) {

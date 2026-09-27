@@ -628,7 +628,7 @@ function craftObjective(def: QuestDef, i: number, obj: Extract<QuestDef['objecti
     guard++;
     let recipeId: string | undefined;
     if (obj.itemId) recipeId = Object.values(RECIPES).find((r) => r.output.itemId === obj.itemId)?.id;
-    else recipeId = cheapestKnownOrAutoRecipe(professionId, state.professions[professionId as any]?.level ?? 1) ?? undefined;
+    else recipeId = cheapestKnownOrAutoRecipe(professionId, (state.professions as any)[professionId]?.level ?? 1) ?? undefined;
     if (!recipeId) { blocker(`Quest '${def.id}': no craftable recipe found for craft objective (profession '${professionId}').`); return; }
     if (!craftOnce(recipeId, 0)) break;
   }
@@ -643,7 +643,7 @@ function gatherObjective(def: QuestDef, i: number, obj: Extract<QuestDef['object
     let did = false;
     for (const nid of nodeIds) {
       const maps = (gatherMapIds[nid] ?? []).filter(isReachable);
-      const profOk = (state.professions[GATHER_NODES[nid]?.profession as any]?.level ?? 0) >= (GATHER_NODES[nid]?.level ?? 0);
+      const profOk = ((state.professions as any)[GATHER_NODES[nid]?.profession]?.level ?? 0) >= (GATHER_NODES[nid]?.level ?? 0);
       if (!maps.length || !profOk) continue;
       for (const mapId of maps) {
         navigateTo(mapId);
@@ -712,7 +712,7 @@ function satisfyObjective(def: QuestDef, i: number) {
     case 'gather': gatherObjective(def, i, obj); break;
     case 'enhance': enhanceObjective(obj.stars); break;
     case 'learnProfession': {
-      const profId = strategy.professions.find((p) => !state.professions[p as any]) ?? strategy.professions[0];
+      const profId = strategy.professions.find((p) => !(state.professions as any)[p]) ?? strategy.professions[0];
       ensureProfessionLearned(profId);
       break;
     }

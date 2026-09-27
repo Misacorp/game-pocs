@@ -85,5 +85,5 @@ export function createChat(session: GameSession): { root: HTMLElement; cleanup: 
     }
   }
 
-  return { root, cleanup: () => { offBus(); offBackend(); offToggle(); } };
+  return { root, cleanup: () => { offBus(); offBackend(); offToggle(); offOpen(); } };
 }

@@ -461,6 +461,112 @@ const STORMBREAK_QUESTS: QuestDef[] = [
     ],
     rewards: { xp: qxp(19), gold: qgold(19), items: [{ itemId: 'use_return_scroll', qty: 2 }], chooseOne: [{ itemId: 'eq_axe_amberlit' }, { itemId: 'eq_staff_stormsteel' }, { itemId: 'eq_gun_amberlit' }, { itemId: 'eq_amulet_stormplume' }] },
   },
+  {
+    id: 'sq_stormbreak_thunder_hunt',
+    name: 'Thunder in the Gears',
+    type: 'side',
+    giver: 'npc_ferry_tamsin',
+    level: 20,
+    reqs: [{ type: 'level', min: 19 }],
+    summary: "Collect thunder beetle carapace to reinforce the ferry's gearbox.",
+    offer:
+      "\"The gondola's gearbox keeps seizing up in the thunderheads,\" Tamsin says, wiping grease on her coat. \"Thunder beetle carapace, cracked right, makes a fine insulator. Interested in a hunt?\"",
+    progress: "\"Beetles, up around the peaks. Their shells, specifically — try not to bring me the whole beetle.\"",
+    complete:
+      "Tamsin fits the carapace plating into the gearbox and gives it a satisfied thump. \"That'll stop the seizing. You've just made every future passenger's trip smoother, you know.\"",
+    objectives: [
+      { type: 'kill', monsterId: 'thunder_beetle', count: 10 },
+      { type: 'collect', itemId: 'mat_thunder_carapace', count: 6 },
+    ],
+    rewards: { xp: qxp(20, 0.3), gold: qgold(20, 14), items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }] },
+  },
+  {
+    id: 'sq_stormbreak_raider_ledger',
+    name: "The Raider's Ledger",
+    type: 'side',
+    giver: 'npc_quill',
+    level: 21,
+    reqs: [{ type: 'level', min: 20 }],
+    summary: 'Break up a sky raider smuggling ring and decide what to do with their ledger.',
+    offer:
+      "Quill leans in conspiratorially. \"Word is the raiders up on the ledges are running a real operation now — organized, ledgers and everything. If you clear enough of them out, you're bound to find the paperwork. I'd... very much like to see it before anyone else does.\"",
+    progress: "\"Raiders, however many it takes. The ledger will turn up.\"",
+    complete: 'The ledger is thick, careful, and utterly damning. Someone kept excellent records of some very illegal business.',
+    objectives: [{ type: 'kill', monsterId: 'sky_raider', count: 15 }],
+    onAccept: [{ type: 'giveItem', itemId: 'qi_raider_ledger', qty: 1 }],
+    rewards: { xp: qxp(21, 0.2), gold: qgold(21, 8) },
+    choices: [
+      {
+        id: 'ledger_expose',
+        label: 'Hand it to Borran',
+        description: 'Let the Outpost crack down on the whole operation.',
+        completeText:
+          'Borran flips through the ledger, jaw tightening with every page. "This\'ll shut them down for good. Good work — the Outpost owes you."',
+        rewards: {
+          xp: qxp(21, 0.15),
+          gold: qgold(21, 6),
+          reputation: { harpooners: 10 },
+          flags: { raider_ledger_handed: true },
+          chooseOne: [
+            { itemId: 'eq_sword_stormsteel' },
+            { itemId: 'eq_staff_stormsteel' },
+            { itemId: 'eq_bow_stormsteel' },
+            { itemId: 'eq_dagger_stormsteel' },
+          ],
+        },
+      },
+      {
+        id: 'ledger_sell',
+        label: 'Sell its secrets quietly',
+        description: 'Someone out there would pay handsomely to know what the raiders knew.',
+        completeText: 'Quill counts out a small fortune, looking faintly guilty about it. "Don\'t ask who bought it. I didn\'t ask either."',
+        rewards: { xp: qxp(21, 0.15), gold: qgold(21, 22), flags: { raider_ledger_handed: false } },
+      },
+    ],
+  },
+  {
+    id: 'sq_stormbreak_raider_aftermath',
+    name: 'Mopping Up',
+    type: 'side',
+    giver: 'npc_borran',
+    level: 22,
+    reqs: [{ type: 'flag', flag: 'raider_ledger_handed', value: true }],
+    summary: 'Finish off the raider remnants named in the ledger.',
+    offer:
+      "\"The ledger named names, and locations,\" Borran says, already strapping on gear. \"Most of them scattered when the raid started. I want them gone, not just scattered.\"",
+    progress: "\"Whatever's left of the raider network. Don't let them regroup.\"",
+    complete:
+      "\"That's the operation finished, properly this time. You've done more for this outpost's safety than half my garrison.\"",
+    objectives: [{ type: 'kill', monsterId: 'sky_raider', count: 10 }],
+    rewards: {
+      xp: qxp(22, 0.3),
+      gold: qgold(22, 15),
+      items: [{ itemId: 'mat_enhance_stone_2', qty: 1 }],
+      chooseOne: [{ itemId: 'eq_armor_stormplate' }, { itemId: 'eq_armor_cloudsilk' }, { itemId: 'eq_armor_galehide' }],
+    },
+  },
+  {
+    id: 'sq_stormbreak_cliffside_vigil',
+    name: 'Cliffside Vigil',
+    type: 'side',
+    giver: 'npc_borran',
+    level: 23,
+    reqs: [{ type: 'level', min: 22 }],
+    summary: "Scout the approach to Kraelith's Aerie and clear the cliffs of golems.",
+    offer:
+      "\"Before you go anywhere near that roc's nest, I want the approach cleared and scouted,\" Borran says, tracing a line on his map. \"Golems first. Then tell me what you see up there.\"",
+    progress: "\"Cliff golems, and eyes on the nest itself.\"",
+    complete: "\"Good. That's one less variable before the real fight.\" Borran nods, already planning three steps ahead.",
+    objectives: [
+      { type: 'kill', monsterId: 'cliff_golem', count: 8 },
+      { type: 'visit', mapId: 'roc_nest' },
+    ],
+    rewards: {
+      xp: qxp(23, 0.3),
+      gold: qgold(23, 15),
+      items: [{ itemId: 'mat_enhance_stone_1', qty: 2 }, { itemId: 'eq_amulet_thundercore', qty: 1 }],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------

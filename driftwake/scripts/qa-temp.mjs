@@ -308,14 +308,12 @@ try {
   });
   // Simplest reliable path: directly dispatch setHotbar like the drop handler would, to verify HUD renders it,
   // then separately confirm the hotbar slot's own drop handler code is exercised by a synthetic DragEvent.
-  const firstSkillId = await page.evaluate(() => {
-    const jobId = window.__session.state.jobId;
-    // read job skills from the game's own data via a temporary global the app doesn't expose; fallback: scan skills obj
-    return Object.keys(window.__session.state.skills)[0] ?? null;
-  });
-  console.log('first learned skill id:', firstSkillId);
-  if (firstSkillId) {
-    await dispatch({ type: 'setHotbar', index: 2, entry: { kind: 'skill', id: firstSkillId } });
+  // index 2 (not 0) on purpose: the tier-1 basic attack skill (index 0) typically has no cooldown,
+  // which wouldn't exercise the cooldown-sweep UI at all.
+  const skillWithCd = await page.evaluate(() => Object.keys(window.__session.state.skills)[2] ?? Object.keys(window.__session.state.skills)[0] ?? null);
+  console.log('skill chosen for hotbar (should have a real cooldown):', skillWithCd);
+  if (skillWithCd) {
+    await dispatch({ type: 'setHotbar', index: 2, entry: { kind: 'skill', id: skillWithCd } });
   }
   await wait(300);
   await shot('hotbar-skill-set');
@@ -327,11 +325,287 @@ try {
   console.log('hotbar slot 2 rect:', JSON.stringify(slot2Rect));
   if (slot2Rect) await page.mouse.click(slot2Rect.x, slot2Rect.y);
   await wait(500);
-  console.log('cooldowns after activate:', await page.evaluate(() => JSON.stringify(window.__session.cooldowns)));
+  console.log('cooldowns after click-activate:', await page.evaluate(() => JSON.stringify(window.__session.cooldowns)));
   await shot('hotbar-after-activate');
+  console.log('player state before direct bus emit:', await page.evaluate(() => {
+    const w = window.__game.scene.getScene('World');
+    return { dead: w?.player?.dead, casting: w?.player?.isCasting?.(), mp: window.__session.mp, hotbar2: window.__session.state.hotbar[2] };
+  }));
+  await page.evaluate(() => window.__ui.bus.emit('hotbar:activate', { index: 2 }));
+  await wait(500);
+  console.log('cooldowns after direct bus emit:', await page.evaluate(() => JSON.stringify(window.__session.cooldowns)));
+
+  console.log('--- real synthetic drag-and-drop: skill row -> hotbar slot 5 ---');
+  const dndResult = await page.evaluate(() => {
+    const skillsWin = Array.from(document.querySelectorAll('#ui .dw-window')).find((w) => w.querySelector('.dw-title')?.textContent?.trim() === 'Skills');
+    const skillRow = skillsWin?.querySelector('.dw-slot[draggable="true"]');
+    const target = document.querySelectorAll('.dw-hotbar .dw-slot')[5];
+    if (!skillRow || !target) return 'missing elements';
+    const dt = new DataTransfer();
+    skillRow.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    return 'dispatched';
+  });
+  await wait(300);
+  console.log('dnd result:', dndResult, 'hotbar[5]:', JSON.stringify((await getState()).hotbar[5]));
+  await shot('hotbar-after-dnd');
+
+  console.log('--- drag a potion item onto hotbar slot 6 ---');
+  await toggle('inventory');
+  await wait(300);
+  await page.evaluate(() => { const t = Array.from(document.querySelectorAll('.dw-tab')).find((x) => x.textContent === 'Items'); t?.click(); });
+  await wait(200);
+  const dndItemResult = await page.evaluate(() => {
+    const invWin = Array.from(document.querySelectorAll('#ui .dw-window')).find((w) => w.querySelector('.dw-title')?.textContent?.trim() === 'Inventory');
+    const itemSlot = invWin ? Array.from(invWin.querySelectorAll('.dw-grid .dw-slot')).find((s) => s.getAttribute('draggable') === 'true') : null;
+    const target = document.querySelectorAll('.dw-hotbar .dw-slot')[6];
+    if (!itemSlot || !target) return 'missing elements';
+    const dt = new DataTransfer();
+    itemSlot.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    return 'dispatched';
+  });
+  await wait(300);
+  console.log('dnd item result:', dndItemResult, 'hotbar[6]:', JSON.stringify((await getState()).hotbar[6]));
+  await shot('hotbar-after-item-dnd');
+  await toggle('inventory');
 } catch (e) {
   console.log('PHASE B ERROR:', e.message);
   await shot('phaseB-error');
+}
+
+// =========================================================================
+console.log('=== PHASE C: professions (learn, craft, buy recipe, salvage, enhance) ===');
+try {
+  await cheat(`
+    const slot = cur.inventory.etc.findIndex((x) => x === null);
+    cur.inventory.etc[slot] = { uid: 'cheat_ore', itemId: 'mat_copper_ore', qty: 12 };
+    const slot2 = cur.inventory.etc.findIndex((x) => x === null);
+    cur.inventory.etc[slot2] = { uid: 'cheat_stone', itemId: 'mat_enhance_stone_1', qty: 3 };
+    cur.gold += 1000;
+  `);
+  await openDialogue('npc_brina');
+  await shot('brina-root');
+  await clickOpt('Crafting');
+  await waitUntil(() => document.body.innerText.includes('PROFESSIONS'), null, 5000);
+  await wait(300);
+  await shot('professions-overview-attrainer');
+  console.log('professions before learn:', JSON.stringify((await getState()).professions));
+  const learnClicked = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Learn');
+    if (btn) { btn.click(); return true; }
+    return false;
+  });
+  console.log('clicked Learn?', learnClicked);
+  await wait(400);
+  console.log('professions after learn:', JSON.stringify((await getState()).professions));
+  await shot('professions-after-learn');
+
+  await page.evaluate(() => { const t = Array.from(document.querySelectorAll('.dw-tab')).find((x) => x.textContent === 'Recipes'); t?.click(); });
+  await wait(200);
+  const selected = await page.evaluate(() => {
+    const sel = document.querySelector('#ui select.dw-select');
+    if (!sel) return 'no select';
+    sel.value = 'smithing';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return 'set';
+  });
+  console.log('profession select:', selected);
+  await wait(300);
+  await shot('recipes-smithing-tab');
+  console.log('known recipes has smelt copper?', (await getState()).knownRecipes.includes('rec_smith_smelt_copper'));
+
+  const craftClicked = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'x1' && !b.disabled);
+    if (btn) { btn.click(); return true; }
+    return 'not found or disabled: ' + JSON.stringify(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent?.trim() === 'x1').map((b) => b.disabled));
+  });
+  console.log('craft x1 clicked?', craftClicked);
+  await wait(400);
+  console.log('copper ore/ingot count:', (await getState()).inventory.etc.filter((i) => i && (i.itemId === 'mat_copper_ore' || i.itemId === 'mat_copper_ingot')).map((i) => `${i.itemId}:${i.qty}`));
+  await shot('after-craft');
+
+  console.log('--- buy a trainer recipe ---');
+  const buyRecipeClicked = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.includes('Buy Recipe'));
+    if (btn) { btn.click(); return btn.textContent; }
+    return null;
+  });
+  console.log('buy recipe button:', buyRecipeClicked);
+  await wait(400);
+  await shot('after-buy-recipe');
+
+  console.log('--- salvage tab ---');
+  await page.evaluate(() => { const t = Array.from(document.querySelectorAll('.dw-tab')).find((x) => x.textContent === 'Salvage'); t?.click(); });
+  await wait(300);
+  await shot('salvage-tab');
+
+  console.log('--- enhance tab ---');
+  await page.evaluate(() => { const t = Array.from(document.querySelectorAll('.dw-tab')).find((x) => x.textContent === 'Enhance'); t?.click(); });
+  await wait(300);
+  await shot('enhance-tab-empty');
+  const enhanceSetup = await page.evaluate(() => {
+    const win = Array.from(document.querySelectorAll('#ui .dw-window')).find((w) => w.querySelector('.dw-title')?.textContent?.trim() === 'Professions');
+    const grids = win?.querySelectorAll('.dw-grid');
+    if (!grids || grids.length < 2) return 'grids not found: ' + grids?.length;
+    const equipSlot = grids[0].querySelector('.dw-slot');
+    const stoneSlot = grids[1].querySelector('.dw-slot');
+    equipSlot?.click();
+    stoneSlot?.click();
+    return { equip: !!equipSlot, stone: !!stoneSlot };
+  });
+  console.log('enhance setup:', JSON.stringify(enhanceSetup));
+  await wait(200);
+  await shot('enhance-selected');
+  const enhanceClicked = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Enhance' && !b.disabled);
+    if (btn) { btn.click(); return true; }
+    return false;
+  });
+  console.log('enhance clicked?', enhanceClicked);
+  await wait(500);
+  await shot('after-enhance');
+  await closeDialogue();
+} catch (e) {
+  console.log('PHASE C ERROR:', e.message);
+  await shot('phaseC-error');
+}
+
+// =========================================================================
+console.log('=== PHASE D: character AP, job advance + tier2 skills, death/respawn, worldmap/bestiary ===');
+try {
+  console.log('--- character window: AP allocation ---');
+  await toggle('character');
+  await wait(300);
+  await shot('character-before-ap');
+  await cheat(`cur.ap = 10;`);
+  await wait(300);
+  const strBefore = (await getState()).baseStats.str;
+  const apPlusClicked = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('#ui .dw-window .dw-stat-row2'));
+    const strRow = rows.find((r) => r.textContent?.trim().startsWith('STR'));
+    const btn = strRow?.querySelector('button');
+    btn?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })); // shift-click = +5
+    return !!btn;
+  });
+  console.log('AP + clicked (shift, +5)?', apPlusClicked);
+  await wait(400);
+  const afterAp = await getState();
+  console.log('STR before/after:', strBefore, afterAp.baseStats.str, 'AP left:', afterAp.ap);
+  await shot('character-after-ap');
+  await toggle('character');
+
+  console.log('--- real job advance via jq_vanguard turn-in choice ---');
+  await cheat(`
+    cur.level = 16; cur.xp = 0;
+    cur.quests['jq_vanguard'] = { state: 'active', progress: [12, 6], acceptedAt: Date.now() };
+  `);
+  await openDialogue('npc_hale');
+  await shot('hale-root');
+  await clickOpt('Bulwark or Reaver');
+  await waitUntil(() => document.querySelectorAll('.dw-choice-card').length >= 2, null, 8000);
+  await shot('jq-vanguard-choice');
+  await page.evaluate(() => { const c = Array.from(document.querySelectorAll('.dw-choice-card')).find((x) => x.textContent?.includes('Bulwark')); c?.click(); });
+  await wait(200);
+  await clickDlgBtn('Complete');
+  await wait(300);
+  await clickAnyButton('Confirm Choice', 3000);
+  await wait(500);
+  const afterAdvance = await getState();
+  console.log('jobId after advance:', afterAdvance.jobId, 'sp:', afterAdvance.sp);
+  await closeDialogue();
+
+  await toggle('skills');
+  await wait(400);
+  await shot('skills-tier2-tabs');
+  await toggle('skills');
+
+  console.log('--- death dialog + respawn ---');
+  await dispatch({ type: 'die' });
+  await wait(600);
+  await shot('death-dialog');
+  const respawnClicked = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Respawn');
+    if (btn) { btn.click(); return true; }
+    return false;
+  });
+  console.log('respawn clicked?', respawnClicked);
+  await wait(600);
+  console.log('hp after respawn:', await page.evaluate(() => window.__session.hp));
+  await shot('after-respawn');
+
+  console.log('--- world map + bestiary with real data ---');
+  await toggle('map');
+  await wait(300);
+  await shot('worldmap-real');
+  await toggle('map');
+  await toggle('bestiary');
+  await wait(300);
+  await shot('bestiary-real');
+  await toggle('bestiary');
+} catch (e) {
+  console.log('PHASE D ERROR:', e.message);
+  await shot('phaseD-error');
+}
+
+// =========================================================================
+console.log('=== PHASE E: settings keybind remap (engine effect) + menu quit/reenter persistence ===');
+try {
+  await toggle('settings');
+  await wait(300);
+  await shot('settings-before-remap');
+  const bindClicked = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('#ui .dw-bind-row'));
+    const jumpRow = rows.find((r) => r.textContent?.includes('Jump'));
+    const keyBtn = jumpRow?.querySelector('.dw-bind-key');
+    keyBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return !!keyBtn;
+  });
+  console.log('bind listen started?', bindClicked);
+  await wait(200);
+  await page.keyboard.down('KeyJ');
+  await page.keyboard.up('KeyJ');
+  await wait(200);
+  const newLabel = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('#ui .dw-bind-row'));
+    const jumpRow = rows.find((r) => r.textContent?.includes('Jump'));
+    return jumpRow?.querySelector('.dw-bind-key')?.textContent;
+  });
+  console.log('jump keybind now shows:', newLabel);
+  await shot('settings-after-remap');
+  await toggle('settings');
+
+  console.log('--- engine effect: pressing J should now jump ---');
+  const vyBefore = await page.evaluate(() => window.__game.scene.getScene('World')?.player?.body?.velocity?.y);
+  await page.keyboard.down('KeyJ');
+  await wait(80);
+  await page.keyboard.up('KeyJ');
+  await wait(120);
+  const vyAfter = await page.evaluate(() => window.__game.scene.getScene('World')?.player?.body?.velocity?.y);
+  console.log('vertical velocity before/after pressing J:', vyBefore, vyAfter, '(expect a negative/upward change if jump bound correctly)');
+
+  console.log('--- menu: Save & Quit to Title, then re-enter same character ---');
+  const nameBefore = (await getState()).name;
+  const goldBefore2 = (await getState()).gold;
+  await toggle('menu');
+  await wait(300);
+  await shot('menu-open');
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll('button')).find((x) => x.textContent === 'Save & Quit to Title'); b?.click(); });
+  await wait(1200);
+  await shot('back-at-title');
+  // re-enter: click first character card's Play button
+  const cardsInfo = await page.evaluate(() => document.querySelectorAll('.dw-charcard').length);
+  console.log('character cards on select screen:', cardsInfo);
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.dw-charcard button')).find((x) => x.textContent === 'Play'); b?.click(); });
+  await wait(1200);
+  await shot('reentered');
+  const afterReenter = await getState();
+  console.log('name/gold persisted?', afterReenter.name === nameBefore, afterReenter.gold === goldBefore2, afterReenter.name, afterReenter.gold);
+} catch (e) {
+  console.log('PHASE E ERROR:', e.message);
+  await shot('phaseE-error');
 }
 
 console.log(JSON.stringify(logs, null, 1));

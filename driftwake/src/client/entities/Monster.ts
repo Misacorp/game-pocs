@@ -82,8 +82,7 @@ export class MonsterEntity {
     playAnim(this.sprite, info, 'idle');
 
     if (this.isBoss) {
-      const scale = def.sprite.scale ?? 3;
-      this.sprite.setScale(scale);
+      // NOTE: gfx already renders bosses at def.sprite.scale resolution — don't scale again.
       bus.emit('ui:banner', { title: def.name, subtitle: def.title, kind: 'boss' });
       audio.playSfx('bossRoar');
       this.publishBossBar();

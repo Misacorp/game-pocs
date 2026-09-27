@@ -1,6 +1,6 @@
 import type { DerivedStats, JobDef, MonsterDef } from '../types';
 import type { Rng } from '../rng';
-import { BASE_CRIT_MULT, DAMAGE_VARIANCE, suggestedMonsterHp } from '../constants';
+import { BASE_CRIT_MULT, DAMAGE_VARIANCE } from '../constants';
 
 export interface DamageTarget { level: number; defense: number; isBoss?: boolean; /** extra dmg taken fraction (mark/weaken) */ vulnerability?: number }
 export interface DamageRoll { damage: number; crit: boolean }
@@ -19,14 +19,16 @@ export interface DamageRoll { damage: number; crit: boolean }
  * so defense can never fully zero out a hit, penalized 4%/level when the target is higher level
  * (floor 0.5x), then scaled by damagePct / bossDamagePct and target vulnerability.
  *
- * Tuning (see final report for the full table): with typical stat allocation this produces
- * ~2-3 basic hits to kill a same-level level-1 monster (~34 hp) and ~3-5 hits at any level
- * 1-40 as long as content authors follow the suggested weapon `attack`/`magicAttack` curve.
+ * Tuning (see final report for the full table, numerically fit against the real
+ * physAtk/magAtk weapon curves in data/items/equipment.ts and suggestedMonsterHp()): this
+ * produces ~2-3 basic hits to kill a same-level level-1 monster (~34 hp) and ~3-5 hits at any
+ * level 1-40, assuming a player invests roughly 70% of AP into their main stat and 20% into
+ * their secondary stat (a reasonable default build) and wears same-tier gear.
  */
 const PHYS_BASE_DAMAGE = 10;
 const MAGIC_BASE_DAMAGE = 10;
 const STAT_MULT_MAIN = 4;
-const ATTACK_DIVISOR = 100;
+const ATTACK_DIVISOR = 40;
 const LEVEL_DIFF_PENALTY_PER_LEVEL = 0.04;
 const LEVEL_DIFF_FLOOR = 0.5;
 
@@ -89,10 +91,15 @@ export function damageRange(stats: DerivedStats, job: JobDef): [number, number] 
 }
 
 /**
- * Guideline for monster contact `attack` by level, for monster authors: ~7% of the suggested
- * monster hp of that level (rough proxy for player maxHp, which is balanced similarly).
- * Not used by the engine itself — purely a content-authoring aid.
+ * Guideline for monster contact `attack` by level, for monster authors: targets ~8% of a
+ * Vanguard's maxHp at that level (player HP grows roughly linearly with level — unlike
+ * suggestedMonsterHp, which is a steeper power curve — so this is linear too, not derived
+ * from suggestedMonsterHp). Squishier classes (lower hpPerLevel, lighter armor -> less
+ * `defense`) naturally take a higher % per hit from the same monster.attack value once
+ * rollMonsterDamage's defense mitigation is applied — that's what should widen the gap
+ * towards the ~12-15% Stormcaller target, not this helper. Not used by the engine itself —
+ * purely a content-authoring aid.
  */
 export function suggestedMonsterAttack(level: number): number {
-  return Math.max(1, Math.round(suggestedMonsterHp(level) * 0.07));
+  return Math.max(1, Math.round(2.3 * level + 3));
 }

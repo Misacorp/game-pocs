@@ -146,9 +146,12 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
     const br = cam.getWorldPoint(cam.width, cam.height);
     const w = br.x - tl.x, h = br.y - tl.y;
     sky.setPosition(tl.x, tl.y).setDisplaySize(w, h);
-    whale.setPosition(tl.x, tl.y + h * 0.05).setDisplaySize(w, h * 0.55);
-    mid.setPosition(tl.x, tl.y + h * 0.1).setDisplaySize(w, h * 0.6);
-    near.setPosition(tl.x, tl.y + h * 0.72).setDisplaySize(w, h * 0.3);
+    // TileSprite tiling is computed from its own width/height (setSize), not displaySize —
+    // using setDisplaySize alone would leave the tiling viewport at its tiny placeholder size
+    // and stretch a sliver of the texture across the whole screen instead of tiling it.
+    whale.setPosition(tl.x, tl.y + h * 0.05).setSize(w, h * 0.55);
+    mid.setPosition(tl.x, tl.y + h * 0.1).setSize(w, h * 0.6);
+    near.setPosition(tl.x, tl.y + h * 0.72).setSize(w, h * 0.3);
     lightning?.setPosition(tl.x, tl.y).setDisplaySize(w, h);
   }
   layout(scene.cameras.main);

@@ -50,7 +50,7 @@ const SMITHING_QUESTS: QuestDef[] = [
     progress: "\"Eight pieces. I'm not counting your failures, just your finished ones.\"",
     complete: "\"That's a master's pace. Proud to have taught you — not that I'll admit that twice.\"",
     objectives: [{ type: 'craft', professionId: 'smithing', count: 8 }],
-    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }] },
+    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }], recipes: ['rec_smith_enhance_stone_2'] },
   },
 ];
 
@@ -99,7 +99,7 @@ const ALCHEMY_QUESTS: QuestDef[] = [
     progress: "\"Eight brews, of whatever complexity you can manage.\"",
     complete: "\"Marvelous work! You'll be outselling me at this rate. I'm delighted, genuinely.\"",
     objectives: [{ type: 'craft', professionId: 'alchemy', count: 8 }],
-    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }] },
+    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }], recipes: ['rec_alchemy_elixir_iron_3'] },
   },
 ];
 
@@ -149,7 +149,7 @@ const COOKING_QUESTS: QuestDef[] = [
     progress: "\"Eight dishes, the fancier kind.\"",
     complete: "\"A feast worthy of the harbor's best table. You've earned your apron, truly.\"",
     objectives: [{ type: 'craft', professionId: 'cooking', count: 8 }],
-    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }] },
+    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }], recipes: ['rec_cook_skyegg_omelette'] },
   },
 ];
 
@@ -199,7 +199,7 @@ const JEWELCRAFTING_QUESTS: QuestDef[] = [
     progress: "\"Eight pieces, no shortcuts.\"",
     complete: "\"Exquisite work. I'd wear these myself, and I don't say that lightly.\"",
     objectives: [{ type: 'craft', professionId: 'jewelcrafting', count: 8 }],
-    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }] },
+    rewards: { xp: qxp(20), gold: qgold(20), items: [{ itemId: 'mat_enhance_stone_2', qty: 2 }], recipes: ['rec_jewel_cut_heart_crystal'] },
   },
 ];
 

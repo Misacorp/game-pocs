@@ -92,7 +92,7 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
     complete:
       'Pim hangs the tiny shell chime by the door. It clinks, off-key, every time the wind changes. "...I love it, actually. Don\'t tell her I said that."',
     objectives: [{ type: 'collect', itemId: 'mat_snail_shell', count: 5, desc: 'Shells Wren collected' }],
-    rewards: { xp: qxp(4), gold: qgold(4), items: [{ itemId: 'use_return_scroll', qty: 1 }] },
+    rewards: { xp: qxp(4), gold: qgold(4), items: [{ itemId: 'use_return_scroll', qty: 1 }], chooseOne: [{ itemId: 'eq_armor_traveler' }, { itemId: 'eq_boots_traveler' }, { itemId: 'eq_ring_copper_band' }, { itemId: 'eq_amulet_shell_pendant' }] },
   },
   {
     id: 'sq_driftmoor_boar_trouble',
@@ -176,7 +176,7 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
     progress: "\"Grotto's crawling with them. Swing first, ask questions never.\"",
     complete: "\"Quiet at last. Good work — here, tools of the trade.\" Brina tosses you a small bundle without looking up from the anvil.",
     objectives: [{ type: 'kill', monsterId: 'barnacle_bat', count: 10 }],
-    rewards: { xp: qxp(9), gold: qgold(9), items: [{ itemId: 'mat_iron_ingot', qty: 3 }] },
+    rewards: { xp: qxp(9), gold: qgold(9), items: [{ itemId: 'mat_iron_ingot', qty: 3 }], chooseOne: [{ itemId: 'eq_armor_kelpshell' }, { itemId: 'eq_armor_tidewoven' }, { itemId: 'eq_armor_vinewrap' }, { itemId: 'eq_amulet_kelp_charm' }] },
   },
   {
     id: 'sq_driftmoor_souvenir_shells',
@@ -200,6 +200,7 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
       xp: qxp(11),
       gold: qgold(11),
       items: [{ itemId: 'mat_enhance_stone_1', qty: 1 }, { itemId: 'use_hp_potion_m', qty: 1 }],
+      chooseOne: [{ itemId: 'eq_sword_kelpwoven' }, { itemId: 'eq_staff_kelpwoven' }, { itemId: 'eq_bow_kelpwoven' }, { itemId: 'eq_dagger_kelpwoven' }],
     },
   },
 ];

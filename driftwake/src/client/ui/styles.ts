@@ -358,6 +358,7 @@ input.dw-input:focus, select.dw-select:focus { border-color: var(--dw-gold); box
 @keyframes dw-drift { from { transform: translateX(0); } to { transform: translateX(-140vw); } }
 .dw-whale { position:absolute; opacity:0.5; animation: dw-drift-whale 90s linear infinite; }
 @keyframes dw-drift-whale { from { transform: translateX(120vw) translateY(0); } to { transform: translateX(-160vw) translateY(-20px); } }
+.dw-title-screen > .dw-panel { position:relative; z-index:2; }
 .dw-title-content { position:relative; z-index:2; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; }
 .dw-logo { font-size: 68px; font-weight:900; letter-spacing:0.12em; color: #fff8e7; text-shadow: 0 4px 0 #a06a2c, 0 8px 24px rgba(0,0,0,0.5), 0 0 40px rgba(255,220,150,0.5); animation: dw-logo-in .8s cubic-bezier(.2,1.5,.3,1) both; }
 @keyframes dw-logo-in { from { opacity:0; transform: translateY(-30px) scale(0.9);} to {opacity:1; transform:none;} }

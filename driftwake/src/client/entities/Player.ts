@@ -11,7 +11,7 @@ import { ITEMS } from '@shared/data';
 import { getCharacterSprite, spawnVfx, type CharacterLook, type SpriteInfo } from '../gfx';
 import { audio } from '../audio';
 import { session } from '../session';
-import { getJobDefOrFallback, getSkillDef } from '../dev/fixtures';
+import { getSkillDef } from '../dev/fixtures';
 import type { DamageTextPool } from '../combat/DamageText';
 import type { PlayerHandle } from '../combat/SkillRunner';
 import { applyBodyBottomAligned, playAnim, invulnAlpha } from './spriteUtil';
@@ -65,6 +65,9 @@ export class Player implements PlayerHandle {
 
   get x() { return this.sprite.x; }
   get y() { return this.sprite.y; }
+  get vy() { return (this.sprite.body as Phaser.Physics.Arcade.Body).velocity.y; }
+  get vx() { return (this.sprite.body as Phaser.Physics.Arcade.Body).velocity.x; }
+  isInvulnerable(now = performance.now()): boolean { return now < this.invulnUntil; }
 
   static buildLook(state: CharacterState, job: JobDef): CharacterLook {
     const colorsOf = (slot: EquipSlot) => { const inst = state.equipment[slot]; return inst ? ITEMS[inst.itemId]?.icon.colors : undefined; };
@@ -101,6 +104,7 @@ export class Player implements PlayerHandle {
   }
 
   private isDashing(now: number): boolean { return now < this.dashUntil; }
+  isCasting(now = performance.now()): boolean { return now < this.castLockUntil; }
 
   update(dtMs: number, input: PlayerInputState, stats: DerivedStats): void {
     if (this.dead) return;
@@ -184,8 +188,7 @@ export class Player implements PlayerHandle {
   }
 
   private tryDoubleJump(now: number, stats: DerivedStats): void {
-    const job = getJobDefOrFallback(session.state.jobId);
-    for (const skillId of job.skills) {
+    for (const skillId of Object.keys(session.state.skills)) {
       const lvl = session.state.skills[skillId];
       if (!lvl) continue;
       const def = getSkillDef(skillId);

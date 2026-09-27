@@ -57,6 +57,8 @@ export function showGameUI(session: GameSession): void {
 
   gameLayer = el('div', { id: 'dw-hud', style: { position: 'absolute', inset: '0' } });
   root.appendChild(gameLayer);
+  // Dev hook so windows can be exercised without the engine (see AGENTS testing notes).
+  (window as any).__ui = { bus, toggle: (panel: string) => bus.emit('ui:toggle', { panel: panel as any }) };
   applyStoredUiScale(root);
 
   const windowsLayer = el('div', { style: { position: 'absolute', inset: '0', pointerEvents: 'none' } });

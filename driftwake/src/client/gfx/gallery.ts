@@ -271,7 +271,7 @@ class VfxScene extends Phaser.Scene {
 // ---------------------------------------------------------------------------
 
 const game = new Phaser.Game({
-  type: Phaser.AUTO,
+  type: Phaser.CANVAS,
   parent: 'game',
   width: 1280,
   height: 720,

@@ -11,6 +11,10 @@ page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 
 page.on('framenavigated', (f) => logs.push(`[nav] ${f.url()}`));
+// First navigation just warms up Vite's dependency pre-bundling (which otherwise
+// forces a full page reload mid-test); the second is the one we actually use.
+await page.goto('http://localhost:5204/scripts/tmp-audio-test.html');
+await page.waitForTimeout(1500);
 await page.goto('http://localhost:5204/scripts/tmp-audio-test.html');
 await page.waitForFunction(() => window.__ready === true);
 await page.waitForTimeout(300);
@@ -61,7 +65,22 @@ console.log('expected step count in 4s:', (4 / expectedStepDur).toFixed(1));
 console.log('actual distinct step count in 4s:', events.length);
 
 console.log('storm: bpm from switch event:', eventsAfterSwitch[0]?.bpm);
-console.log('same-id playMusic call while already playing added new events (should be false):', result.noopAddedEvents);
+console.log(
+  '(informational only, always true since the current song keeps scheduling) same-id call window had events:',
+  result.noopAddedEvents
+);
+
+// The real no-op check: if playMusic('storm') while storm was already playing had
+// started a SECOND scheduler, we'd see near-duplicate/near-zero-gap timestamps
+// (two schedulers ticking independently over the same track). Verify there are none.
+const allTimes = [...events, ...eventsAfterSwitch].map((e) => e.time).sort((a, b) => a - b);
+let minGap = Infinity;
+for (let i = 1; i < allTimes.length; i++) {
+  const d = allTimes[i] - allTimes[i - 1];
+  if (d > 0.0001) minGap = Math.min(minGap, d);
+}
+console.log('smallest positive gap between any two scheduled steps across both tracks (s):', minGap.toFixed(4));
+console.log('(a duplicate/overlapping scheduler from a same-id no-op bug would show gaps near 0)');
 
 console.log('final volumes:', JSON.stringify(volumes));
 console.log('--- page logs ---');

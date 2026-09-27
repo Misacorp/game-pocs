@@ -44,7 +44,7 @@ export interface CastDescriptor {
   channel?: boolean;
 }
 
-function evalScalarMods(mods: Record<string, any> | undefined, level: number): StatMods {
+export function evalScalarMods(mods: Record<string, any> | undefined, level: number): StatMods {
   const out: StatMods = {};
   if (!mods) return out;
   for (const k in mods) (out as any)[k] = scalar(mods[k], level);

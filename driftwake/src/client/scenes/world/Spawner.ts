@@ -9,7 +9,7 @@ import { DEFAULT_RESPAWN_MS } from '@shared/constants';
 import { session } from '../../session';
 import { getMonsterDef } from '../../dev/fixtures';
 import { MonsterEntity, type MonsterWorldCtx } from '../../entities/Monster';
-import type { Terrain } from './Terrain';
+import { onewayProcess, type Terrain } from './Terrain';
 
 interface PendingRespawn { monsterId: string; x: number; y: number; respawnMs: number; readyAt: number }
 
@@ -53,6 +53,10 @@ export class Spawner {
     const seg = this.terrain.platformSegmentAt(x);
     m.setPatrolRange(seg.minX, seg.maxX);
     if (forceAggro) m.setAggro(true);
+    if (def.behavior !== 'flyer') {
+      this.scene.physics.add.collider(m.sprite, this.terrain.solidGroup);
+      this.scene.physics.add.collider(m.sprite, this.terrain.onewayGroup, undefined, onewayProcess(() => 0));
+    }
     m.onDeath = (mm) => {
       this.monsters = this.monsters.filter((e) => e !== mm);
       this.onDeath(mm);

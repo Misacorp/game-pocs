@@ -13,19 +13,31 @@ import { isWebGLAvailable, type Quality } from './quality';
  *  in caves and the reef, sickly violet/red in the Blight zones. Deliberately separate from
  *  gfx/palette.ts (owned by the sprite artist) since this is a lighting-only concern. */
 const AMBIENT: Record<ThemeId, number> = {
-  // Raised from the first pass: characters (player/NPCs) were reading too dark against the dusk
-  // town ambient. Player/NPC personal fill lights (Player.ts, Npc.ts) do the rest of the work —
-  // gameplay readability wins over moodier-but-dimmer ambient.
-  driftmoor: 0x6a5b74,
-  meadow: 0x92a5be,
-  grotto: 0x14211e,
-  kelpwood: 0x1a3a2c,
-  galeoutpost: 0x848fac,
-  stormspire: 0x2c2e3a,
-  lanternreef: 0x121e34,
-  galleon: 0x0e241c,
-  hollow: 0x22132a,
-  heart: 0x241012,
+  // Tuning pass 2: daylight ambient dialed back slightly to leave headroom for the (also now
+  // scaled down, see LIGHT_SCALE) player/decor lights — Light2D adds light on top of ambient with
+  // no HDR/tone-mapping before the framebuffer write, so ambient + light stacking past ~1.0 just
+  // clips to flat white with no way to recover it in post. Night/cave/reef themes raised
+  // substantially instead — glowtide_shallows in particular read as almost pure black.
+  driftmoor: 0x584a60,
+  meadow: 0x7f93aa,
+  grotto: 0x1c2f2a,
+  kelpwood: 0x1e3f30,
+  galeoutpost: 0x76819e,
+  stormspire: 0x363a52,
+  lanternreef: 0x1c3454,
+  galleon: 0x163a2a,
+  hollow: 0x33193f,
+  heart: 0x341318,
+};
+
+/** Multiplies every light's authored intensity (player/NPC/monster personal lights, decor,
+ *  projectiles, hit-flashes...) by theme so the same nominal intensities read as a subtle fill in
+ *  bright daylight (no hotspots on the player/NPCs/walls) and a real, pop-off-the-background glow
+ *  in caves/night/blight zones (where ambient alone still can't carry full readability). */
+const LIGHT_SCALE: Record<ThemeId, number> = {
+  driftmoor: 0.48, meadow: 0.42, galeoutpost: 0.48,
+  grotto: 1.15, kelpwood: 0.9, stormspire: 0.85,
+  lanternreef: 1.25, galleon: 1.2, hollow: 1.1, heart: 1.1,
 };
 
 const normalMapped = new Set<string>();
@@ -110,6 +122,7 @@ export function setupWorldLighting(scene: Phaser.Scene, theme: ThemeId, quality:
   }
   const budget = quality === 'high' ? 8 : 4;
   const manager = new LightManager(scene, budget);
+  const lightScale = LIGHT_SCALE[theme] ?? 1;
   return {
     manager,
     lit(obj, textureKey, opts) {
@@ -117,7 +130,7 @@ export function setupWorldLighting(scene: Phaser.Scene, theme: ThemeId, quality:
       try { obj.setPipeline('Light2D'); } catch { /* pipeline unavailable (canvas fallback) */ }
       return obj;
     },
-    addLight(src) { manager.add(src); },
+    addLight(src) { manager.add({ ...src, intensity: src.intensity * lightScale }); },
     removeLight(id) { manager.remove(id); },
     update(dtMs, cam) { manager.update(dtMs, cam.midPoint.x, cam.midPoint.y); },
     destroy() { manager.destroy(); },

@@ -30,9 +30,9 @@ export const GRADING: Record<ThemeId, GradingPreset> = {
     lift: FLAT, gamma: ONE, gain: [1.02, 1.03, 0.98],
     saturation: 1.05, shadowTint: [0.92, 0.96, 1.02], highlightTint: [1.04, 1.02, 0.92], splitAmount: 0.15, grain: 0.012,
   },
-  grotto: { // desaturated, cool, murky
-    lift: [-0.01, 0.01, 0.02], gamma: [1.05, 1.05, 1.0], gain: [0.85, 0.95, 0.95],
-    saturation: 0.8, shadowTint: [0.85, 1.0, 1.0], highlightTint: [0.9, 1.05, 1.0], splitAmount: 0.2, grain: 0.03,
+  grotto: { // desaturated, cool, murky — but still readable (ambient + gain raised alongside it)
+    lift: [-0.01, 0.01, 0.02], gamma: [1.0, 1.02, 1.0], gain: [0.98, 1.05, 1.02],
+    saturation: 0.85, shadowTint: [0.85, 1.0, 1.0], highlightTint: [0.9, 1.05, 1.0], splitAmount: 0.2, grain: 0.03,
   },
   kelpwood: { // push toward teal-green
     lift: [-0.01, 0.01, 0.0], gamma: ONE, gain: [0.92, 1.08, 0.98],
@@ -42,17 +42,19 @@ export const GRADING: Record<ThemeId, GradingPreset> = {
     lift: [0.0, 0.0, 0.01], gamma: ONE, gain: [0.98, 1.0, 1.04],
     saturation: 1.0, shadowTint: [0.92, 0.96, 1.05], highlightTint: [1.0, 1.0, 1.02], splitAmount: 0.1, grain: 0.012,
   },
-  stormspire: { // desaturated, cold, heavy grain
-    lift: [0.0, 0.0, 0.02], gamma: [1.05, 1.05, 1.08], gain: [0.82, 0.85, 0.92],
-    saturation: 0.62, shadowTint: [0.85, 0.88, 1.0], highlightTint: [0.9, 0.92, 1.05], splitAmount: 0.25, grain: 0.045,
+  stormspire: { // cold, moody, but not crushed to flat grey — the shader's own cloud contrast and
+    // lightning need real gain/gamma headroom to read, so this pulls back from the first pass's
+    // heavier desaturation/dimming.
+    lift: [0.0, 0.0, 0.02], gamma: [1.0, 1.0, 1.02], gain: [0.95, 0.98, 1.06],
+    saturation: 0.8, shadowTint: [0.85, 0.88, 1.0], highlightTint: [0.92, 0.94, 1.08], splitAmount: 0.22, grain: 0.035,
   },
   lanternreef: { // teal shadows / magenta highlights
     lift: [-0.02, 0.0, 0.02], gamma: ONE, gain: [0.95, 1.0, 1.1],
     saturation: 1.18, shadowTint: [0.75, 1.05, 1.05], highlightTint: [1.1, 0.85, 1.1], splitAmount: 0.35, grain: 0.02,
   },
-  galleon: { // dark, eerie, desaturated teal-green
-    lift: [-0.02, 0.0, -0.01], gamma: [1.08, 1.05, 1.08], gain: [0.8, 0.92, 0.85],
-    saturation: 0.75, shadowTint: [0.85, 1.0, 0.95], highlightTint: [0.9, 1.05, 0.95], splitAmount: 0.22, grain: 0.035,
+  galleon: { // dark, eerie, desaturated teal-green — readable, not pitch-black
+    lift: [-0.01, 0.01, 0.0], gamma: [1.0, 1.0, 1.02], gain: [0.95, 1.05, 0.98],
+    saturation: 0.8, shadowTint: [0.85, 1.0, 0.95], highlightTint: [0.9, 1.05, 0.95], splitAmount: 0.22, grain: 0.035,
   },
   hollow: { // sickly violet
     lift: [0.02, -0.01, 0.02], gamma: ONE, gain: [0.95, 0.85, 1.05],

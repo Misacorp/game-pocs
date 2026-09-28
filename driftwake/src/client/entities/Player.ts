@@ -76,7 +76,7 @@ export class Player implements PlayerHandle {
     // glow would be, deliberately, so the character reads clearly even against a dim ambient.
     worldCtx.lighting?.addLight({
       id: Player.LIGHT_ID, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 0.6,
-      color: 0xffe9c2, radius: 175, intensity: 1.35, flicker: 0.06, priority: 3,
+      color: 0xffe9c2, radius: 150, intensity: 1.1, flicker: 0.06, priority: 3,
     });
     this.shadow = new ContactShadow(scene, this.info.bodyWidth * 1.5, 8);
   }

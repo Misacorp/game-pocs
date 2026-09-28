@@ -44,7 +44,7 @@ export function createWeather(scene: Phaser.Scene, w: WeatherId): Weather {
       // A second, additive-blended pass of the same drops gives rain a faint catch-light glint
       // that the threshold bloom pass can pick up, without brightening (and thus blurring) the
       // whole rain layer — most drops stay a normal crisp alpha-blended streak.
-      add('wx_drop', { x: { min: -20, max: vw + 20 }, y: -20, lifespan: 900, speedY: { min: 500, max: 700 }, speedX: -60, scaleY: { min: 0.8, max: 1.3 }, scaleX: 0.4, alpha: 0.16, quantity: 1, frequency: 55, tint: 0xdff2ff, blendMode: Phaser.BlendModes.ADD });
+      add('wx_drop', { x: { min: -20, max: vw + 20 }, y: -20, lifespan: 900, speedY: { min: 500, max: 700 }, speedX: -60, scaleY: { min: 0.8, max: 1.3 }, scaleX: 0.4, alpha: 0.26, quantity: 1, frequency: 55, tint: 0xdff2ff, blendMode: Phaser.BlendModes.ADD });
       if (w === 'storm') lightning = scene.add.rectangle(0, 0, 10, 10, 0xffffff, 0).setOrigin(0).setDepth(210);
       break;
     case 'snow':

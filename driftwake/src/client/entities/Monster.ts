@@ -89,6 +89,13 @@ export class MonsterEntity {
     playAnim(this.sprite, info, 'idle');
     ctx.lighting?.lit(this.sprite, info.key);
     this.shadow = new ContactShadow(scene, info.bodyWidth * (this.isBoss ? 2.2 : 1.4), 8);
+    // A small personal fill light so monsters never read as flat dark silhouettes against a dim
+    // background (LightManager/theme scaling keeps this negligible in bright daylight themes and
+    // a real, readable pop in caves/night/blight zones).
+    ctx.lighting?.addLight({
+      id: `mon_${this.uid}`, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 0.55,
+      color: 0xcfe0ff, radius: this.isBoss ? 130 : 70, intensity: this.isBoss ? 0.7 : 0.45,
+    });
     this.cachedGroundY = ctx.groundYAt(x, y);
 
     if (this.isBoss) {
@@ -142,6 +149,7 @@ export class MonsterEntity {
     (this.sprite.body as Phaser.Physics.Arcade.Body).enable = false;
     this.hpBar?.bg.destroy(); this.hpBar?.fill.destroy(); this.hpBar?.label?.destroy();
     this.shadow.destroy();
+    this.ctx.lighting?.removeLight(`mon_${this.uid}`);
     if (this.isBoss) { bus.emit('ui:bossBar', null); audio.playSfx('bossRoar'); }
     // Fire onDeath (loot/XP dispatch, respawn scheduling) right away rather than waiting for the
     // fade-out tween to complete: a map transition (portal dash right after a killing blow, or a
@@ -533,6 +541,7 @@ export class MonsterEntity {
     this.status.clear();
     this.hpBar?.bg.destroy(); this.hpBar?.fill.destroy(); this.hpBar?.label?.destroy();
     this.shadow.destroy(); // Image.destroy() no-ops safely if die() already destroyed it
+    this.ctx.lighting?.removeLight(`mon_${this.uid}`); // no-op if die() already removed it
     this.sprite.destroy();
   }
 }

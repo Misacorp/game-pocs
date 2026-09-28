@@ -109,15 +109,25 @@ void main() {
     float horizon = fbm(vec2(uv.x * 3.0 + t * 0.03, 3.0));
     col = mix(col, uSkyBottom, smoothstep(0.75, 1.0, uv.y) * (0.5 + 0.4 * horizon));
   } else if (mode < 2.5) {
-    // --- storm: roiling dark cloud mass + lightning flashes lighting it from inside ---
+    // --- storm: roiling dark cloud mass with real contrast + lightning flashes lighting the
+    // cloud undersides from inside (not just a flat screen-wide brighten) ---
     vec2 cp = vec2(uv.x * 2.4 + t * 0.09, uv.y * 2.6 - t * 0.05);
-    float clouds = uQuality > 0.5 ? fbm(cp) * fbm(cp * 1.7 + 4.0) : fbm(cp);
-    col = mix(col, col * 0.4, smoothstep(0.15, 0.6, clouds));
-    float flashPhase = fract(t * 0.12 + uSeed);
-    float flash = smoothstep(0.97, 0.985, flashPhase) - smoothstep(0.99, 1.0, flashPhase);
-    flash += 0.4 * (smoothstep(0.55, 0.565, flashPhase) - smoothstep(0.58, 0.6, flashPhase));
-    float lit = smoothstep(0.3, 0.8, clouds);
-    col += vec3(0.75, 0.8, 1.0) * flash * (0.3 + 0.7 * lit);
+    float n1 = fbm(cp);
+    float n2 = fbm(cp * 2.3 + 4.0);
+    float clouds = n1 * 0.65 + n2 * 0.35;
+    // Push the mass toward two clusters (dark cores / thin, lit-from-behind edges) instead of a
+    // single smooth gradient — this is what actually reads as "volume" instead of flat grey fog.
+    float core = smoothstep(0.42, 0.85, clouds);
+    col = mix(col, col * 0.22, core);
+    float edge = smoothstep(0.3, 0.45, clouds) * smoothstep(0.62, 0.45, clouds);
+    col += vec3(0.55, 0.58, 0.68) * edge * 0.3;
+    float flashPhase = fract(t * 0.11 + uSeed);
+    float flash = smoothstep(0.965, 0.98, flashPhase) - smoothstep(0.985, 1.0, flashPhase);
+    flash += 0.5 * (smoothstep(0.5, 0.515, flashPhase) - smoothstep(0.53, 0.55, flashPhase));
+    // The flash brightens the cloud mass itself (backlighting the dark cores toward a hot
+    // blue-white) rather than just adding a flat wash on top, plus a soft overall scene-wide glow.
+    col = mix(col, vec3(0.85, 0.88, 1.0), flash * core * 0.85);
+    col += vec3(0.6, 0.65, 0.85) * flash * 0.35;
   } else if (mode < 3.5) {
     // --- cave: near-black with drifting bioluminescent motes ---
     col *= 0.9;

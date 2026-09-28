@@ -20,7 +20,9 @@ varying vec2 outTexCoord;
 vec3 brightPass(vec2 uv) {
   vec3 c = texture2D(uMainSampler, uv).rgb;
   float l = dot(c, vec3(0.299, 0.587, 0.114));
-  return c * smoothstep(uThreshold, uThreshold + 0.25, l);
+  // A tight knee: only texels genuinely near-white (true emissives — lanterns, crystals, VFX,
+  // eyes) contribute, not merely well-lit sprites/walls sitting in the upper-mid brightness range.
+  return c * smoothstep(uThreshold, uThreshold + 0.12, l);
 }
 
 void main() {
@@ -43,8 +45,8 @@ void main() {
 `;
 
 export class ThresholdBloomPipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
-  threshold = 0.75;
-  intensity = 0.9;
+  threshold = 0.88;
+  intensity = 0.75;
 
   constructor(game: Phaser.Game) {
     super({ game, fragShader: FRAG });

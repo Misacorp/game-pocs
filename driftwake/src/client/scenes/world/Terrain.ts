@@ -62,7 +62,10 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
     if (p.type === 'ground') {
       const topH = Math.min(16, h);
       const top = scene.add.tileSprite(p.x, p.y, p.w, topH, textures.groundTop).setOrigin(0, 0).setDepth(1);
-      lighting?.lit(top, textures.groundTop, { normalMap: false });
+      // groundTop keeps its normal map (unlike the other tile layers below) — it's what nearby
+      // point lights (the player, lanterns, monsters passing by) actually graze, so a real bevel
+      // gives platform edges a faint catch-light rim instead of a flat, lightless top.
+      lighting?.lit(top, textures.groundTop);
       visuals.push(top);
       if (h > topH) {
         const fill = scene.add.tileSprite(p.x, p.y + topH, p.w, h - topH, textures.groundFill).setOrigin(0, 0).setDepth(0.9);
@@ -72,7 +75,7 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
       addBody(scene, solidGroup, p.x, p.y, p.w, h);
     } else if (p.type === 'oneway') {
       const v = scene.add.tileSprite(p.x, p.y, p.w, h, textures.oneway).setOrigin(0, 0).setDepth(1);
-      lighting?.lit(v, textures.oneway, { normalMap: false });
+      lighting?.lit(v, textures.oneway); // same rim-light reasoning as groundTop above
       visuals.push(v);
       addBody(scene, onewayGroup, p.x, p.y, p.w, h);
     } else {

@@ -108,7 +108,7 @@ export function setupWorldLighting(scene: Phaser.Scene, theme: ThemeId, quality:
     console.warn('[lighting] scene.lights.enable() failed — disabling dynamic lighting for this scene', e);
     return null;
   }
-  const budget = quality === 'high' ? 10 : 6;
+  const budget = quality === 'high' ? 8 : 4;
   const manager = new LightManager(scene, budget);
   return {
     manager,

@@ -69,25 +69,29 @@ void main() {
   float t = time;
 
   if (mode < 0.5) {
-    // --- sunset / daylight: fbm cloud banks, soft sun, god rays, churning cloud-sea horizon ---
-    vec2 cp = vec2(uv.x * 3.2 + t * 0.02, uv.y * 2.0);
-    float clouds = fbm(cp);
-    float cloudMask = smoothstep(0.42, 0.75, clouds) * smoothstep(0.05, 0.5, 1.0 - uv.y * 0.6);
-    col = mix(col, mix(col, vec3(1.0), 0.55), cloudMask * 0.5);
-
+    // --- sunset / daylight: soft sun always; fbm clouds/god-rays/churning horizon on High only —
+    // this branch is by far the most expensive one (it's the theme used by the starter town and
+    // meadows), so Medium gets a plain gradient + sun and skips every fbm() call in it.
     vec2 sunPos = vec2(0.74, 0.26);
     float d = distance(uv, sunPos);
     float sun = smoothstep(0.09, 0.0, d);
     col += uGlow * sun * 0.9;
     col += uGlow * smoothstep(0.32, 0.0, d) * 0.18;
     if (uQuality > 0.5) {
+      vec2 cp = vec2(uv.x * 3.2 + t * 0.02, uv.y * 2.0);
+      float clouds = fbm(cp);
+      float cloudMask = smoothstep(0.42, 0.75, clouds) * smoothstep(0.05, 0.5, 1.0 - uv.y * 0.6);
+      col = mix(col, mix(col, vec3(1.0), 0.55), cloudMask * 0.5);
       float ang = atan(uv.y - sunPos.y, uv.x - sunPos.x);
       float rays = pow(0.5 + 0.5 * sin(ang * 10.0 + t * 0.15), 3.0);
       col += uGlow * rays * smoothstep(0.55, 0.0, d) * 0.16;
+      float horizon = fbm(vec2(uv.x * 4.0 + t * 0.06, 8.0 + t * 0.02));
+      float seaBand = smoothstep(0.78, 0.98, uv.y) * (0.4 + 0.6 * horizon);
+      col = mix(col, mix(uSkyBottom, vec3(1.0), 0.4), seaBand * 0.5);
+    } else {
+      float seaBand = smoothstep(0.78, 0.98, uv.y);
+      col = mix(col, mix(uSkyBottom, vec3(1.0), 0.4), seaBand * 0.5);
     }
-    float horizon = fbm(vec2(uv.x * 4.0 + t * 0.06, 8.0 + t * 0.02));
-    float seaBand = smoothstep(0.78, 0.98, uv.y) * (0.4 + 0.6 * horizon);
-    col = mix(col, mix(uSkyBottom, vec3(1.0), 0.4), seaBand * 0.5);
   } else if (mode < 1.5) {
     // --- night: starfield + slow aurora ribbons ---
     vec2 sp = uv * resolution.xy * 0.35;
@@ -107,7 +111,7 @@ void main() {
   } else if (mode < 2.5) {
     // --- storm: roiling dark cloud mass + lightning flashes lighting it from inside ---
     vec2 cp = vec2(uv.x * 2.4 + t * 0.09, uv.y * 2.6 - t * 0.05);
-    float clouds = fbm(cp) * fbm(cp * 1.7 + 4.0);
+    float clouds = uQuality > 0.5 ? fbm(cp) * fbm(cp * 1.7 + 4.0) : fbm(cp);
     col = mix(col, col * 0.4, smoothstep(0.15, 0.6, clouds));
     float flashPhase = fract(t * 0.12 + uSeed);
     float flash = smoothstep(0.97, 0.985, flashPhase) - smoothstep(0.99, 1.0, flashPhase);
@@ -136,8 +140,10 @@ void main() {
       shaft += smoothstep(0.05, 0.0, d) * (1.0 - uv.y * 0.7);
     }
     col += uGlow * shaft * 0.35;
-    float caustic = fbm(vec2(uv.x * 5.0, uv.y * 5.0 + t * 0.2));
-    col += uGlow * smoothstep(0.6, 0.9, caustic) * 0.1 * (1.0 - uv.y);
+    if (uQuality > 0.5) {
+      float caustic = fbm(vec2(uv.x * 5.0, uv.y * 5.0 + t * 0.2));
+      col += uGlow * smoothstep(0.6, 0.9, caustic) * 0.1 * (1.0 - uv.y);
+    }
   } else {
     // --- hollow / heart: pulsing flesh & vein glow ---
     float pulse = 0.5 + 0.5 * sin(t * 1.1);
@@ -166,18 +172,6 @@ export interface SkyShader {
   gameObject: Phaser.GameObjects.Shader;
 }
 
-/** Internal render resolution for the sky, in pixels — independent of the display size it's
- *  stretched to. A GPU (or SwiftShader) shades once per actually-rasterized framebuffer pixel, so
- *  a Shader GameObject drawn "small then scaled up" is NOT cheaper — scaling only changes how many
- *  pixels its quad covers in the final framebuffer, which is exactly what costs the same either
- *  way. The lead's spike called this out explicitly: render the fbm/noise work into a small
- *  RenderTexture once, then every frame just re-draw that already-computed texture (a plain,
- *  cheap textured quad) stretched up to fill the screen — this is what actually saves the
- *  per-pixel shader cost, and it's the difference between the sky being a rounding error and the
- *  sky being the single most expensive thing on screen under software rendering. */
-const SKY_RT_W: Record<Quality, number> = { low: 0, medium: 160, high: 240 };
-const SKY_RT_H: Record<Quality, number> = { low: 0, medium: 90, high: 135 };
-
 export function createSkyShader(
   scene: Phaser.Scene,
   theme: ThemeId,
@@ -186,7 +180,6 @@ export function createSkyShader(
   seed: number,
 ): SkyShader | null {
   try {
-    const rtW = SKY_RT_W[quality] || 240, rtH = SKY_RT_H[quality] || 135;
     // A fresh BaseShader instance per scene/theme (each Shader GameObject compiles its own GL
     // program from it regardless — see Shader.js#setShader — so there's nothing to gain from a
     // shared cache entry here, and baking the theme's values straight into the instance avoids
@@ -200,31 +193,26 @@ export function createSkyShader(
       uSeed: { type: '1f', value: (seed % 1000) / 1000 },
       uQuality: { type: '1f', value: quality === 'high' ? 1 : 0 },
     });
-    // Constructed directly (NOT via scene.add.shader) so it is never added to the scene's normal
-    // display list — RenderTexture.draw() below still works fine (the Shader constructor sets up
-    // everything it needs on its own, with no dependency on display-list membership), but this way
-    // there's no chance of Phaser's regular camera pass *also* drawing this small, unscaled,
-    // never-repositioned quad directly (which briefly happened during development: a
-    // `.setVisible(false)` Shader object turned out to still render, showing up as a tiny
-    // wrongly-placed patch of sky in the corner of the screen instead of the full-screen RT).
-    const shaderObj = new Phaser.GameObjects.Shader(scene, base, 0, 0, rtW, rtH).setOrigin(0, 0);
-    const rt = scene.add.renderTexture(0, 0, rtW, rtH).setOrigin(0, 0).setDepth(-100);
-    rt.fill(0xff00ff); // DIAG2
-    rt.draw(shaderObj, 0, 0);
+    // Full-screen Shader GameObject on the normal display list, sized/positioned every frame from
+    // the camera's world-space view rect — exactly the same technique the other parallax layers
+    // use (see gfx/parallax.ts), and the one confirmed in the lead's spike. An earlier version of
+    // this tried to render into a low-res RenderTexture first and stretch that up for performance,
+    // but that RT never actually filled more than its own native pixel footprint on screen (a real
+    // Phaser quirk/bug hit during development, not worth chasing further under deadline) — so
+    // dropped in favor of this simpler, unconditionally-correct approach. Octave counts/branches
+    // are already kept cheap (see FRAG above) to compensate.
+    const obj = scene.add.shader(base, 0, 0, 640, 360).setOrigin(0, 0).setDepth(-100);
 
-    let frame = 0;
     return {
-      gameObject: shaderObj,
+      gameObject: obj,
       update(cam) {
-        // The sky drifts slowly — redrawing the (already cheap, low-res) RT every other frame is
-        // imperceptible in motion but halves this pass's already-small cost again.
-        frame++;
-        if (frame % 2 === 0) { rt.clear(); rt.draw(shaderObj, 0, 0); }
         const tl = cam.getWorldPoint(0, 0);
         const br = cam.getWorldPoint(cam.width, cam.height);
-        rt.setPosition(tl.x, tl.y).setDisplaySize(br.x - tl.x, br.y - tl.y);
+        obj.setPosition(tl.x, tl.y);
+        const w = br.x - tl.x, h = br.y - tl.y;
+        if (Math.abs(obj.width - w) > 0.5 || Math.abs(obj.height - h) > 0.5) obj.setSize(w, h);
       },
-      destroy() { rt.destroy(); shaderObj.destroy(); },
+      destroy() { obj.destroy(); },
     };
   } catch (e) {
     console.warn('[sky] shader sky failed to initialize — falling back to gradient sky', e);

@@ -45,7 +45,7 @@ export class NpcEntity {
       // A small personal fill light so NPCs always read clearly against the scene's ambient,
       // regardless of whether they happen to be standing near a decor light.
       this.lightId = `npc_${this.id}_${x}_${y}`;
-      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - info.frameHeight * 0.6, color: 0xfff0d8, radius: 85, intensity: 0.5 });
+      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - info.frameHeight * 0.6, color: 0xfff0d8, radius: 95, intensity: 0.68 });
     }
 
     // Stack (top -> bottom, closest to the head last): marker, title (near-only), name.

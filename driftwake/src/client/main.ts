@@ -36,10 +36,12 @@ async function main() {
     // Compiled-in light count for the Light2D pipeline shader — fixed regardless of quality tier
     // (Phaser recompiles the light shader's loop bound from this constant, and it can't change at
     // runtime). LightManager (render/LightManager.ts) is what actually caps how many are active at
-    // once (10 on High, 6 on Medium, Light2D unused entirely on Low) — this is the compiled ceiling
-    // both tiers share, kept modest since every lit pixel on screen pays for this many loop
-    // iterations regardless of how many lights are actually doing anything that frame.
-    render: { maxLights: 10 },
+    // once (8 on High, 4 on Medium, Light2D unused entirely on Low) — this is the compiled ceiling
+    // both tiers share, kept deliberately modest since every lit pixel on screen (which, between
+    // terrain and characters, is most of them) pays for this many loop iterations every frame
+    // regardless of how many lights are actually doing anything that frame — profiling in headless
+    // SwiftShader showed Light2D as a meaningful chunk of total frame cost.
+    render: { maxLights: 8 },
   });
   (window as any).__game = game;
   (window as any).__session = session;

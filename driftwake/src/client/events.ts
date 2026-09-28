@@ -1,7 +1,7 @@
 /**
  * Client-side typed event bus connecting engine (Phaser scenes), UI (DOM) and session.
  */
-import type { CharacterState, DerivedStats, StatMods } from '@shared/types';
+import type { CharacterState, DerivedStats, StatMods, SkillIconSpec } from '@shared/types';
 import type { GameEvent, ChatMessage, NotifyKind } from '@shared/protocol';
 
 export type PanelId =
@@ -21,7 +21,7 @@ export interface ClientEventMap {
    *  from CharacterState.buffs (food/elixirs), whose `expiresAt` is Date.now()-based; the top buff
    *  bar (buffbar.ts) merges both, converting each to its own clock. `stats` lets the buff bar's
    *  tooltip show what the buff actually does (see combat/Buffs.ts's emit). */
-  buffs: { id: string; name: string; expiresAt: number; icon?: { shape: string; colors: string[] }; stats?: StatMods }[];
+  buffs: { id: string; name: string; expiresAt: number; icon?: SkillIconSpec; stats?: StatMods }[];
 
   // --- engine -> UI
   'ui:dialogue': { npcId: string };

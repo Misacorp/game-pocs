@@ -38,7 +38,7 @@ export function createBuffBar(_session: GameSession): { root: HTMLElement; clean
   const root = el('div', { class: 'dw-buffbar' });
 
   let engineBuffs: { id: string; name: string; expiresAt: number; icon?: SkillIconSpec; stats?: StatMods }[] = [];
-  let stateBuffs: { id: string; name: string; expiresAt: number; icon?: SkillIconSpec }[] = [];
+  let stateBuffs: { id: string; name: string; expiresAt: number; icon?: SkillIconSpec; stats?: StatMods }[] = [];
   const totalDurations = new Map<string, number>();
   let views: BuffView[] = [];
 
@@ -47,7 +47,7 @@ export function createBuffBar(_session: GameSession): { root: HTMLElement; clean
     const wall = Date.now();
     const raw: (RawBuff & { remaining: number })[] = [
       ...engineBuffs.map((b) => ({ id: b.id, name: b.name, icon: b.icon, stats: b.stats, remaining: b.expiresAt - now })),
-      ...stateBuffs.map((b) => ({ id: b.id, name: b.name, icon: b.icon, remaining: b.expiresAt - wall })),
+      ...stateBuffs.map((b) => ({ id: b.id, name: b.name, icon: b.icon, stats: b.stats, remaining: b.expiresAt - wall })),
     ].filter((b) => b.remaining > 0);
     views = raw
       .map((b) => {

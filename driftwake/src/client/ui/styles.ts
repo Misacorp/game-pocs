@@ -277,7 +277,7 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-tracker-quest { padding: 8px 10px 8px 24px; position: relative; }
 .dw-tracker-quest::before {
   content:''; position:absolute; left:9px; top:11px; width:14px; height:10px;
-  background: var(--dw-fluke) center / contain no-repeat; opacity:0.6;
+  background: var(--dw-fluke-mini) center / contain no-repeat; opacity:0.7;
 }
 .dw-tracker-quest .dw-tq-name { font: 400 var(--dw-fs-md) / 1.1 var(--dw-font-display); color: var(--dw-bone); }
 .dw-tracker-quest.dw-ready .dw-tq-name { color: var(--dw-tide); }
@@ -396,11 +396,10 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 }
 .dw-dlg-opt::before {
   content:''; position:absolute; left:10px; top:50%; width:14px; height:10px; transform: translateY(-50%);
-  background: var(--dw-fluke) center / contain no-repeat; opacity:0.8;
-  filter: drop-shadow(0 1px 0 rgba(0,0,0,.6));
+  background: var(--dw-fluke-mini) center / contain no-repeat; opacity:0.8;
 }
 .dw-dlg-opt:hover { border-color: rgba(255,179,71,0.35); background: rgba(255,179,71,0.08); }
-.dw-dlg-opt:hover::before { opacity:1; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)) sepia(1) saturate(6) hue-rotate(-8deg) brightness(1.1); }
+.dw-dlg-opt:hover::before { opacity:1; filter: sepia(1) saturate(6) hue-rotate(-8deg) brightness(1.15); }
 .dw-dlg-opt .dw-dlg-marker { font-family: var(--dw-font-label); font-weight:800; width:14px; text-align:center; }
 .dw-dlg-opt.dw-marker-ready .dw-dlg-marker { color: var(--dw-tide); }
 .dw-dlg-opt.dw-marker-offer .dw-dlg-marker { color: var(--dw-lantern-hot); }
@@ -460,43 +459,60 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-prof-bar { height: 10px; border-radius: var(--dw-radius-vial); background: rgba(5,11,13,0.6); overflow:hidden; border:1px solid var(--dw-bone-faint); }
 .dw-prof-bar > div { height:100%; background: linear-gradient(90deg, var(--dw-song-a), var(--dw-song-b)); }
 
-/* ---------- World map — illustrated sky-chart ---------- */
-.dw-skychart { position: relative; width: 100%; min-height: 440px; }
-.dw-skychart-routes { position:absolute; inset:0; pointer-events:none; }
-.dw-skychart-routes path { fill:none; stroke: var(--dw-bone-faint); stroke-width:1.6; stroke-dasharray: 3 5; }
+/* ---------- World map — illustrated sky-chart -----------------------------------------------
+   A compact grid of region cards (fits 1280x720 with no clipping/scrolling): each region is its
+   own stylized skywhale, biome-tinted, carrying its maps as small islands along its back. */
+.dw-skychart-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.dw-region-card {
+  position:relative; border-radius: var(--dw-radius-sm); border:1px solid var(--dw-bone-faint);
+  background: linear-gradient(180deg, rgba(241,230,207,0.03), transparent); padding: 8px 8px 6px;
+}
+.dw-region-card.dw-region-current { border-color: rgba(255,179,71,0.45); box-shadow: var(--dw-glow-lantern); }
+.dw-region-name {
+  font: 400 var(--dw-fs-md) / 1 var(--dw-font-display); color: var(--dw-bone); text-align:center;
+  letter-spacing:0.02em; margin-bottom: 4px;
+}
+.dw-region-whale { position:relative; height: 112px; }
+.dw-region-whale svg { position:absolute; inset:0; width:100%; height:100%; filter: drop-shadow(0 3px 6px rgba(0,0,0,.5)); }
+.dw-region-whale .dw-chart-routes { fill:none; stroke: rgba(241,230,207,0.4); stroke-width:1.3; stroke-dasharray: 2.5 4; }
+
+.dw-chart-isle {
+  position:absolute; transform: translate(-50%, -50%); display:flex; flex-direction:column; align-items:center;
+  cursor: var(--dw-cursor-point); transition: transform var(--dw-dur) var(--dw-ease);
+}
+.dw-chart-isle:hover { transform: translate(-50%, -50%) translateY(-2px); }
+.dw-chart-isle .dot {
+  position:relative; width:13px; height:13px; border-radius:50%; margin-bottom:2px;
+  background: radial-gradient(circle at 35% 30%, var(--dw-hide-3), var(--dw-hide) 70%);
+  border: 1.5px solid var(--dw-bone-faint); box-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.dw-chart-isle.town .dot { border-color: var(--dw-lantern); box-shadow: 0 0 6px rgba(255,179,71,.55); }
+.dw-chart-isle.boss .dot { border-color: var(--dw-coral); box-shadow: 0 0 6px rgba(255,107,107,.55); }
+.dw-chart-isle .badge { position:absolute; top:-6px; right:-6px; width:10px; height:10px; }
+.dw-chart-isle.town .badge {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffb347' d='M6 1 11 5.5V6H10v5H2V6H1v-.5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.dw-chart-isle.boss .badge {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cg stroke='%23ff6b6b' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M1 11 9 3'/%3E%3Cpath d='M11 1 3 9'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+}
+.dw-chart-isle .label { font: 400 11px/1 var(--dw-font-display); color: var(--dw-bone); white-space:nowrap; }
+.dw-chart-isle .lvl { font: 600 9px/1 var(--dw-font-pixel); color: var(--dw-bone-dim); margin-top:1px; }
+.dw-chart-isle.current .dot {
+  background: var(--dw-lantern); border-color: var(--dw-lantern-hot); box-shadow: 0 0 10px var(--dw-lantern);
+}
+.dw-chart-isle.current .dot::after {
+  content:''; position:absolute; inset:-6px; border-radius:50%; border: 1.5px solid var(--dw-lantern);
+  animation: dw-pulse-ring 1.8s ease-out infinite;
+}
+.dw-chart-isle.current .label { color: var(--dw-lantern-hot); }
+.dw-chart-isle.unknown .dot { filter: grayscale(1) brightness(0.6); opacity:.55; border-style: dashed; }
+.dw-chart-isle.unknown .label { color: var(--dw-bone-dim); font-style: italic; }
+@keyframes dw-pulse-ring { 0% { opacity:0.9; transform: scale(0.7); } 100% { opacity:0; transform: scale(2.1); } }
+@media (prefers-reduced-motion: reduce) { .dw-chart-isle.current .dot::after { animation:none; } }
+
 .dw-skychart-legend { display:flex; gap:14px; flex-wrap:wrap; font: 500 10.5px/1 var(--dw-font-label); letter-spacing:0.03em; text-transform:uppercase; color: var(--dw-bone-dim); margin-top:8px; }
 .dw-skychart-legend span { display:inline-flex; align-items:center; gap:5px; }
 .dw-skychart-legend i { width:9px; height:9px; border-radius:50%; display:inline-block; }
-.dw-region-title {
-  font: 400 var(--dw-fs-lg) / 1 var(--dw-font-display); color: var(--dw-bone); letter-spacing:0.02em;
-  position:absolute; text-align:center; width: 100%; pointer-events:none;
-}
-.dw-whale-island {
-  position:absolute; width: 168px; display:flex; flex-direction:column; align-items:center; gap:2px;
-  cursor: var(--dw-cursor-point); transition: transform var(--dw-dur) var(--dw-ease);
-}
-.dw-whale-island:hover { transform: translateY(-2px); }
-.dw-whale-island svg { filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
-.dw-whale-island .dw-mn-name { font: 400 var(--dw-fs-sm) / 1 var(--dw-font-display); color: var(--dw-bone); margin-top:2px; }
-.dw-whale-island .dw-mn-level { font: 600 10px/1 var(--dw-font-pixel); color: var(--dw-bone-dim); }
-.dw-whale-island.dw-current .dw-mn-name { color: var(--dw-tide); }
-.dw-whale-island.dw-current .dw-back { stroke: var(--dw-tide); }
-.dw-whale-island.dw-unknown { filter: grayscale(1) brightness(0.5) blur(0.3px); opacity:0.6; }
-.dw-whale-island.dw-unknown .dw-mn-name, .dw-whale-island.dw-unknown .dw-mn-level { visibility: hidden; }
-.dw-whale-island .dw-boss-mark { font-size:10px; color: var(--dw-coral); }
-.dw-current-pulse { animation: dw-pulse-ring 1.8s ease-out infinite; transform-origin: center; transform-box: fill-box; }
-@keyframes dw-pulse-ring { 0% { opacity:0.9; transform: scale(0.85); } 100% { opacity:0; transform: scale(1.6); } }
-@media (prefers-reduced-motion: reduce) { .dw-current-pulse { animation:none; } }
-
-/* legacy list layout kept for any map without chart coordinates yet */
-.dw-worldmap-region { margin-bottom: 14px; }
-.dw-worldmap-region h4 { margin: 0 0 8px; font: 400 var(--dw-fs-lg) / 1 var(--dw-font-display); color: var(--dw-bone); }
-.dw-worldmap-nodes { display:flex; flex-wrap:wrap; gap:10px; }
-.dw-map-node { width: 116px; padding:8px; border-radius: var(--dw-radius-sm); border:1px solid var(--dw-bone-faint); background: rgba(241,230,207,0.03); }
-.dw-map-node.dw-current { border-color: var(--dw-tide); box-shadow: var(--dw-glow-tide); }
-.dw-map-node.dw-unknown { opacity:0.4; filter: grayscale(1); }
-.dw-map-node .dw-mn-name { font: 400 var(--dw-fs-md) / 1 var(--dw-font-display); color: var(--dw-bone); }
-.dw-map-node .dw-mn-level { font: 600 10px/1 var(--dw-font-pixel); color: var(--dw-bone-dim); margin-top:2px; }
 
 /* ---------- Bestiary — naturalist's field-journal plates ---------- */
 .dw-bestiary-grid { display:grid; grid-template-columns: repeat(auto-fill, 100px); gap:10px; }
@@ -518,7 +534,7 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-ach-name { font: 400 var(--dw-fs-md) / 1 var(--dw-font-display); color: var(--dw-bone); }
 .dw-ach-desc { font-size:11px; color: var(--dw-bone-dim); margin-top:2px; }
 .dw-ach-date { display:flex; align-items:center; gap:5px; font: 600 10px/1 var(--dw-font-pixel); color: var(--dw-tide); margin-top:4px; }
-.dw-ach-seal { width:12px; height:9px; flex:none; background: var(--dw-fluke) center / contain no-repeat; opacity:0.9; filter: sepia(1) saturate(4) hue-rotate(-5deg); }
+.dw-ach-seal { width:12px; height:9px; flex:none; background: var(--dw-fluke-mini) center / contain no-repeat; opacity:0.9; filter: sepia(1) saturate(4) hue-rotate(-5deg); }
 .dw-ach-progress { flex:1; }
 
 /* ---------- Settings ---------- */
@@ -588,23 +604,27 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-charcard .dw-cc-porthole img { width:100%; height: 130%; object-fit: cover; object-position: top; image-rendering:pixelated; position:absolute; left:0; top:-6%; }
 .dw-charcard .dw-cc-name { font: 400 var(--dw-fs-md) / 1 var(--dw-font-display); color: var(--dw-bone); margin-top:2px; }
 .dw-charcard .dw-cc-sub { font: 500 10.5px/1 var(--dw-font-label); letter-spacing:0.04em; text-transform:uppercase; color: var(--dw-bone-dim); margin-top:3px; }
-.dw-create-flow { width: 940px; max-width:94vw; max-height:90vh; padding:24px 28px; display:flex; flex-direction:column; gap:16px; overflow:auto; }
-.dw-class-cards { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
-/* class cards — engraved bone tablets with a class-color accent + scrimshaw sigil */
+/* Sized (with the trimmed markup in title.ts) to fit whole at 1280x720 with no scrollbar:
+   heading ~30px + cards ~110px + appearance ~150px + name row ~40px + gaps/padding ~90px. */
+.dw-create-flow { width: 940px; max-width:94vw; max-height:96vh; padding:16px 28px; display:flex; flex-direction:column; gap:10px; overflow:auto; }
+.dw-create-heading { font: 400 var(--dw-fs-xl) / 1 var(--dw-font-display); color: var(--dw-bone); text-align:center; letter-spacing:0.02em; }
+.dw-class-cards { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+/* class cards — engraved bone tablets with a class-color accent + scrimshaw sigil (full flavor
+   text moved to a hover tooltip so the tablet itself stays compact — see title.ts classCard()) */
 .dw-class-card {
-  padding:14px; border-radius: var(--dw-radius); border:1px solid var(--dw-bone-faint); cursor: var(--dw-cursor-point);
+  padding:10px; border-radius: var(--dw-radius); border:1px solid var(--dw-bone-faint); cursor: var(--dw-cursor-point);
   background: linear-gradient(180deg, rgba(241,230,207,0.04), transparent); position:relative; overflow:hidden;
 }
 .dw-class-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--dw-class-color, var(--dw-bone-faint)); }
 .dw-class-card:hover { border-color: rgba(255,179,71,0.4); }
 .dw-class-card.dw-selected { border-color: var(--dw-lantern); box-shadow: var(--dw-glow-lantern); background: rgba(255,179,71,0.06); }
-.dw-class-card .dw-class-sigil { width:34px; height:34px; margin-bottom:6px; opacity:0.9; }
-.dw-class-card h3 { margin:0 0 5px; font: 400 var(--dw-fs-lg) / 1 var(--dw-font-display); color: var(--dw-bone); }
-.dw-class-card p { margin:3px 0; font-size:11px; line-height:1.4; color: var(--dw-bone-dim); }
+.dw-class-card .dw-class-sigil { width:26px; height:26px; margin-bottom:4px; opacity:0.9; }
+.dw-class-card h3 { margin:0 0 4px; font: 400 var(--dw-fs-md) / 1 var(--dw-font-display); color: var(--dw-bone); }
+.dw-class-card p { margin:2px 0; font-size:10.5px; line-height:1.35; color: var(--dw-bone-dim); }
 .dw-class-card p b { color: var(--dw-bone); font-family: var(--dw-font-label); font-weight:700; }
-.dw-appearance-row { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+.dw-appearance-row { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; }
 /* appearance swatches — round glass beads */
-.dw-swatches { display:flex; gap:6px; flex-wrap:wrap; max-width:170px; }
+.dw-swatches { display:flex; gap:5px; flex-wrap:wrap; max-width:170px; }
 .dw-swatch {
   width:24px; height:24px; border-radius:50%; cursor: var(--dw-cursor-point); border:2px solid rgba(241,230,207,0.2);
   box-shadow: inset 0 2px 3px rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,.5);

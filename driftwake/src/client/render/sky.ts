@@ -200,9 +200,16 @@ export function createSkyShader(
       uSeed: { type: '1f', value: (seed % 1000) / 1000 },
       uQuality: { type: '1f', value: quality === 'high' ? 1 : 0 },
     });
-    // Rendered off the normal display list (setVisible(false)); only ever drawn into the RT below.
-    const shaderObj = scene.add.shader(base, 0, 0, rtW, rtH).setOrigin(0, 0).setVisible(false);
+    // Constructed directly (NOT via scene.add.shader) so it is never added to the scene's normal
+    // display list — RenderTexture.draw() below still works fine (the Shader constructor sets up
+    // everything it needs on its own, with no dependency on display-list membership), but this way
+    // there's no chance of Phaser's regular camera pass *also* drawing this small, unscaled,
+    // never-repositioned quad directly (which briefly happened during development: a
+    // `.setVisible(false)` Shader object turned out to still render, showing up as a tiny
+    // wrongly-placed patch of sky in the corner of the screen instead of the full-screen RT).
+    const shaderObj = new Phaser.GameObjects.Shader(scene, base, 0, 0, rtW, rtH).setOrigin(0, 0);
     const rt = scene.add.renderTexture(0, 0, rtW, rtH).setOrigin(0, 0).setDepth(-100);
+    rt.fill(0xff00ff); // DIAG2
     rt.draw(shaderObj, 0, 0);
 
     let frame = 0;

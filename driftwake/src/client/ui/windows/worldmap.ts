@@ -1,8 +1,9 @@
 /**
- * World Map — an illustrated sky-chart. Each map is drawn as an island on the back of a stylized
- * skywhale, grouped by region, with dotted route lines following the portal graph and a pulsing
- * marker on the player's current map. Undiscovered maps still get a place on the chart (so players
- * can see there's more world to find) but sit under fog. A signature screen per BRAND.md.
+ * World Map — an illustrated sky-chart. Each region is one stylized skywhale, biome-tinted, with
+ * its maps sitting as small islands along its back; a compact 3-column grid of these region cards
+ * fits the whole chart in an 1280x720 viewport with no clipping or scrolling. Undiscovered maps
+ * still get a place on the back (so players can see there's more world to find) but sit fogged
+ * and labelled '???'. A signature screen per BRAND.md.
  */
 import { el } from '../dom';
 import { bus } from '../../events';
@@ -11,112 +12,102 @@ import { WindowManager, createWindow } from '../manager';
 import { MAPS } from '@shared/data';
 import type { RegionId, MapDef } from '@shared/types';
 
-const REGION_ORDER: RegionId[] = ['driftmoor', 'finreach', 'stormbreak', 'lanternreef', 'hollow'];
-const REGION_LABEL: Record<RegionId, string> = { driftmoor: 'Driftmoor', finreach: 'Finreach', stormbreak: 'Stormbreak', lanternreef: 'Lanternreef', hollow: 'The Hollow' };
+/** Display grouping is a client-only concept for the chart (RegionId itself is unchanged data —
+ *  see @shared/types) — it lets the post-game "Drift Beyond" maps read as their own region
+ *  ("Vesper", star-gold) instead of blending into Hollow's purple. */
+type DisplayRegion = RegionId | 'vesper';
+const VESPER_MAP_IDS = new Set(['vesper_landing', 'starfall_ruins', 'singers_spire', 'vesper_core']);
+function displayRegionOf(m: MapDef): DisplayRegion { return VESPER_MAP_IDS.has(m.id) ? 'vesper' : m.region; }
 
-const ISLAND_W = 168;
-const COL_W = 190;
-const ROW_H = 148;
-const COLS = 4;
-const CHART_PAD = 14;
+const REGION_ORDER: DisplayRegion[] = ['driftmoor', 'finreach', 'stormbreak', 'lanternreef', 'hollow', 'vesper'];
+const REGION_LABEL: Record<DisplayRegion, string> = {
+  driftmoor: 'Driftmoor', finreach: 'Finreach', stormbreak: 'Stormbreak',
+  lanternreef: 'Lanternreef', hollow: 'The Hollow', vesper: 'Vesper',
+};
 
-interface Placement { map: MapDef; x: number; y: number; }
+interface Tint { body: string; light: string; starry?: boolean; }
+const REGION_TINT: Record<DisplayRegion, Tint> = {
+  driftmoor: { body: '#2e4a33', light: '#436b49' },       // moss green
+  finreach: { body: '#1f4a48', light: '#2c6a63' },        // kelp teal
+  stormbreak: { body: '#3a4048', light: '#4c5865' },      // storm slate
+  lanternreef: { body: '#3a2a52', light: '#3f6a63' },     // reef violet-teal
+  hollow: { body: '#2a2038', light: '#3a2a52' },           // hollow purple
+  vesper: { body: '#3a331a', light: '#5a4a20', starry: true }, // star-gold
+};
 
-function whaleIslandSvg(kind: 'town' | 'boss' | 'wild', current: boolean): string {
-  const capFill = kind === 'town' ? 'rgba(255,179,71,0.42)' : kind === 'boss' ? 'rgba(255,107,107,0.36)' : 'rgba(95,227,198,0.32)';
-  const capStroke = kind === 'town' ? 'var(--dw-lantern)' : kind === 'boss' ? 'var(--dw-coral)' : 'var(--dw-tide)';
-  const ringSvg = current
-    ? `<circle class="dw-current-pulse" cx="84" cy="34" r="14" fill="none" stroke="var(--dw-tide)" stroke-width="2"/>
-       <circle cx="84" cy="34" r="4" fill="var(--dw-tide)"/>`
+const VIEW_W = 340, VIEW_H = 100;
+const BACK_Y = 34;
+
+/** A full-body stylized skywhale (head, dorsal fin, tail fluke) in a 340x100 viewBox, tinted per
+ *  region, with a dotted spine connecting the given island x-positions (viewBox units). */
+function regionWhaleSvg(tint: Tint, islandXs: number[]): string {
+  const routeD = islandXs.length > 1 ? `M${islandXs.map((x) => `${x.toFixed(1)},${BACK_Y}`).join(' L')}` : '';
+  const stars = tint.starry
+    ? [[92, 46], [136, 68], [204, 42], [246, 64], [168, 76]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3" fill="#ffd27a" opacity=".85"/>`).join('')
     : '';
-  return `<svg width="${ISLAND_W}" height="66" viewBox="0 0 168 66" xmlns="http://www.w3.org/2000/svg">
-    <ellipse class="dw-back" cx="84" cy="42" rx="78" ry="20" fill="var(--dw-hide-3)" stroke="var(--dw-bone-faint)" stroke-width="1.3"/>
-    <ellipse cx="84" cy="30" rx="62" ry="13" fill="${capFill}" stroke="${capStroke}" stroke-width="1.2" stroke-opacity="0.85"/>
-    <path d="M14 44 Q4 40 2 30" fill="none" stroke="var(--dw-bone-faint)" stroke-width="1.2"/>
-    ${ringSvg}
+  return `<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="180" cy="58" rx="150" ry="32" fill="${tint.body}" stroke="var(--dw-bone-faint)" stroke-width="1.3"/>
+    <ellipse cx="46" cy="60" rx="34" ry="23" fill="${tint.body}" stroke="var(--dw-bone-faint)" stroke-width="1.1"/>
+    <circle cx="30" cy="54" r="2.4" fill="#0b1519"/>
+    <path d="M158,34 168,10 186,36Z" fill="${tint.light}"/>
+    <path d="M308,58 338,30 326,58Z" fill="${tint.light}" stroke="var(--dw-bone-faint)" stroke-width="1"/>
+    <path d="M308,58 338,86 326,58Z" fill="${tint.light}" stroke="var(--dw-bone-faint)" stroke-width="1"/>
+    ${stars}
+    ${routeD ? `<path class="dw-chart-routes" d="${routeD}"/>` : ''}
   </svg>`;
 }
 
 export function createWorldMapWindow(wm: WindowManager, session: GameSession) {
-  const chart = el('div', { class: 'dw-skychart' });
+  const grid = el('div', { class: 'dw-skychart-grid' });
   const legend = el('div', { class: 'dw-skychart-legend' },
     el('span', null, el('i', { style: { background: 'var(--dw-lantern)' } }), 'Town'),
-    el('span', null, el('i', { style: { background: 'var(--dw-tide)' } }), 'Wilds'),
+    el('span', null, el('i', { style: { background: 'var(--dw-hide-3)', border: '1px solid var(--dw-bone-faint)' } }), 'Wilds'),
     el('span', null, el('i', { style: { background: 'var(--dw-coral)' } }), 'Boss'),
-    el('span', null, el('i', { style: { background: 'var(--dw-hide-3)' } }), 'Fog · Undiscovered'));
-  const body = el('div', { class: 'dw-body', style: { width: '790px', maxHeight: '560px', overflowY: 'auto' } }, chart, legend);
-  const ctrl = createWindow(wm, { panel: 'map', title: 'Sky-Chart', width: 820 }, body);
+    el('span', null, el('i', { style: { background: 'var(--dw-lantern-hot)' } }), 'You Are Here'),
+    el('span', null, el('i', { style: { background: 'var(--dw-hide-2)' } }), 'Fog · Undiscovered'));
+  const body = el('div', { class: 'dw-body', style: { width: '1130px' } }, grid, legend);
+  const ctrl = createWindow(wm, { panel: 'map', title: 'Sky-Chart', width: 1160, defaultPos: { x: 20, y: 10 } }, body);
 
   function render() {
-    chart.innerHTML = '';
+    grid.innerHTML = '';
     const st = session.state;
-    const byRegion = new Map<RegionId, MapDef[]>();
+    const byRegion = new Map<DisplayRegion, MapDef[]>();
     for (const m of Object.values(MAPS)) {
-      if (!byRegion.has(m.region)) byRegion.set(m.region, []);
-      byRegion.get(m.region)!.push(m);
+      const region = displayRegionOf(m);
+      if (!byRegion.has(region)) byRegion.set(region, []);
+      byRegion.get(region)!.push(m);
     }
-    if (!Object.keys(MAPS).length) { chart.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'No maps discovered yet.')); return; }
-
-    const placements = new Map<string, Placement>();
-    let y = CHART_PAD;
-    const regionRows: { region: RegionId; y: number }[] = [];
+    if (!Object.keys(MAPS).length) { grid.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'No maps discovered yet.')); return; }
 
     for (const region of REGION_ORDER) {
       const maps = byRegion.get(region);
       if (!maps?.length) continue;
-      regionRows.push({ region, y });
-      y += 26;
+      const hasCurrent = maps.some((m) => m.id === st.mapId);
+      const tint = REGION_TINT[region];
+
+      const n = maps.length;
+      const xs = n === 1 ? [VIEW_W / 2] : maps.map((_, i) => 70 + (i * (VIEW_W - 140)) / (n - 1));
+
+      const whaleHost = el('div', { class: 'dw-region-whale', html: regionWhaleSvg(tint, xs) });
       maps.forEach((m, i) => {
-        const col = i % COLS, row = Math.floor(i / COLS);
-        placements.set(m.id, { map: m, x: CHART_PAD + col * COL_W, y: y + row * ROW_H });
+        const known = st.discoveredMaps.includes(m.id);
+        const current = st.mapId === m.id;
+        const kindClass = m.town ? 'town' : m.boss ? 'boss' : '';
+        const isle = el('div', {
+          class: `dw-chart-isle ${kindClass} ${current ? 'current' : ''} ${known ? '' : 'unknown'}`,
+          style: { left: `${(xs[i] / VIEW_W) * 100}%`, top: `${(BACK_Y / VIEW_H) * 100}%` },
+          onclick: () => bus.emit('ui:toast', { text: known ? m.name : 'An uncharted stretch of sky.', kind: 'info' }),
+        },
+          el('div', { class: 'dot' }, (m.town || m.boss) && known ? el('div', { class: 'badge' }) : null),
+          el('div', { class: 'label' }, known ? m.name : '???'),
+          el('div', { class: 'lvl' }, known ? (m.town ? 'TOWN' : m.levelRange ? `LV ${m.levelRange[0]}-${m.levelRange[1]}` : '') : ''));
+        whaleHost.appendChild(isle);
       });
-      const rows = Math.ceil(maps.length / COLS);
-      y += rows * ROW_H + 18;
-    }
-    chart.style.minHeight = `${y}px`;
 
-    // Route lines first (under the islands): connect every portal edge we have coordinates for.
-    const drawn = new Set<string>();
-    const pathParts: string[] = [];
-    for (const p of placements.values()) {
-      for (const portal of p.map.portals) {
-        const target = placements.get(portal.to);
-        if (!target) continue;
-        const key = [p.map.id, target.map.id].sort().join('|');
-        if (drawn.has(key)) continue;
-        drawn.add(key);
-        const x1 = p.x + ISLAND_W / 2, y1 = p.y + 34;
-        const x2 = target.x + ISLAND_W / 2, y2 = target.y + 34;
-        pathParts.push(`<path d="M${x1} ${y1} L${x2} ${y2}"/>`);
-      }
-    }
-    const routesWrap = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    routesWrap.setAttribute('class', 'dw-skychart-routes');
-    routesWrap.setAttribute('width', '100%');
-    routesWrap.setAttribute('height', `${y}`);
-    routesWrap.innerHTML = pathParts.join('');
-    chart.appendChild(routesWrap);
-
-    for (const { region, y: ry } of regionRows) {
-      chart.appendChild(el('div', { class: 'dw-region-title', style: { top: `${ry}px` } }, REGION_LABEL[region]));
-    }
-
-    for (const p of placements.values()) {
-      const m = p.map;
-      const known = st.discoveredMaps.includes(m.id);
-      const current = st.mapId === m.id;
-      const kind: 'town' | 'boss' | 'wild' = m.town ? 'town' : m.boss ? 'boss' : 'wild';
-      const island = el('div', {
-        class: `dw-whale-island ${current ? 'dw-current' : ''} ${known ? '' : 'dw-unknown'}`,
-        style: { left: `${p.x}px`, top: `${p.y}px` },
-        onclick: () => bus.emit('ui:toast', { text: known ? m.name : 'An uncharted stretch of sky.', kind: 'info' }),
-      });
-      const svgHost = el('div', { html: whaleIslandSvg(kind, current) });
-      island.appendChild(svgHost.firstElementChild!);
-      island.appendChild(el('div', { class: 'dw-mn-name' }, known ? m.name : '???'));
-      island.appendChild(el('div', { class: 'dw-mn-level' }, m.town ? 'TOWN' : known && m.levelRange ? `LV ${m.levelRange[0]}-${m.levelRange[1]}` : ''));
-      if (m.boss && known) island.appendChild(el('div', { class: 'dw-boss-mark' }, '⚔ Boss'));
-      chart.appendChild(island);
+      const card = el('div', { class: `dw-region-card ${hasCurrent ? 'dw-region-current' : ''}` },
+        el('div', { class: 'dw-region-name' }, REGION_LABEL[region]),
+        whaleHost);
+      grid.appendChild(card);
     }
   }
 

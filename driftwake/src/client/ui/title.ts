@@ -9,6 +9,7 @@ import { JOBS } from '@shared/data';
 import type { Appearance, ClassId, CharacterSummary } from '@shared/types';
 import { characterPreviewUrlSafe } from './icons';
 import { confirmDialog } from './widgets';
+import { attachTooltip } from './tooltip';
 import { audio } from '../audio';
 
 const CLASS_IDS: ClassId[] = ['vanguard', 'stormcaller', 'windrunner', 'shade'];
@@ -126,8 +127,8 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
     let classId: ClassId = 'vanguard';
     let appearance: Appearance = randomAppearance();
     const errorEl = el('div', { class: 'dw-error-text' }, '');
-    const preview = el('img', { class: 'dw-doll-preview', style: { position: 'static', width: '140px', height: '175px' } });
-    const nameInput = el('input', { class: 'dw-input', placeholder: 'Character name', maxLength: 14, style: { width: '220px' } }) as HTMLInputElement;
+    const preview = el('img', { class: 'dw-doll-preview', style: { position: 'static', width: '92px', height: '115px' } });
+    const nameInput = el('input', { class: 'dw-input', placeholder: 'Character name', maxLength: 14, style: { width: '200px' } }) as HTMLInputElement;
 
     function classCard(id: ClassId): HTMLElement {
       const job = JOBS[id];
@@ -138,10 +139,12 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
       },
         el('div', { class: 'dw-class-sigil', html: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${CLASS_SIGILS[id]}</svg>` }),
         el('h3', null, job?.name ?? fb.name),
-        el('p', null, job?.description ?? fb.description),
         el('p', null, el('b', null, 'Playstyle: '), job?.playstyle ?? fb.playstyle),
         el('p', null, el('b', null, 'Main Stat: '), job ? job.mainStat.toUpperCase() : fb.mainStat),
         el('p', null, el('b', null, 'Weapons: '), job ? job.weaponTypes.join(', ') : fb.weapons));
+      // Full flavor description moves to a hover tooltip — keeps the tablet compact enough that
+      // the whole creation screen fits an 1280x720 viewport without scrolling.
+      attachTooltip(card, () => [job?.description ?? fb.description]);
       return card;
     }
 
@@ -165,25 +168,26 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
       const nameVal = nameInput.value;
       body.innerHTML = '';
       body.appendChild(el('span', { class: 'dwb-corners' }, el('i'), el('i'), el('i'), el('i')));
-      body.appendChild(logoLockup('sm'));
+      // Compact heading (not the full logo lockup) — keeps the whole flow inside 1280x720.
+      body.appendChild(el('div', { class: 'dw-create-heading' }, 'Create Your Wayfarer'));
       body.appendChild(el('div', { class: 'dw-class-cards' }, ...CLASS_IDS.map(classCard)));
       body.appendChild(el('div', { class: 'dw-appearance-row' },
-        el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' } }, preview,
+        el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' } }, preview,
           el('button', { class: 'dw-btn dw-btn-sm dw-btn-ghost', onclick: () => { appearance = randomAppearance(); rebuild(); } }, '\u{1F3B2} Random')),
-        el('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
           swatchRow('Skin Tone', SKIN_TONES, appearance.skin, (c) => appearance = { ...appearance, skin: c }),
           swatchRow('Hair Color', HAIR_COLORS, appearance.hair, (c) => appearance = { ...appearance, hair: c }),
           hairStyleRow()),
-        el('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
           swatchRow('Eye Color', EYE_COLORS, appearance.eyes, (c) => appearance = { ...appearance, eyes: c }),
           swatchRow('Outfit Color', OUTFIT_COLORS, appearance.outfit, (c) => appearance = { ...appearance, outfit: c }))));
       nameInput.value = nameVal;
-      body.appendChild(el('div', { class: 'dw-name-plate', style: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px', justifyContent: 'center' } },
-        el('div', { class: 'dw-field-label' }, ''), nameInput));
-      body.appendChild(errorEl);
-      body.appendChild(el('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      // Name plate + Back/Create share one row so the flow never needs a scrollbar at 720p.
+      body.appendChild(el('div', { class: 'dw-name-plate', style: { display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' } },
+        nameInput,
         el('button', { class: 'dw-btn dw-btn-ghost', onclick: showCharSelect }, 'Back'),
         el('button', { class: 'dw-btn dw-btn-primary', onclick: doCreate }, 'Create')));
+      body.appendChild(errorEl);
       nameInput.oninput = () => { name = nameInput.value; };
       nameInput.onkeydown = (e) => { if (e.key === 'Enter') doCreate(); };
     }

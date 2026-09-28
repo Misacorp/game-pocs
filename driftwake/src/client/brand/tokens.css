@@ -75,6 +75,11 @@
   --dw-wake: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14' fill='none' stroke='%23f1e6cf' stroke-linecap='round'%3E%3Cpath d='M2 7 C 22 1, 38 13, 60 7 S 98 1, 118 7' stroke-opacity='.85' stroke-width='1.3'/%3E%3Cpath d='M14 11 C 30 7, 44 14, 60 11 S 88 7, 106 11' stroke-opacity='.45'/%3E%3Cpath d='M14 3 C 30 -1, 44 6, 60 3 S 88 -1, 106 3' stroke-opacity='.45'/%3E%3C/svg%3E");
   /* whale fluke glyph (brand mark, bullets) */
   --dw-fluke: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath fill='%23f1e6cf' d='M16 19.5 14.9 12.3C11.6 11.7 5.6 10.4 1 3.6c4.6 2.3 9.6 2.6 13.2 4.9L16 6.4l1.8 2.1c3.6-2.3 8.6-2.6 13.2-4.9-4.6 6.8-10.6 8.1-13.9 8.7z'/%3E%3C/svg%3E");
+  /* Same fluke, redrawn with chunkier lobes and a deeper notch so it still reads as a whale tail
+     at bullet size (~14-16px) — the full-detail --dw-fluke above thins out to an unreadable
+     curve/chevron at that scale, so anything used as a small list/option marker should use this
+     one instead (dialogue options, quest-tracker bullets, achievement seals, etc). */
+  --dw-fluke-mini: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath fill='%23f1e6cf' d='M16 20 15 9 C 12 12 6 13 0 8 C 6 9 11 7 14 2 L16 6 18 2 C21 7 26 9 32 8 C 26 13 20 12 17 9Z'/%3E%3C/svg%3E");
   /* scrimshaw corner ornament (compass star + curl), drawn for the top-left corner */
   --dw-corner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none' stroke='%23f1e6cf' stroke-linecap='round'%3E%3Cpath d='M1 12 V5 a4 4 0 0 1 4 -4 H12' stroke-width='1.2'/%3E%3Cpath d='M4 16 V7 a3 3 0 0 1 3 -3 H16' stroke-opacity='.45'/%3E%3Cpath fill='%23f1e6cf' stroke='none' d='M9 6.2 9.7 8.3 11.8 9 9.7 9.7 9 11.8 8.3 9.7 6.2 9 8.3 8.3Z'/%3E%3C/svg%3E");
 

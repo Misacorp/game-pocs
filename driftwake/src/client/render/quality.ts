@@ -17,18 +17,25 @@ export type Quality = 'low' | 'medium' | 'high';
 const STORAGE_KEY = 'driftwake:gfx';
 const SHAKE_KEY = 'driftwake:shake';
 
-function readStorage(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
+/** The Settings window (ui/windows/settings.ts) stores these JSON-encoded via its own `store`
+ *  helper (`JSON.stringify('high')` -> the 6 characters `"high"`, quotes included) — read them the
+ *  same way rather than as raw strings, or a real value here will never match. */
+function readStoredString(key: string): string | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return null;
+    try { return JSON.parse(raw); } catch { return raw; } // tolerate a raw (non-JSON) value too
+  } catch { return null; }
 }
 
 export function getQuality(): Quality {
-  const v = readStorage(STORAGE_KEY);
+  const v = readStoredString(STORAGE_KEY);
   if (v === 'low' || v === 'medium' || v === 'high') return v;
   return 'high';
 }
 
 export function isShakeEnabled(): boolean {
-  return readStorage(SHAKE_KEY) !== 'off';
+  return readStoredString(SHAKE_KEY) !== 'off';
 }
 
 /** True only for a real WebGL renderer — every shader/Light2D/postFX subsystem must gate on this

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Driftwake — rig lab</title>
+    <style>
+      html, body { margin: 0; background: #15212a; color: #e9dfc8; font: 12px/1.4 system-ui, sans-serif; }
+      .row { display: flex; gap: 14px; align-items: flex-end; padding: 8px 12px; flex-wrap: wrap; }
+      h2 { margin: 10px 12px 2px; font-size: 13px; color: #f0c674; font-weight: 600; }
+      .clip { display: grid; gap: 2px; justify-items: start; }
+      .clip span { font-size: 10px; color: #a99f88; }
+      canvas { display: block; }
+      .scene { background: linear-gradient(#bfe0f0, #e9f3d8 62%, #7fb85a 62%, #5f8f4a); border-radius: 6px; }
+      .pix { image-rendering: pixelated; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/client/gfx/rig/lab.ts"></script>
+  </body>
+</html>

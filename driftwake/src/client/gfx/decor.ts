@@ -1,0 +1,172 @@
+/**
+ * Non-colliding world decoration, themed per ThemeId where it matters. Anchored bottom-center.
+ */
+import Phaser from 'phaser';
+import type { DecorKind, ThemeId } from '@shared/types';
+import { makeCanvas, ctx2d, rect, rrect, circle, ellipse, line, poly, registerCanvasTexture, shade, mix, hashStr, seedRandom } from './canvasKit';
+import { THEMES } from './palette';
+import { outlineHued, emissiveDab, glowHalo, warmHighlight, coolShadow } from './shading';
+
+type DrawFn = (ctx: CanvasRenderingContext2D, w: number, h: number, theme: ThemeId) => void;
+
+function organicColor(theme: ThemeId): { primary: string; secondary: string; accent: string } {
+  const pal = THEMES[theme];
+  return { primary: pal.groundAccent, secondary: shade(pal.groundAccent, -0.25), accent: pal.glow };
+}
+
+// World-pixel sizes. Buildings and other town/landmark props are sized to actually read as
+// buildings next to a ~32x40 character; small clutter (crates, signs, flowers...) stays tiny.
+const SIZE: Partial<Record<DecorKind, [number, number]>> = {
+  house: [110, 110], shop: [120, 100], tent: [70, 60], lamp: [12, 40], lantern: [14, 18], sign: [16, 20],
+  crate: [16, 14], barrel: [14, 16], fence: [24, 14], well: [30, 26], tree: [90, 110], bush: [30, 20],
+  flower: [8, 8], grass: [12, 8], rock: [24, 16], mushroom: [22, 22], kelp: [16, 50], coral: [26, 28],
+  crystal: [16, 24], barnacle: [10, 10], bones: [22, 10], ruin: [50, 60], pillar: [18, 60], statue: [28, 50],
+  windmill: [70, 120], mast: [18, 140], anchor: [16, 20], banner: [14, 24], campfire: [16, 12], vine: [8, 40],
+  shell: [12, 10], pod: [10, 12], tendril: [10, 30], chest: [18, 12],
+};
+
+const DRAW: Record<DecorKind, DrawFn> = {
+  house: (ctx, w, h) => {
+    const wood = '#8a6a48'; const wall = '#d8c9a8';
+    rrect(ctx, 2, h * 0.32, w - 4, h * 0.68, 3, wall);
+    poly(ctx, [[-2, h * 0.34], [w / 2, 0], [w + 2, h * 0.34]], shade(wood, -0.3));
+    rect(ctx, 0, h * 0.3, w, h * 0.06, wood);
+    // timber framing
+    for (let x = w * 0.15; x < w; x += w * 0.28) rect(ctx, x, h * 0.36, w * 0.04, h * 0.62, wood);
+    rect(ctx, 2, h * 0.6, w - 4, h * 0.04, wood);
+    // door
+    rrect(ctx, w * 0.4, h * 0.66, w * 0.2, h * 0.34, 2, wood);
+    // windows: warm lit glass with light spilling out (emissive, picked up by bloom)
+    for (const wx of [w * 0.18, w * 0.7]) {
+      const cx = wx + w * 0.08, cy = h * 0.44 + h * 0.08;
+      glowHalo(ctx, cx, cy, w * 0.16, '#ffcf7a', 0.5);
+      rrect(ctx, wx, h * 0.44, w * 0.16, h * 0.16, 1, shade(wood, -0.4));
+      rrect(ctx, wx + 1.5, h * 0.44 + 1.5, w * 0.16 - 3, h * 0.16 - 3, 1, '#ffe07a');
+      rect(ctx, wx + w * 0.08 - 0.5, h * 0.44 + 1.5, 1, w * 0.16 - 3, shade('#ffe07a', -0.25)); // mullion
+    }
+  },
+  shop: (ctx, w, h) => {
+    const wood = '#a9784a'; const wall = '#e2d3ae';
+    rrect(ctx, 2, h * 0.42, w - 4, h * 0.58, 3, wall);
+    // striped awning
+    const stripes = 6;
+    for (let i = 0; i < stripes; i++) poly(ctx, [[i * (w / stripes), h * 0.3], [(i + 1) * (w / stripes), h * 0.3], [(i + 1) * (w / stripes) - w * 0.03, h * 0.44], [i * (w / stripes) + w * 0.03, h * 0.44]], i % 2 ? wood : shade(wood, 0.2));
+    rect(ctx, 0, h * 0.28, w, h * 0.04, shade(wood, -0.3));
+    rrect(ctx, w * 0.34, h * 0.58, w * 0.32, h * 0.42, 2, shade(wood, -0.35));
+    for (const wx of [w * 0.1, w * 0.76]) {
+      glowHalo(ctx, wx + w * 0.07, h * 0.5 + h * 0.1, w * 0.14, '#ffcf7a', 0.45);
+      rrect(ctx, wx, h * 0.5, w * 0.14, h * 0.2, 1, shade(wood, -0.4));
+      rrect(ctx, wx + 1.5, h * 0.5 + 1.5, w * 0.14 - 3, h * 0.2 - 3, 1, '#ffe07a');
+    }
+  },
+  tent: (ctx, w, h) => { poly(ctx, [[2, h], [w / 2, 0], [w - 2, h]], '#c9a15c'); poly(ctx, [[w * 0.4, h], [w / 2, h * 0.4], [w * 0.6, h]], '#8a6a48'); },
+  lamp: (ctx, w, h) => {
+    rect(ctx, w / 2 - 1, h * 0.25, 2, h * 0.75, '#4a4038');
+    glowHalo(ctx, w / 2, h * 0.16, w * 0.7, '#ffdd88', 0.55);
+    emissiveDab(ctx, w / 2, h * 0.16, w * 0.36, '#ffcf5a', { coreStop: 0.3 });
+  },
+  lantern: (ctx, w, h) => {
+    rect(ctx, w / 2 - 0.5, 0, 1, h * 0.2, '#3a3226');
+    glowHalo(ctx, w / 2, h * 0.5, w * 0.6, '#ffcf5a', 0.5);
+    rrect(ctx, w * 0.2, h * 0.2, w * 0.6, h * 0.6, 2, '#5a4636');
+    emissiveDab(ctx, w / 2, h * 0.5, w * 0.26, '#ffcf5a', { coreStop: 0.32 }); // glowing glass
+    rect(ctx, w * 0.2, h * 0.2, w * 0.6, 1.4, warmHighlight('#5a4636', 0.3));
+  },
+  sign: (ctx, w, h) => { rect(ctx, w / 2 - 1.5, h * 0.3, 3, h * 0.7, '#6b5438'); rrect(ctx, 0, 0, w, h * 0.4, 1, '#8a6a48'); },
+  crate: (ctx, w, h) => { rect(ctx, 0, 0, w, h, '#8a6a48'); rect(ctx, 0, h * 0.4, w, 1.5, '#5a4636'); rect(ctx, w * 0.4, 0, 1.5, h, '#5a4636'); },
+  barrel: (ctx, w, h) => { rrect(ctx, 0, 0, w, h, 3, '#7a5636'); rect(ctx, 0, h * 0.2, w, 1.5, '#4a3826'); rect(ctx, 0, h * 0.7, w, 1.5, '#4a3826'); },
+  fence: (ctx, w, h) => { for (let x = 0; x < w; x += 6) rect(ctx, x, 0, 2.4, h, '#8a6a48'); rect(ctx, 0, h * 0.3, w, 2, '#6b5438'); rect(ctx, 0, h * 0.7, w, 2, '#6b5438'); },
+  well: (ctx, w, h) => { ctx.fillStyle = '#6b5438'; ctx.beginPath(); ctx.ellipse(w / 2, h * 0.7, w * 0.48, h * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ellipse(ctx, w / 2, h * 0.65, w * 0.32, h * 0.16, '#1c2a30'); poly(ctx, [[2, h * 0.5], [2, 0], [w - 2, 0], [w - 2, h * 0.5]], '#8a6a48'); },
+  tree: (ctx, w, h, theme) => {
+    const c = organicColor(theme);
+    if (theme === 'kelpwood') { line(ctx, w / 2, h, w / 2, h * 0.15, 3, c.secondary); for (let i = 0; i < 5; i++) ellipse(ctx, w / 2 + (i % 2 ? 6 : -6), h * 0.2 + i * h * 0.12, 8, 4, c.primary); }
+    else if (theme === 'hollow' || theme === 'heart') { line(ctx, w / 2, h, w / 2, h * 0.3, 3, '#3a1f40'); for (const s of [-1, 1]) line(ctx, w / 2, h * 0.5, w / 2 + s * 10, h * 0.2, 2, '#3a1f40'); circle(ctx, w / 2, h * 0.18, 6, c.accent); }
+    else { const leaf = mix('#4f9e3d', THEMES[theme].groundAccent, 0.2); rect(ctx, w / 2 - 2, h * 0.45, 4, h * 0.55, '#6b5438'); circle(ctx, w / 2, h * 0.32, w * 0.42, leaf); circle(ctx, w * 0.3, h * 0.45, w * 0.28, shade(leaf, -0.12)); circle(ctx, w * 0.68, h * 0.42, w * 0.3, shade(leaf, 0.1)); }
+  },
+  bush: (ctx, w, h, theme) => { const leaf = mix('#4f9e3d', THEMES[theme].groundAccent, 0.2); circle(ctx, w * 0.3, h * 0.6, h * 0.5, leaf); circle(ctx, w * 0.7, h * 0.5, h * 0.55, shade(leaf, -0.08)); },
+  flower: (ctx, w, h, theme) => { const c = organicColor(theme); line(ctx, w / 2, h, w / 2, h * 0.4, 1, '#4a7a3a'); circle(ctx, w / 2, h * 0.25, 3, c.accent); },
+  grass: (ctx, w, h, theme) => { const c = organicColor(theme); for (let i = 0; i < 4; i++) line(ctx, i * 3 + 1, h, i * 3 - 1 + (i % 2) * 2, h * 0.1, 1.4, c.primary); },
+  rock: (ctx, w, h, theme) => { poly(ctx, [[0, h], [2, h * 0.3], [w * 0.5, 0], [w - 2, h * 0.4], [w, h]], shade(THEMES[theme].groundFill, 0.1)); },
+  mushroom: (ctx, w, h, theme) => { const c = organicColor(theme); rect(ctx, w / 2 - 1.5, h * 0.4, 3, h * 0.6, '#e8dcc0'); ellipse(ctx, w / 2, h * 0.35, w * 0.46, h * 0.3, c.primary); circle(ctx, w * 0.35, h * 0.28, 1.4, c.accent); circle(ctx, w * 0.62, h * 0.35, 1.4, c.accent); },
+  kelp: (ctx, w, h, theme) => {
+    const c = organicColor(theme);
+    for (let i = 0; i < h; i += 5) {
+      const off = Math.sin(i * 0.5) * 3;
+      ctx.save(); ctx.globalAlpha = 0.55 + 0.35 * (1 - i / h); // gradient translucency: denser near the base
+      rect(ctx, w / 2 - 2 + off, h - i, 4, 5, i % 10 ? c.primary : c.secondary);
+      ctx.restore();
+    }
+  },
+  coral: (ctx, w, h, theme) => {
+    const c = organicColor(theme);
+    for (let i = 0; i < 3; i++) {
+      const cy = h - 4 - i * 3;
+      ellipse(ctx, w * 0.2 + i * w * 0.3, cy, 6, 10, i % 2 ? c.primary : c.accent);
+      // glowing coral tip — a small emissive polyp at the branch end
+      emissiveDab(ctx, w * 0.2 + i * w * 0.3, cy - 8, 2.2, warmHighlight(c.accent, 0.3), { coreStop: 0.35, alpha: 0.85 });
+    }
+  },
+  crystal: (ctx, w, h, theme) => {
+    const c = organicColor(theme);
+    glowHalo(ctx, w / 2, h * 0.5, w * 0.9, c.accent, 0.4);
+    poly(ctx, [[w / 2, 0], [w, h * 0.5], [w * 0.7, h], [w * 0.3, h], [0, h * 0.5]], c.accent);
+    poly(ctx, [[w / 2, h * 0.15], [w * 0.8, h * 0.5], [w / 2, h]], coolShadow(c.accent, 0.3));
+    poly(ctx, [[w / 2, 0], [w * 0.2, h * 0.5], [w / 2, h * 0.15]], warmHighlight(c.accent, 0.4)); // lit facet
+    emissiveDab(ctx, w / 2, h * 0.4, w * 0.14, '#ffffff', { core: '#ffffff', alpha: 0.7, coreStop: 0.15 }); // inner spark
+  },
+  barnacle: (ctx, w, h, theme) => { const c = organicColor(theme); circle(ctx, w / 2, h * 0.6, w * 0.42, c.secondary); circle(ctx, w / 2, h * 0.45, w * 0.2, warmHighlight(c.accent, 0.2)); },
+  bones: (ctx, w, h) => { for (let i = 0; i < 3; i++) ellipse(ctx, i * 8 + 2, h * 0.6, 3, 5, '#e8e0c8'); line(ctx, 0, h * 0.5, w, h * 0.5, 2, '#e8e0c8'); },
+  ruin: (ctx, w, h, theme) => {
+    const stone = shade(THEMES[theme].groundFill, 0.15);
+    rect(ctx, 2, h * 0.3, w * 0.3, h * 0.7, stone);
+    rect(ctx, w * 0.6, h * 0.15, w * 0.32, h * 0.85, stone);
+    rect(ctx, 0, h * 0.28, w, 3, shade(stone, -0.2));
+    // engraved glyphs, faintly glowing with the theme's accent — ancient magic still lit
+    const glyphColor = THEMES[theme].glow;
+    for (const [gx, gy] of [[w * 0.16, h * 0.5], [w * 0.76, h * 0.35], [w * 0.76, h * 0.62]] as [number, number][]) {
+      ctx.save(); ctx.globalAlpha = 0.75; ctx.strokeStyle = glyphColor; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.arc(gx, gy, 3, 0, Math.PI * 1.5); ctx.stroke();
+      ctx.restore();
+      emissiveDab(ctx, gx, gy, 1.4, glyphColor, { coreStop: 0.4, alpha: 0.55 });
+    }
+  },
+  pillar: (ctx, w, h, theme) => { const stone = shade(THEMES[theme].groundFill, 0.15); rect(ctx, w * 0.2, 0, w * 0.6, h, stone); rect(ctx, w * 0.1, 0, w * 0.8, 3, shade(stone, -0.2)); rect(ctx, w * 0.1, h - 3, w * 0.8, 3, shade(stone, -0.2)); },
+  statue: (ctx, w, h, theme) => { const stone = shade(THEMES[theme].groundFill, 0.2); rect(ctx, w * 0.3, h * 0.5, w * 0.4, h * 0.5, stone); circle(ctx, w / 2, h * 0.32, w * 0.24, stone); rect(ctx, w * 0.15, h * 0.9, w * 0.7, h * 0.1, shade(stone, -0.1)); },
+  windmill: (ctx, w, h) => { rect(ctx, w * 0.4, h * 0.2, w * 0.2, h * 0.8, '#8a6a48'); for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2; line(ctx, w / 2, h * 0.2, w / 2 + Math.cos(a) * w * 0.4, h * 0.2 + Math.sin(a) * w * 0.4, 3, '#d8cdb0'); } },
+  mast: (ctx, w, h) => { rect(ctx, w / 2 - 1.5, 0, 3, h, '#6b5438'); poly(ctx, [[w / 2, h * 0.1], [w, h * 0.28], [w / 2, h * 0.45]], '#d8cdb0'); },
+  anchor: (ctx, w, h) => { circle(ctx, w / 2, h * 0.18, 3, '#8a97a6'); rect(ctx, w / 2 - 1.2, h * 0.2, 2.4, h * 0.6, '#8a97a6'); ctx.strokeStyle = '#8a97a6'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w / 2, h * 0.78, w * 0.32, 0.2, Math.PI - 0.2); ctx.stroke(); },
+  banner: (ctx, w, h, theme) => { const c = organicColor(theme); rect(ctx, w / 2 - 1, 0, 2, h, '#5a4636'); poly(ctx, [[w / 2, h * 0.08], [w, h * 0.14], [w / 2 + 2, h * 0.4], [w, h * 0.5], [w / 2, h * 0.56]], c.accent); },
+  campfire: (ctx, w, h) => {
+    for (let i = 0; i < 3; i++) line(ctx, i * 5, h, i * 5 + 3, h * 0.5, 2, '#5a4636');
+    glowHalo(ctx, w / 2, h * 0.4, w * 1.1, '#ff9a3a', 0.6);
+    poly(ctx, [[w / 2 - 3, h * 0.55], [w / 2, h * 0.05], [w / 2 + 3, h * 0.55]], '#ff8a3a');
+    emissiveDab(ctx, w / 2, h * 0.32, w * 0.22, '#ffe07a', { coreStop: 0.35 }); // white-hot flame core
+  },
+  vine: (ctx, w, h, theme) => { const c = organicColor(theme); for (let y = 0; y < h; y += 4) line(ctx, w / 2 + Math.sin(y * 0.4) * 2, y, w / 2 + Math.sin((y + 4) * 0.4) * 2, y + 4, 1.6, c.primary); },
+  shell: (ctx, w, h, theme) => { const c = organicColor(theme); ellipse(ctx, w / 2, h * 0.7, w * 0.45, h * 0.3, c.primary); for (let i = -2; i <= 2; i++) line(ctx, w / 2, h * 0.4, w / 2 + i * 3, h * 0.85, 1, shade(c.primary, -0.2)); },
+  pod: (ctx, w, h, theme) => {
+    // pulsing bioluminescent pod: static art gets a soft halo + hot inner core to sell "alive"
+    const c = organicColor(theme);
+    glowHalo(ctx, w / 2, h * 0.5, w * 0.7, c.accent, 0.45);
+    ellipse(ctx, w / 2, h * 0.5, w * 0.38, h * 0.45, c.secondary);
+    emissiveDab(ctx, w / 2, h * 0.5, w * 0.2, c.accent, { coreStop: 0.3 });
+  },
+  tendril: (ctx, w, h, theme) => { const c = organicColor(theme); for (let y = 0; y < h; y += 5) { const glow = y % 10 === 0; if (glow) emissiveDab(ctx, w / 2 + Math.sin(y * 0.5) * 3, h - y, 2.6, c.accent, { coreStop: 0.35 }); else circle(ctx, w / 2 + Math.sin(y * 0.5) * 3, h - y, 2, c.secondary); } },
+  chest: (ctx, w, h) => { rrect(ctx, 0, h * 0.35, w, h * 0.65, 2, '#8a6a48'); rrect(ctx, 0, 0, w, h * 0.4, 2, '#a9784a'); rect(ctx, w / 2 - 2, h * 0.3, 4, h * 0.2, '#e8c95a'); },
+};
+
+const cache = new Map<string, { key: string }>();
+
+export function getDecorTexture(scene: Phaser.Scene, kind: DecorKind, theme: ThemeId): { key: string } {
+  const key = `decor_${theme}_${kind}`;
+  const cached = cache.get(key);
+  if (cached && scene.textures.exists(key)) return cached;
+  const [w, h] = SIZE[kind] ?? [20, 24];
+  const art = makeCanvas(w, h);
+  const ctx = ctx2d(art);
+  (DRAW[kind] ?? DRAW.rock)(ctx, w, h, theme);
+  registerCanvasTexture(scene, key, outlineHued(art, false));
+  const result = { key };
+  cache.set(key, result);
+  return result;
+}

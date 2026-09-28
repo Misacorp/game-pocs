@@ -7,6 +7,7 @@ import type { ActionResult, ClientAction, CreateCharacterRequest, ChatMessage, P
 import { createCharacter, summarize, migrateCharacter, handleAction, createSession, type SessionState, type ServerContext } from '@shared/logic';
 import { makeUid } from '@shared/rng';
 import type { Backend, BackendEvents } from './Backend';
+import { WorldSimulation } from './simulation';
 
 const STORAGE_PREFIX = 'driftwake:';
 const INDEX_KEY = `${STORAGE_PREFIX}characters`;
@@ -22,13 +23,15 @@ export class LocalBackend implements Backend {
   /** Optional hook so a simulation layer (bots) can observe presence */
   onPresence?: (p: PresenceUpdate) => void;
   onChat?: (msg: ChatMessage) => void;
+  /** Simulated "other players" that make the offline world feel alive (see simulation.ts). */
+  private sim: WorldSimulation | null = null;
 
   async connect(): Promise<void> { /* nothing to do */ }
 
   private readIndex(): string[] {
     try { return JSON.parse(localStorage.getItem(INDEX_KEY) || '[]'); } catch { return []; }
   }
-  private writeIndex(ids: string[]) { localStorage.setItem(INDEX_KEY, JSON.stringify(ids)); }
+  private writeIndex(ids: string[]) { try { localStorage.setItem(INDEX_KEY, JSON.stringify(ids)); } catch (e) { console.warn('[LocalBackend] could not save character index', e); } }
   private load(id: string): CharacterState | null {
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}char:${id}`);
@@ -36,7 +39,7 @@ export class LocalBackend implements Backend {
     } catch { return null; }
   }
   private persist(c: CharacterState) {
-    localStorage.setItem(`${STORAGE_PREFIX}char:${c.id}`, JSON.stringify(c));
+    try { localStorage.setItem(`${STORAGE_PREFIX}char:${c.id}`, JSON.stringify(c)); } catch (e) { console.warn('[LocalBackend] could not save character (storage blocked or full)', e); }
   }
   private schedulePersist() {
     if (this.saveTimer !== null) return;
@@ -64,7 +67,7 @@ export class LocalBackend implements Backend {
   }
 
   async deleteCharacter(id: string): Promise<void> {
-    localStorage.removeItem(`${STORAGE_PREFIX}char:${id}`);
+    try { localStorage.removeItem(`${STORAGE_PREFIX}char:${id}`); } catch { /* storage unavailable */ }
     this.writeIndex(this.readIndex().filter((x) => x !== id));
   }
 
@@ -73,12 +76,21 @@ export class LocalBackend implements Backend {
     if (!c) throw new Error('Character not found');
     this.current = c;
     this.session = createSession();
+    this.sim?.dispose();
+    this.sim = new WorldSimulation(this);
+    this.onPresence = (p) => this.sim?.onMapChanged(p.mapId);
+    this.onChat = (msg) => this.sim?.onPlayerChat(msg);
+    this.sim.start(c.mapId, c.name);
     return structuredClone(c);
   }
 
   async leaveWorld(): Promise<void> {
     if (this.current) this.persist(this.current);
     this.current = null;
+    this.sim?.dispose();
+    this.sim = null;
+    this.onPresence = undefined;
+    this.onChat = undefined;
   }
 
   private ctx(): ServerContext {
@@ -97,6 +109,7 @@ export class LocalBackend implements Backend {
     if (res.ok) {
       this.current = res.state;
       this.schedulePersist();
+      this.sim?.onMapChanged(this.current.mapId);
     }
     return { ok: res.ok, error: res.error, events: res.events, state: structuredClone(this.current) };
   }
@@ -124,4 +137,17 @@ export class LocalBackend implements Backend {
 
   /** Flush pending save (e.g. on page unload). */
   flush() { if (this.current) this.persist(this.current); }
+
+  /**
+   * DEV/QA ONLY: mutate the authoritative local character directly (e.g. set level, grant items).
+   * Returns the new state; callers should pass it to session.applyState(). Not part of Backend.
+   */
+  devMutate(fn: (s: CharacterState) => void): CharacterState | null {
+    if (!this.current) return null;
+    const next = structuredClone(this.current);
+    fn(next);
+    this.current = next;
+    this.schedulePersist();
+    return structuredClone(next);
+  }
 }

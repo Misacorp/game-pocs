@@ -102,6 +102,8 @@ export const ENHANCE_DOWNGRADE_FROM = 6;
 // ---- Professions ----------------------------------------------------------
 
 export const MAX_CRAFTING_PROFESSIONS = 2;
+/** Character level required to learn a crafting profession. */
+export const PROFESSION_UNLOCK_LEVEL = 10;
 export const PROFESSION_MAX_LEVEL = 10;
 export function professionXpToNext(level: number): number {
   return Math.round(40 + 35 * Math.pow(level, 1.6));

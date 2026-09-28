@@ -1,30 +1,162 @@
 /**
- * DOM UI layer (HUD, windows, title screen). STUB — the UI module replaces internals, keeps API.
+ * DOM UI layer (HUD, windows, title screen) — public API used by main.ts. Keep these signatures stable.
  */
+import '../brand/tokens.css';
+import '../brand/components.css';
 import type { Backend } from '../net';
 import type { GameSession } from '../session';
+import { injectStyles } from './styles';
+import { el } from './dom';
+import { bus } from '../events';
+import { buildTitleScreen } from './title';
+import { WindowManager } from './manager';
+import { createHud } from './hud';
+import { createMinimap } from './minimap';
+import { createQuestTracker } from './tracker';
+import { createBuffBar } from './buffbar';
+import { createNotificationLayer } from './notifications';
+import { createTipLayer } from './tips';
+import { createChat } from './chat';
+import { createInventoryWindow } from './windows/inventory';
+import { createCharacterWindow } from './windows/character';
+import { createSkillsWindow } from './windows/skills';
+import { createQuestLogWindow } from './windows/questlog';
+import { createDialogueWindow } from './windows/dialogue';
+import { createShopWindow } from './windows/shop';
+import { createProfessionsWindow } from './windows/professions';
+import { createWorldMapWindow } from './windows/worldmap';
+import { createBestiaryWindow } from './windows/bestiary';
+import { createAchievementsWindow } from './windows/achievements';
+import { createSettingsWindow, applyStoredUiScale } from './windows/settings';
+import { createMenuWindow } from './windows/menu';
+import { createHelpWindow } from './windows/help';
+import { uiState } from './state';
+import { hideTooltip } from './tooltip';
+import { isConfirmDialogOpen } from './widgets';
 
 let root: HTMLElement;
+let gameLayer: HTMLElement | null = null;
+let cleanupFns: (() => void)[] = [];
+let settingsListening: (() => boolean) | null = null;
 
 /** Create UI root layers inside #ui. */
-export function initUI(el: HTMLElement): void { root = el; }
+export function initUI(rootEl: HTMLElement): void {
+  root = rootEl;
+  injectStyles();
+}
 
 /**
  * Title / character select / character creation flow.
  * Calls onEnter(characterId) when the player picks a character.
  */
 export function showTitleScreen(backend: Backend, onEnter: (characterId: string) => void): void {
-  root.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;pointer-events:auto"><button id="dw-new">New character</button></div>';
-  root.querySelector('#dw-new')!.addEventListener('click', async () => {
-    const list = await backend.listCharacters();
-    const c = list[0] ?? await backend.createCharacter({ name: 'Tester' + Math.floor(Math.random() * 99), classId: 'vanguard', appearance: { skin: '#f1c27d', hair: '#6b3e26', hairStyle: 0, eyes: '#223', outfit: '#3a6ea5' } });
-    root.innerHTML = '';
-    onEnter(c.id);
-  });
+  root.innerHTML = '';
+  hideTooltip();
+  removeBootSplash();
+  buildTitleScreen(root, backend, onEnter);
+}
+
+/** Removes the branded pre-boot splash (index.html #dw-splash) the first time the title screen
+ *  is ready to show. Fades out rather than snapping so it never looks like a flash of blank page. */
+let splashRemoved = false;
+function removeBootSplash(): void {
+  if (splashRemoved) return;
+  splashRemoved = true;
+  const splash = document.getElementById('dw-splash');
+  if (!splash) return;
+  splash.classList.add('dw-splash-out');
+  window.setTimeout(() => splash.remove(), 450);
 }
 
 /** Mount in-game HUD + panels bound to the session. */
-export function showGameUI(_session: GameSession): void {}
-export function hideGameUI(): void { if (root) root.innerHTML = ''; }
+export function showGameUI(session: GameSession): void {
+  root.innerHTML = '';
+  cleanupFns = [];
+  uiState.openShopId = null;
+  uiState.trainerNpcId = null;
+  uiState.trainerProfessionId = null;
+
+  gameLayer = el('div', { id: 'dw-hud', style: { position: 'absolute', inset: '0' } });
+  root.appendChild(gameLayer);
+  // Dev hook so windows can be exercised without the engine (see AGENTS testing notes).
+  (window as any).__ui = { bus, toggle: (panel: string) => bus.emit('ui:toggle', { panel: panel as any }) };
+  applyStoredUiScale(root);
+
+  const windowsLayer = el('div', { style: { position: 'absolute', inset: '0', pointerEvents: 'none' } });
+  gameLayer.appendChild(windowsLayer);
+  const wm = new WindowManager(windowsLayer);
+
+  const hud = createHud(session);
+  const minimap = createMinimap(session);
+  const tracker = createQuestTracker(session, wm, minimap);
+  const buffBar = createBuffBar(session);
+  const notif = createNotificationLayer(session);
+  const chat = createChat(session);
+  const tips = createTipLayer(session);
+
+  gameLayer.appendChild(hud.root);
+  gameLayer.appendChild(minimap.root);
+  gameLayer.appendChild(tracker.root);
+  gameLayer.appendChild(buffBar.root);
+  gameLayer.appendChild(notif.root);
+  gameLayer.appendChild(chat.root);
+  gameLayer.appendChild(tips.root);
+  cleanupFns.push(hud.cleanup, minimap.cleanup, tracker.cleanup, buffBar.cleanup, notif.cleanup, chat.cleanup, tips.cleanup, () => wm.dispose());
+
+  createInventoryWindow(wm, session);
+  createCharacterWindow(wm, session);
+  createSkillsWindow(wm, session);
+  createQuestLogWindow(wm, session);
+  createProfessionsWindow(wm, session);
+  createWorldMapWindow(wm, session);
+  createBestiaryWindow(wm, session);
+  createAchievementsWindow(wm, session);
+  createShopWindow(wm, session);
+  createDialogueWindow(wm, session, (panel) => wm.open(panel));
+  const settings = createSettingsWindow(wm, root);
+  settingsListening = settings.isListening;
+  createMenuWindow(wm);
+  createHelpWindow(wm);
+
+  const offToggle = bus.on('ui:toggle', ({ panel }) => {
+    if (panel === 'menu') {
+      if (wm.anyOpen('menu')) wm.closeTopmost();
+      else wm.toggle('menu');
+    } else {
+      wm.toggle(panel);
+    }
+  });
+  cleanupFns.push(offToggle);
+
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    if (settingsListening?.()) return; // key-remap capture handles its own Escape
+    // A confirmDialog open on top owns Escape (cancel) while it's up — without this, Escape would
+    // do double duty and also close whatever window sits behind the confirm (its own listener
+    // runs later than this one, since it's registered fresh on open — see isConfirmDialogOpen()).
+    if (isConfirmDialogOpen()) return;
+    if (document.activeElement && root.contains(document.activeElement) && (document.activeElement as HTMLElement).tagName === 'INPUT') return; // let chat/input own-handler deal with it
+    if (wm.anyOpen()) { wm.closeTopmost(); e.stopPropagation(); }
+  };
+  window.addEventListener('keydown', onKeydown, true);
+  cleanupFns.push(() => window.removeEventListener('keydown', onKeydown, true));
+}
+
+export function hideGameUI(): void {
+  for (const fn of cleanupFns) { try { fn(); } catch { /* ignore */ } }
+  cleanupFns = [];
+  settingsListening = null;
+  hideTooltip();
+  if (root) root.innerHTML = '';
+  gameLayer = null;
+}
+
 /** True while a text input / modal wants the keyboard. */
-export function isUIBlockingInput(): boolean { return false; }
+export function isUIBlockingInput(): boolean {
+  if (settingsListening?.()) return true;
+  const active = document.activeElement as HTMLElement | null;
+  if (!active || !root) return false;
+  if (!root.contains(active)) return false;
+  const tag = active.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active.isContentEditable;
+}

@@ -64,6 +64,8 @@ export class MonsterEntity {
   private homeY: number;
   private flashUntil = 0;
   private shadow: ContactShadow;
+  private cachedGroundY: number;
+  private shadowTickOffset = Math.floor(Math.random() * 6);
 
   constructor(
     private scene: Phaser.Scene,
@@ -87,6 +89,7 @@ export class MonsterEntity {
     playAnim(this.sprite, info, 'idle');
     ctx.lighting?.lit(this.sprite, info.key);
     this.shadow = new ContactShadow(scene, info.bodyWidth * (this.isBoss ? 2.2 : 1.4), 8);
+    this.cachedGroundY = ctx.groundYAt(x, y);
 
     if (this.isBoss) {
       // NOTE: gfx already renders bosses at def.sprite.scale resolution — don't scale again.
@@ -205,7 +208,13 @@ export class MonsterEntity {
 
     this.updateVisualTint(now);
     this.updateHpBar();
-    this.shadow.update(this.sprite.x, this.ctx.groundYAt(this.sprite.x, this.sprite.y), this.sprite.y);
+    // groundYAt() walks every platform on the map — cheap for one entity, but 30+ monsters all
+    // doing it every single frame purely to size a cosmetic shadow adds up. Refresh it only every
+    // 6th tick per monster (staggered per-instance so they don't all recompute on the same frame),
+    // reusing the last value the rest of the time; a shadow lags a few ticks behind a Y change
+    // imperceptibly.
+    if ((Math.floor(now / 16) + this.shadowTickOffset) % 6 === 0) this.cachedGroundY = this.ctx.groundYAt(this.sprite.x, this.sprite.y);
+    this.shadow.update(this.sprite.x, this.cachedGroundY, this.sprite.y);
 
     // contact damage
     if (now > this.contactCooldownUntil && dist < (this.isBoss ? 40 : 18) && Math.abs(dy) < (this.isBoss ? 50 : 26)) {

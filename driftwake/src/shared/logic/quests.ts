@@ -55,24 +55,35 @@ export interface ObjectiveView { text: string; current: number; target: number; 
 
 /** First map (by registry order) where this monster spawns or is the boss — used to give quest
  *  objective text a concrete location ("Defeat 8 Puffmoss in Mossback Meadows") instead of making
- *  the player guess from the monster name alone. */
+ *  the player guess from the monster name alone.
+ *  MAPS/MONSTERS are static content registries, so these lookups are memoized on first use —
+ *  `questObjectiveProgress` (and describeObjectiveBase) runs on every tracker/quest-log render,
+ *  i.e. on every non-silent dispatch while quests are active, so an unmemoized O(maps) /
+ *  O(monsters*maps) scan per objective per render would add up during a combat/looting spree. */
+let monsterMapCache: Map<string, string | undefined> | null = null;
 function findMapForMonster(monsterId: string): string | undefined {
-  for (const map of Object.values(MAPS)) {
-    if (map.boss?.monsterId === monsterId) return map.name;
-    if (map.spawns.some((s) => s.monsterId === monsterId)) return map.name;
+  if (!monsterMapCache) {
+    monsterMapCache = new Map();
+    for (const map of Object.values(MAPS)) {
+      if (map.boss?.monsterId && !monsterMapCache.has(map.boss.monsterId)) monsterMapCache.set(map.boss.monsterId, map.name);
+      for (const s of map.spawns) if (!monsterMapCache.has(s.monsterId)) monsterMapCache.set(s.monsterId, map.name);
+    }
   }
-  return undefined;
+  return monsterMapCache.get(monsterId);
 }
 
 /** Same idea for a collectible material/quest item: found via the first monster that drops it. */
+let itemMapCache: Map<string, string | undefined> | null = null;
 function findMapForItem(itemId: string): string | undefined {
-  for (const [monsterId, m] of Object.entries(MONSTERS)) {
-    if (m.drops.some((d) => d.itemId === itemId)) {
+  if (!itemMapCache) {
+    itemMapCache = new Map();
+    for (const [monsterId, m] of Object.entries(MONSTERS)) {
       const map = findMapForMonster(monsterId);
-      if (map) return map;
+      if (!map) continue;
+      for (const d of m.drops) if (!itemMapCache.has(d.itemId)) itemMapCache.set(d.itemId, map);
     }
   }
-  return undefined;
+  return itemMapCache.get(itemId);
 }
 
 /**

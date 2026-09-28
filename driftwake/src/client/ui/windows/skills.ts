@@ -82,10 +82,15 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
     }
   }
 
+  /** Skill mpCost Scalars are tuned by a balance script (base * factor) and can carry harmless
+   *  binary floating-point noise (e.g. 9.600000000000001) at some levels — round to one decimal
+   *  for display so the tooltip never shows raw float garbage to the player. */
+  function round1(n: number): number { return Math.round(n * 10) / 10; }
+
   function valuesLine(def: SkillDef, level: number): HTMLElement {
     const cur = level > 0 ? level : 1;
     const bits: string[] = [];
-    if (def.mpCost !== undefined) bits.push(`MP ${scalar(def.mpCost, cur)}`);
+    if (def.mpCost !== undefined) bits.push(`MP ${round1(scalar(def.mpCost, cur))}`);
     if (def.hpCostPct !== undefined) bits.push(`HP ${Math.round(scalar(def.hpCostPct, cur) * 100)}%`);
     if (def.cooldownMs !== undefined) bits.push(`CD ${(scalar(def.cooldownMs, cur) / 1000).toFixed(1)}s`);
     if (def.damagePct !== undefined) bits.push(`${Math.round(scalar(def.damagePct, cur))}% dmg`);
@@ -95,7 +100,7 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
       const next = level + 1;
       const nextBits: string[] = [];
       if (def.damagePct !== undefined) nextBits.push(`${Math.round(scalar(def.damagePct, next))}%`);
-      if (def.mpCost !== undefined) nextBits.push(`MP ${scalar(def.mpCost, next)}`);
+      if (def.mpCost !== undefined) nextBits.push(`MP ${round1(scalar(def.mpCost, next))}`);
       if (nextBits.length) text += `  →  next: ${nextBits.join(', ')}`;
     }
     return el('div', { style: { fontSize: '11px', color: '#e8c477' } }, text);

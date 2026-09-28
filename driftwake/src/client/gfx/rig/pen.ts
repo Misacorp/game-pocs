@@ -7,7 +7,7 @@
  * Coordinates are TEXTURE pixels (RIG_SCALE per world pixel). Path functions only ADD subpaths
  * to the current path (they never call beginPath) so they can be composed and shifted.
  */
-import { shade, mix, withAlpha } from '../canvasKit';
+import { shade, mix, withAlpha, hexToRgb } from '../canvasKit';
 import { coolShadow, warmHighlight, outlineTone, emissiveDab, glowHalo } from '../shading';
 
 export { emissiveDab, glowHalo, shade, mix, withAlpha };
@@ -187,3 +187,65 @@ export const easeIn = (t: number) => t * t;
 export const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 /** Point at distance `len` from (x,y) along angle `a` where 0 = straight DOWN, +a swings toward +x. */
 export function along(x: number, y: number, a: number, len: number): Pt { return [x + Math.sin(a) * len, y + Math.cos(a) * len]; }
+
+// ---------------------------------------------------------------------------
+// critter face (monsters): big anime eyes + blush, shared by every MonsterBase drawer
+// ---------------------------------------------------------------------------
+
+/** True when a palette eye color is bright enough to read as a colored light source rather than
+ *  flat dark pigment — the same rule the pixel-art monsters use (see DEFAULT_EYE in gfx/monsters.ts). */
+export function isBrightEye(hex: string): boolean {
+  const [r, g, b] = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.42;
+}
+
+export interface CritterEyeOpts {
+  state?: 'open' | 'closed' | 'happy' | 'squeeze' | 'wide' | 'x';
+  /** horizontal look offset, -1..1 (pupil/iris shift, e.g. for swaying eye stalks) */
+  look?: number;
+}
+
+/** Big glossy anime-style critter eye (slimes, snails, mushrooms, birds...): white sclera,
+ *  gradient iris (dark top, light bottom per ART_BIBLE), pupil and two glints. `rx`/`ry` are the
+ *  sclera radii in texture px. A bright, non-dark `iris` (see `isBrightEye`) gets an emissive
+ *  underlay so colored-eye variants read as a light source, same as the pixel-art rule. */
+export function critterEye(g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, iris: string, o: CritterEyeOpts = {}): void {
+  const state = o.state ?? 'open';
+  const lineC = mix(shade(iris, -0.5), '#1d1420', 0.45);
+  if (state === 'closed') {
+    stroke(g, (gg) => { gg.moveTo(x - rx, y + ry * 0.1); gg.quadraticCurveTo(x, y + ry * 0.75, x + rx, y + ry * 0.05); }, lineC, Math.max(1, rx * 0.3));
+    return;
+  }
+  if (state === 'x') {
+    stroke(g, [[x - rx * 0.75, y - ry * 0.7], [x + rx * 0.75, y + ry * 0.7]], lineC, Math.max(1, rx * 0.24));
+    stroke(g, [[x - rx * 0.75, y + ry * 0.7], [x + rx * 0.75, y - ry * 0.7]], lineC, Math.max(1, rx * 0.24));
+    return;
+  }
+  let eRx = rx, eRy = ry;
+  if (state === 'squeeze') eRy *= 0.3;
+  else if (state === 'happy') eRy *= 0.5;
+  else if (state === 'wide') { eRx *= 1.14; eRy *= 1.16; }
+  const ix = x + (o.look ?? 0) * rx * 0.28;
+  if (isBrightEye(iris)) emissiveDab(g, ix, y, Math.max(eRx, eRy) * 2.2, iris, { coreStop: 0.35, alpha: 0.85 });
+  const sclera = path.ellipse(x, y, eRx, eRy);
+  fill(g, sclera, '#fffaf2');
+  g.save(); g.beginPath(); sclera(g); g.clip();
+  const grad = g.createLinearGradient(0, y - eRy, 0, y + eRy);
+  grad.addColorStop(0, shade(iris, -0.42)); grad.addColorStop(0.55, iris); grad.addColorStop(1, lightOf(iris, 0.42));
+  g.fillStyle = grad;
+  g.beginPath(); g.ellipse(ix, y + eRy * 0.1, eRx * 0.82, eRy * 0.9, 0, 0, TAU); g.fill();
+  fill(g, path.ellipse(ix, y + eRy * 0.32, eRx * 0.42, eRy * 0.48), shade(iris, -0.75));
+  g.restore();
+  if (state !== 'happy' && state !== 'squeeze') {
+    stroke(g, (gg) => { gg.moveTo(x - eRx * 1.05, y - eRy * 0.5); gg.quadraticCurveTo(x, y - eRy * 1.2, x + eRx * 1.05, y - eRy * 0.5); }, lineC, Math.max(0.9, eRx * 0.17));
+  }
+  glint(g, ix - eRx * 0.32, y - eRy * 0.4, eRx * 0.32, eRy * 0.36, -0.3, 0.95);
+  glint(g, ix + eRx * 0.26, y + eRy * 0.32, eRx * 0.15, eRy * 0.17, 0, 0.7);
+}
+
+/** A soft pink blush pair under/beside the eyes — the "cute mob" personality tell, same rule
+ *  the pixel-art monsters use (blush on friendly early-game bases). */
+export function critterBlush(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, spread: number, alpha = 0.32): void {
+  fill(g, path.ellipse(cx - spread, cy, r, r * 0.62), '#ff8fa8', alpha);
+  fill(g, path.ellipse(cx + spread, cy, r, r * 0.62), '#ff8fa8', alpha);
+}

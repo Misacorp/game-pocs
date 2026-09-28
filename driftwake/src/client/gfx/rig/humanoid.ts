@@ -755,6 +755,25 @@ function attackPose(p: HumanPose, t: number, i: number, n: number, fam: Family, 
   return p;
 }
 
+/** Solves the back arm so the drawing hand lands exactly on the bow's nocked-string point
+ *  (computed from the front hand + `p.wA` + the string pull the bow itself draws), instead of
+ *  a hand-tuned angle that only approximately tracks it. 2-bone IK, elbow bent up and back. */
+function solveBowDrawHand(p: HumanPose): void {
+  const j = solve(p);
+  const pull = p.draw * 9;
+  const target: Pt = [j.haF[0] - pull * Math.cos(p.wA), j.haF[1] - pull * Math.sin(p.wA)];
+  const l1 = BODY.upperArm, l2 = BODY.foreArm;
+  const dx = target[0] - j.shB[0], dy = target[1] - j.shB[1];
+  const d = clamp(Math.hypot(dx, dy), Math.abs(l1 - l2) + 0.5, l1 + l2 - 0.01);
+  const baseA = Math.atan2(dx, dy);
+  const angleE = Math.acos(clamp((l1 * l1 + l2 * l2 - d * d) / (2 * l1 * l2), -1, 1));
+  const shoulderOffset = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
+  const bend = 1; // elbow pokes up/back, away from the body — a natural archer's draw
+  const ua = baseA + bend * shoulderOffset;
+  const fa = ua + Math.PI - bend * angleE;
+  p.aB = [ua - p.lean * 0.5, fa - ua];
+}
+
 function shootPose(p: HumanPose, t: number, i: number, n: number, fam: Family, rest: number): HumanPose {
   void t; void n;
   if (fam === 'bow') {
@@ -762,13 +781,15 @@ function shootPose(p: HumanPose, t: number, i: number, n: number, fam: Family, r
     const drawAmt = [0.2, 0.7, 1, 0, 0][i] ?? 0;
     p.aF = [1.55, 0.02];
     p.wA = 0.02;
-    p.aB = [1.35 + (1 - drawAmt) * 0.15, 0.3 + drawAmt * 1.25];
     p.draw = drawAmt;
     p.lean = i === 3 ? -0.08 : 0.02;
     p.dx = i === 3 ? -1 : 0;
     p.lF = [0.35, -0.05]; p.lB = [-0.3, 0];
     p.eyes = i >= 1 && i <= 2 ? 'focus' : 'open'; p.mouth = 'flat';
     p.sway = i === 3 ? 0.5 : 0.1;
+    // raise/draw/full-draw: solve the back hand onto the string; release/recover: follow-through
+    if (i <= 2) solveBowDrawHand(p);
+    else p.aB = [1.35 + (1 - drawAmt) * 0.15, 0.3 + drawAmt * 1.25];
     return p;
   }
   if (fam === 'gun') {

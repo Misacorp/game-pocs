@@ -5,7 +5,7 @@
  * Sets window.__labReady = true when done (used by scripts/rig-lab-shot.mjs).
  */
 import type { CharacterLook } from '../spec';
-import type { ClassId, WeaponType } from '@shared/types';
+import type { ClassId, JobId, WeaponType } from '@shared/types';
 import { MONSTER_LIST } from '@shared/data/monsters';
 import { NPC_LIST } from '@shared/data/npcs';
 import { renderRigFrame, type RigSpec } from './bake';
@@ -43,6 +43,24 @@ for (const [id, classId, weaponType, appearance] of CHARS) {
 }
 // a geared-up variant (equipment tints: armor, helmet, boots, gloves)
 subjects.push({ id: 'vanguard_geared', spec: characterRigSpec({ classId: 'vanguard', jobId: 'vanguard', weaponType: 'sword', appearance: CHARS[0][3], armorColors: ['#8a5a3a', '#caa66a'], helmetColors: ['#9aa6b4', '#c9464e'], bootsColors: ['#5a3a2a'], glovesColors: ['#6b4a30'] }) });
+subjects.push({ id: 'stormcaller_geared', spec: characterRigSpec({ classId: 'stormcaller', jobId: 'stormcaller', weaponType: 'staff', appearance: CHARS[2][3], armorColors: ['#3a2a5a', '#8fe6ff'], helmetColors: ['#7a2e4a', '#ffd27a'], bootsColors: ['#2a2036'], glovesColors: ['#3a2a46'] }) });
+subjects.push({ id: 'windrunner_geared', spec: characterRigSpec({ classId: 'windrunner', jobId: 'windrunner', weaponType: 'bow', appearance: CHARS[4][3], armorColors: ['#2e5a3a', '#caa64a'], bootsColors: ['#3a2a1a'], glovesColors: ['#4a3a26'] }) });
+subjects.push({ id: 'shade_geared', spec: characterRigSpec({ classId: 'shade', jobId: 'shade', weaponType: 'knives', appearance: CHARS[6][3], armorColors: ['#232028', '#8a2e2e'], bootsColors: ['#1a1820'], glovesColors: ['#2a2630'] }) });
+// tier-2 job accent variants
+const JOB_VARIANTS: [string, ClassId, JobId, WeaponType][] = [
+  ['vanguard_bulwark', 'vanguard', 'bulwark', 'sword'],
+  ['vanguard_reaver', 'vanguard', 'reaver', 'axe'],
+  ['stormcaller_tempest', 'stormcaller', 'tempest', 'staff'],
+  ['stormcaller_tidesinger', 'stormcaller', 'tidesinger', 'wand'],
+  ['windrunner_skyhunter', 'windrunner', 'skyhunter', 'bow'],
+  ['windrunner_sparkgunner', 'windrunner', 'sparkgunner', 'gun'],
+  ['shade_duskblade', 'shade', 'duskblade', 'dagger'],
+  ['shade_hexslinger', 'shade', 'hexslinger', 'knives'],
+];
+for (const [id, classId, jobId, weaponType] of JOB_VARIANTS) {
+  const base = CHARS.find((c) => c[1] === classId)!;
+  subjects.push({ id, spec: characterRigSpec({ classId, jobId, appearance: base[3], weaponType }) });
+}
 for (const def of MONSTER_LIST) if (hasRigMonster(def)) subjects.push({ id: def.id, spec: monsterRigSpec(def) });
 for (const def of NPC_LIST) if (hasRigNpc(def)) subjects.push({ id: def.id, spec: npcRigSpec(def) });
 

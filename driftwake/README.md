@@ -65,12 +65,12 @@ profession and daily content add several more hours. Global XP speed is one knob
 - **22 maps across 6 regions** — Driftmoor harbor town, Mossback Meadows & Hills, Barnacle Grotto,
   the floating Kelpwood, Gale Outpost & the Stormbreak Spires, the bioluminescent Lanternreef and a
   sunken ghost galleon, the inside of the whale itself — and, post-game, a second, older Skywhale.
-- **108 quests** — a 5-act main story with faction politics (Harpooners vs Tidekeepers), job quests,
+- **122 quests** — a 5-act main story plus a post-game Act VI, with faction politics (Harpooners vs Tidekeepers), job quests,
   faction quests, 43 side quests, 10 daily bounties and 17 profession quests. Big choices set flags that later
   content reacts to; a secret "true ending" unlocks only if you made the merciful choices along the way.
 - **Progression** — levels 1–40 (tunable curve in `src/shared/constants.ts`), AP/SP, items across
-  5 rarities (350+ items) with random bonus lines, set bonuses, star enhancement, titles, bestiary,
-  and 36 achievements (J) with rewards.
+  5 rarities (390+ items) with random bonus lines, set bonuses, star enhancement, titles, bestiary,
+  and 38 achievements (J) with rewards.
 - **Professions** — everyone gathers (Mining, Foraging); pick two crafts: Smithing (the best non-boss gear
   + enhancement stones), Alchemy (potions & elixirs), Cooking (long XP/drop/stat food buffs),
   Jewelcrafting (the best accessories). 104 recipes, salvage for materials.

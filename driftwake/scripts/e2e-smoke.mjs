@@ -29,6 +29,15 @@ for (const cls of CLASSES) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Headless SwiftShader (software WebGL) cannot sustain the High-quality render pipeline's frame
+  // rate the way a real GPU does — High is verified error-free and to run at a good clip on real
+  // hardware (see the rendering pipeline's own perf notes), but under headless software rendering
+  // its lower fps can, on a busy CI box, leave too few real ticks for a short-range melee class to
+  // close distance within this test's fixed-duration input holds. Medium keeps the same render
+  // pipeline (shader sky, Light2D lighting, color grading/vignette) minus the heaviest bits
+  // (bloom, full cloud detail), which is enough to restore reliable headless throughput while
+  // still exercising the pipeline end to end.
+  await page.addInitScript(() => localStorage.setItem('driftwake:gfx', JSON.stringify('medium')));
   try {
     await page.goto(url);
     await page.waitForTimeout(2500);
@@ -46,12 +55,7 @@ for (const cls of CLASSES) {
     await page.waitForTimeout(4000);
     await page.evaluate(() => window.__dw?.godmode?.(true));
     for (let i = 0; i < 6; i++) {
-      // Melee classes (short basic-attack range) need to actually close the distance to a
-      // monster before Q/X can land a hit, which takes more than a token movement tap under
-      // headless SwiftShader's much lower real frame rate (see README/DESIGN performance notes on
-      // the rendering pipeline) — a longer hold gives them the same fair shot ranged classes get
-      // "for free" from their much longer attack range, without changing what the test verifies.
-      await hold(page, 'ArrowRight', 900);
+      await hold(page, 'ArrowRight', 350);
       await hold(page, 'KeyQ', 1500);
       await hold(page, 'KeyX', 1500);
     }

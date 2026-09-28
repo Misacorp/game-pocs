@@ -66,7 +66,7 @@ profession and daily content add several more hours. Global XP speed is one knob
   the floating Kelpwood, Gale Outpost & the Stormbreak Spires, the bioluminescent Lanternreef and a
   sunken ghost galleon, the inside of the whale itself — and, post-game, a second, older Skywhale.
 - **122 quests** — a 5-act main story plus a post-game Act VI, with faction politics (Harpooners vs Tidekeepers), job quests,
-  faction quests, 43 side quests, 10 daily bounties and 17 profession quests. Big choices set flags that later
+  faction quests, 48 side quests, 12 daily bounties and 17 profession quests. Big choices set flags that later
   content reacts to; a secret "true ending" unlocks only if you made the merciful choices along the way.
 - **Progression** — levels 1–40 (tunable curve in `src/shared/constants.ts`), AP/SP, items across
   5 rarities (390+ items) with random bonus lines, set bonuses, star enhancement, titles, bestiary,

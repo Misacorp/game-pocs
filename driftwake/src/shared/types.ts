@@ -503,7 +503,11 @@ export interface SpawnDef {
   respawnMs?: number;
 }
 
-export interface MapNpcPlacement { npcId: string; x: number; y: number; flip?: boolean }
+export interface MapNpcPlacement {
+  npcId: string; x: number; y: number; flip?: boolean;
+  /** NPC is only present on the map while these pass (e.g. crafters arrive after a main quest). */
+  reqs?: Condition[];
+}
 
 export interface GatherPlacement { nodeId: string; x: number; y: number }
 

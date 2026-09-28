@@ -31,7 +31,7 @@ export class LocalBackend implements Backend {
   private readIndex(): string[] {
     try { return JSON.parse(localStorage.getItem(INDEX_KEY) || '[]'); } catch { return []; }
   }
-  private writeIndex(ids: string[]) { localStorage.setItem(INDEX_KEY, JSON.stringify(ids)); }
+  private writeIndex(ids: string[]) { try { localStorage.setItem(INDEX_KEY, JSON.stringify(ids)); } catch (e) { console.warn('[LocalBackend] could not save character index', e); } }
   private load(id: string): CharacterState | null {
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}char:${id}`);
@@ -39,7 +39,7 @@ export class LocalBackend implements Backend {
     } catch { return null; }
   }
   private persist(c: CharacterState) {
-    localStorage.setItem(`${STORAGE_PREFIX}char:${c.id}`, JSON.stringify(c));
+    try { localStorage.setItem(`${STORAGE_PREFIX}char:${c.id}`, JSON.stringify(c)); } catch (e) { console.warn('[LocalBackend] could not save character (storage blocked or full)', e); }
   }
   private schedulePersist() {
     if (this.saveTimer !== null) return;
@@ -67,7 +67,7 @@ export class LocalBackend implements Backend {
   }
 
   async deleteCharacter(id: string): Promise<void> {
-    localStorage.removeItem(`${STORAGE_PREFIX}char:${id}`);
+    try { localStorage.removeItem(`${STORAGE_PREFIX}char:${id}`); } catch { /* storage unavailable */ }
     this.writeIndex(this.readIndex().filter((x) => x !== id));
   }
 

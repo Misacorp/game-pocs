@@ -63,7 +63,9 @@ export function createQuestLogWindow(wm: WindowManager, session: GameSession) {
     const prog = session.state.quests[selected];
     if (!def || !prog) { detailEl.appendChild(el('div', { style: { color: '#a7b0c4' } }, '??? Unknown quest')); return; }
     detailEl.appendChild(el('div', { style: { fontWeight: '800', color: '#ffe6a8', fontSize: '14px' } }, def.name));
-    detailEl.appendChild(el('div', { class: 'dw-tt-sub' }, `${TYPE_LABEL[def.type]}  ·  Lv ${def.level}  ·  Giver: ${NPCS[def.giver]?.name ?? def.giver}`));
+    const turnInDiffers = !!def.turnIn && def.turnIn !== def.giver;
+    detailEl.appendChild(el('div', { class: 'dw-tt-sub' }, `${TYPE_LABEL[def.type]}  ·  Lv ${def.level}  ·  Giver: ${NPCS[def.giver]?.name ?? def.giver}`
+      + (turnInDiffers ? `  ·  Turn in: ${NPCS[def.turnIn!]?.name ?? def.turnIn}` : '')));
     detailEl.appendChild(el('div', { style: { margin: '8px 0', fontSize: '12.5px' } }, mode === 'completed' ? def.summary : def.summary));
     if (mode === 'active') {
       for (const o of questObjectiveProgress(session.state, selected)) {

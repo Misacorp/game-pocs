@@ -22,7 +22,14 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
   const tabsHost = el('div');
   const content = el('div', { style: { marginTop: '10px' } });
   const body = el('div', { class: 'dw-body' }, tabsHost, content);
-  const ctrl = createWindow(wm, { panel: 'professions', title: 'Professions', width: 480 }, body);
+  const ctrl = createWindow(wm, {
+    panel: 'professions', title: 'Professions', width: 480,
+    // Same fix as the Shop window: when Professions was opened from an NPC's "Crafting" button,
+    // the conversation window stays open behind it with input capture on. Closing Professions
+    // while that's the case must release the conversation too, or the player is silently stuck
+    // unable to move (opened via the B hotkey with no conversation open, this is a harmless no-op).
+    onClose: () => { if (wm.isOpen('dialogue')) wm.close('dialogue'); },
+  }, body);
 
   const tabs = makeTabs([
     { id: 'overview', label: 'Overview' }, { id: 'recipes', label: 'Recipes' },

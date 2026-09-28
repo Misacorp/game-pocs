@@ -35,7 +35,7 @@ export class PortalManager {
     return best;
   }
 
-  positions(): { x: number; y: number }[] { return this.entries.map((e) => ({ x: e.def.x, y: e.def.y })); }
+  positions(): { x: number; y: number; to: string }[] { return this.entries.map((e) => ({ x: e.def.x, y: e.def.y, to: e.def.to })); }
 
   use(p: PortalDef): void {
     if (!checkConditions(session.state, p.reqs)) {

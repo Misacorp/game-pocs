@@ -1,4 +1,4 @@
-import type { CharacterState, QuestDef } from '../types';
+import type { CharacterState, Objective, QuestDef } from '../types';
 import { QUESTS, ITEMS, MONSTERS, NPCS, MAPS } from '../data';
 import { checkConditions, getQuestState } from './conditions';
 import { countItem } from './items';
@@ -53,6 +53,62 @@ export function npcQuestMarker(state: CharacterState, npcId: string): '!' | '?' 
 
 export interface ObjectiveView { text: string; current: number; target: number; done: boolean }
 
+/** First map (by registry order) where this monster spawns or is the boss — used to give quest
+ *  objective text a concrete location ("Defeat 8 Puffmoss in Mossback Meadows") instead of making
+ *  the player guess from the monster name alone. */
+function findMapForMonster(monsterId: string): string | undefined {
+  for (const map of Object.values(MAPS)) {
+    if (map.boss?.monsterId === monsterId) return map.name;
+    if (map.spawns.some((s) => s.monsterId === monsterId)) return map.name;
+  }
+  return undefined;
+}
+
+/** Same idea for a collectible material/quest item: found via the first monster that drops it. */
+function findMapForItem(itemId: string): string | undefined {
+  for (const [monsterId, m] of Object.entries(MONSTERS)) {
+    if (m.drops.some((d) => d.itemId === itemId)) {
+      const map = findMapForMonster(monsterId);
+      if (map) return map;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Human-readable objective label, WITHOUT progress counts (a quest offer, shown before the quest
+ * is accepted, has no progress yet). Also the base text `questObjectiveProgress` appends
+ * "(current/target)" to — kept free of counts here so that suffix is never duplicated.
+ */
+export function describeObjectiveBase(obj: Objective): string {
+  if (obj.desc) return obj.desc;
+  switch (obj.type) {
+    case 'kill': {
+      const name = MONSTERS[obj.monsterId]?.name ?? obj.monsterId;
+      const map = findMapForMonster(obj.monsterId);
+      return map ? `Defeat ${obj.count} ${name} in ${map}` : `Defeat ${obj.count} ${name}`;
+    }
+    case 'collect': {
+      const name = ITEMS[obj.itemId]?.name ?? obj.itemId;
+      const map = findMapForItem(obj.itemId);
+      return map ? `Collect ${obj.count} ${name} in ${map}` : `Collect ${obj.count} ${name}`;
+    }
+    case 'talk': return `Talk to ${NPCS[obj.npcId]?.name ?? obj.npcId}`;
+    case 'visit': return `Visit ${MAPS[obj.mapId]?.name ?? obj.mapId}`;
+    case 'craft': return obj.itemId ? `Craft ${obj.count} ${ITEMS[obj.itemId]?.name ?? obj.itemId}` : `Craft ${obj.count} items`;
+    case 'gather': return `Gather ${obj.count} materials`;
+    case 'level': return `Reach level ${obj.level}`;
+    case 'boss': {
+      const name = MONSTERS[obj.monsterId]?.name ?? obj.monsterId;
+      const map = findMapForMonster(obj.monsterId);
+      return map ? `Defeat ${name} in ${map}` : `Defeat ${name}`;
+    }
+    case 'enhance': return `Enhance an item to +${obj.stars}`;
+    case 'learnProfession': return 'Learn a profession';
+    default: return 'Unknown objective';
+  }
+}
+
 /** Human-readable objective progress for the quest log / tracker. */
 export function questObjectiveProgress(state: CharacterState, questId: string): ObjectiveView[] {
   const def = QUESTS[questId];
@@ -60,54 +116,50 @@ export function questObjectiveProgress(state: CharacterState, questId: string): 
   const qp = state.quests[questId];
   return def.objectives.map((obj, i): ObjectiveView => {
     const progress = qp?.progress?.[i] ?? 0;
+    const text = describeObjectiveBase(obj);
     switch (obj.type) {
       case 'kill': {
-        const name = MONSTERS[obj.monsterId]?.name ?? obj.monsterId;
         const current = Math.min(progress, obj.count);
-        return { text: obj.desc ?? `Defeat ${name} ${current}/${obj.count}`, current, target: obj.count, done: current >= obj.count };
+        return { text, current, target: obj.count, done: current >= obj.count };
       }
       case 'collect': {
-        const name = ITEMS[obj.itemId]?.name ?? obj.itemId;
         const current = Math.min(countItem(state, obj.itemId), obj.count);
-        return { text: obj.desc ?? `Collect ${name} ${current}/${obj.count}`, current, target: obj.count, done: current >= obj.count };
+        return { text, current, target: obj.count, done: current >= obj.count };
       }
       case 'talk': {
         const done = progress >= 1;
-        const name = NPCS[obj.npcId]?.name ?? obj.npcId;
-        return { text: obj.desc ?? `Talk to ${name}`, current: done ? 1 : 0, target: 1, done };
+        return { text, current: done ? 1 : 0, target: 1, done };
       }
       case 'visit': {
         const done = progress >= 1;
-        const name = MAPS[obj.mapId]?.name ?? obj.mapId;
-        return { text: obj.desc ?? `Visit ${name}`, current: done ? 1 : 0, target: 1, done };
+        return { text, current: done ? 1 : 0, target: 1, done };
       }
       case 'craft': {
         const current = Math.min(progress, obj.count);
-        return { text: obj.desc ?? `Craft ${current}/${obj.count}`, current, target: obj.count, done: current >= obj.count };
+        return { text, current, target: obj.count, done: current >= obj.count };
       }
       case 'gather': {
         const current = Math.min(progress, obj.count);
-        return { text: obj.desc ?? `Gather ${current}/${obj.count}`, current, target: obj.count, done: current >= obj.count };
+        return { text, current, target: obj.count, done: current >= obj.count };
       }
       case 'level': {
         const done = state.level >= obj.level;
-        return { text: obj.desc ?? `Reach level ${obj.level}`, current: Math.min(state.level, obj.level), target: obj.level, done };
+        return { text, current: Math.min(state.level, obj.level), target: obj.level, done };
       }
       case 'boss': {
         const done = progress >= 1;
-        const name = MONSTERS[obj.monsterId]?.name ?? obj.monsterId;
-        return { text: obj.desc ?? `Defeat ${name}`, current: done ? 1 : 0, target: 1, done };
+        return { text, current: done ? 1 : 0, target: 1, done };
       }
       case 'enhance': {
         const done = progress >= obj.stars;
-        return { text: obj.desc ?? `Enhance an item to +${obj.stars}`, current: Math.min(progress, obj.stars), target: obj.stars, done };
+        return { text, current: Math.min(progress, obj.stars), target: obj.stars, done };
       }
       case 'learnProfession': {
         const done = progress >= 1;
-        return { text: obj.desc ?? 'Learn a profession', current: done ? 1 : 0, target: 1, done };
+        return { text, current: done ? 1 : 0, target: 1, done };
       }
       default:
-        return { text: 'Unknown objective', current: 0, target: 1, done: false };
+        return { text, current: 0, target: 1, done: false };
     }
   });
 }

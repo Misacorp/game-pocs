@@ -70,7 +70,7 @@ export function showGameUI(session: GameSession): void {
   const wm = new WindowManager(windowsLayer);
 
   const hud = createHud(session);
-  const minimap = createMinimap();
+  const minimap = createMinimap(session);
   const tracker = createQuestTracker(session, wm);
   const notif = createNotificationLayer(session);
   const chat = createChat(session);

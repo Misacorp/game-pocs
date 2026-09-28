@@ -47,7 +47,19 @@ export function createCharacterWindow(wm: WindowManager, session: GameSession) {
 
   const statRows: Record<StatKey, HTMLElement> = {} as any;
   const apLabel = el('span', { class: 'dw-caps', style: { color: '#e8c477' } }, 'AP: 0');
-  const statBlock = el('div', {}, el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } }, el('b', null, 'Base Stats'), apLabel));
+  const autoBtn = el('button', {
+    class: 'dw-btn dw-btn-sm', title: 'Spend all AP: mostly your main stat, some into your secondary',
+    onclick: () => {
+      const st = session.state;
+      const job = JOBS[st.jobId];
+      if (!job || st.ap <= 0) return;
+      const secondary = Math.floor(st.ap * 0.2);
+      const main = st.ap - secondary;
+      if (main > 0) session.dispatch({ type: 'allocateStat', stat: job.mainStat, amount: main });
+      if (secondary > 0) session.dispatch({ type: 'allocateStat', stat: job.secondaryStat, amount: secondary });
+    },
+  }, 'Auto');
+  const statBlock = el('div', {}, el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } }, el('b', null, 'Base Stats'), el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, apLabel, autoBtn)));
   for (const stat of STAT_KEYS) {
     const valueEl = el('span', { style: { fontWeight: '700' } }, '0');
     const plus = el('button', {
@@ -94,6 +106,7 @@ export function createCharacterWindow(wm: WindowManager, session: GameSession) {
     }
 
     apLabel.textContent = `AP: ${st.ap}`;
+    (autoBtn as HTMLButtonElement).disabled = st.ap <= 0;
     for (const stat of STAT_KEYS) {
       statRows[stat].textContent = String(st.baseStats[stat]);
       const btn = statBlock.querySelectorAll<HTMLButtonElement>('.dw-stat-plus')[STAT_KEYS.indexOf(stat)];

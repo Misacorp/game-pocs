@@ -246,7 +246,7 @@ export class WorldScene extends Phaser.Scene {
       bus.emit('world:minimap', {
         mapId: this.map.id, width: this.map.width, height: this.map.height,
         player: { x: this.player.x, y: this.player.y },
-        npcs: this.npcs.map((n) => ({ x: n.x, y: n.y })),
+        npcs: this.npcs.map((n) => ({ x: n.x, y: n.y, id: n.id })),
         portals: this.portalMgr.positions(),
         monsters: this.spawner.monsters.filter((m) => !m.dead).map((m) => ({ x: m.sprite.x, y: m.sprite.y, boss: m.isBoss })),
         others: this.presence.positions(),

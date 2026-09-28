@@ -25,7 +25,12 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   const ctrl = createWindow(wm, {
     panel: 'shop', title: 'Shop', width: 360,
     defaultPos: invPos ? { x: invPos.offsetLeft + 330, y: invPos.offsetTop } : undefined,
-    onClose: () => { uiState.openShopId = null; },
+    // The Shop panel only ever opens from an NPC conversation (there's no standalone hotkey for
+    // it). Closing it while that conversation is still open behind it used to leave the
+    // conversation's input:capture stuck true — the player could no longer move and had nothing
+    // on screen telling them why, since the shop visually covered the conversation window. Close
+    // the conversation too so closing the shop always hands control back.
+    onClose: () => { uiState.openShopId = null; if (wm.isOpen('dialogue')) wm.close('dialogue'); },
   }, body);
 
   const tabs = makeTabs([{ id: 'buy', label: 'Buy' }, { id: 'sell', label: 'Sell' }], (id) => { mode = id as any; render(); });

@@ -36,7 +36,7 @@ export interface ClientEventMap {
   'ui:death': { xpLost: number };
   'world:entered': { mapId: string };
   /** Minimap data (engine publishes each ~250ms) */
-  'world:minimap': { mapId: string; width: number; height: number; player: { x: number; y: number }; npcs: { x: number; y: number }[]; portals: { x: number; y: number }[]; monsters: { x: number; y: number; boss?: boolean }[]; others: { x: number; y: number }[] };
+  'world:minimap': { mapId: string; width: number; height: number; player: { x: number; y: number }; npcs: { x: number; y: number; id: string }[]; portals: { x: number; y: number; to: string }[]; monsters: { x: number; y: number; boss?: boolean }[]; others: { x: number; y: number }[] };
   chat: ChatMessage;
 
   // --- UI -> engine

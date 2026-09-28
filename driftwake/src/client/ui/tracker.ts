@@ -1,7 +1,7 @@
 import { el } from './dom';
 import { bus } from '../events';
 import type { GameSession } from '../session';
-import { QUESTS } from '@shared/data';
+import { QUESTS, NPCS } from '@shared/data';
 import { getQuestState, questObjectiveProgress } from '@shared/logic';
 import { WindowManager } from './manager';
 
@@ -21,6 +21,10 @@ export function createQuestTracker(session: GameSession, wm: WindowManager): { r
       const ready = getQuestState(session.state, questId) === 'ready';
       const card = el('div', { class: `dw-panel dw-tracker-quest ${ready ? 'dw-ready' : ''}`, onclick: () => wm.open('quests') },
         el('div', { class: 'dw-tq-name' }, def?.name ?? questId, ready ? ' ✔' : ''));
+      if (ready && def) {
+        const turnInNpc = NPCS[def.turnIn ?? def.giver]?.name ?? def.turnIn ?? def.giver;
+        card.appendChild(el('div', { class: 'dw-tq-obj dw-done' }, `Return to ${turnInNpc}`));
+      }
       const objectives = questObjectiveProgress(session.state, questId);
       for (const o of objectives) {
         card.appendChild(el('div', { class: `dw-tq-obj ${o.done ? 'dw-done' : ''}` }, `${o.text} (${o.current}/${o.target})`));

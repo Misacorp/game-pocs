@@ -5,8 +5,8 @@ import { WindowManager, createWindow } from '../manager';
 import { confirmDialog } from '../widgets';
 import { safeNpcPortrait, safeItemIcon, goldIconUrl } from '../icons';
 import { NPCS, DIALOGUES, QUESTS, ITEMS } from '@shared/data';
-import { checkConditions, questsOfferedBy, questsReadyAt, questsInProgressAt, questObjectiveProgress } from '@shared/logic';
-import type { DialogueAction, DialogueNode, DialogueDef, QuestDef, Objective } from '@shared/types';
+import { checkConditions, questsOfferedBy, questsReadyAt, questsInProgressAt, questObjectiveProgress, describeObjectiveBase } from '@shared/logic';
+import type { DialogueAction, DialogueNode, DialogueDef, QuestDef } from '@shared/types';
 import { uiState } from '../state';
 import { audio } from '../../audio';
 
@@ -152,7 +152,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
         optionsEl.appendChild(optionRow('Back', null, 'dw-goodbye', () => renderRoot()));
         return;
       }
-      for (const o of def.objectives) optionsEl.appendChild(el('div', { class: 'dw-dlg-obj' }, `• ${describeObjective(o)}`));
+      for (const o of def.objectives) optionsEl.appendChild(el('div', { class: 'dw-dlg-obj' }, `• ${describeObjectiveBase(o)}`));
       optionsEl.appendChild(rewardsRow(def));
       const actions = el('div', { class: 'dw-dlg-actions' },
         el('button', { class: 'dw-btn dw-btn-ghost', onclick: () => renderRoot() }, 'Decline'),
@@ -250,18 +250,6 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     if (def.rewards.gold) row.appendChild(el('div', { class: 'dw-dlg-reward' }, el('img', { src: goldIconUrl(16) }), `${fmtNum(def.rewards.gold)}`));
     for (const it of def.rewards.items ?? []) row.appendChild(el('div', { class: 'dw-dlg-reward' }, el('img', { src: safeItemIcon(ITEMS[it.itemId]) }), `${ITEMS[it.itemId]?.name ?? it.itemId}${it.qty && it.qty > 1 ? ` x${it.qty}` : ''}`));
     return row;
-  }
-
-  function describeObjective(o: Objective): string {
-    if (o.desc) return o.desc;
-    switch (o.type) {
-      case 'kill': return `Defeat ${o.count} ${o.monsterId}`;
-      case 'collect': return `Collect ${o.count} ${ITEMS[o.itemId]?.name ?? o.itemId}`;
-      case 'talk': return `Talk to ${NPCS[o.npcId]?.name ?? o.npcId}`;
-      case 'visit': return `Visit ${o.mapId}`;
-      case 'boss': return `Defeat ${o.monsterId}`;
-      default: return o.type;
-    }
   }
 
   wm.track(bus.on('ui:dialogue', ({ npcId: id }) => {

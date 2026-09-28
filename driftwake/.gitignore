@@ -4,3 +4,4 @@ dist
 .DS_Store
 server/data/
 dist-e2e
+scripts/_diag_*

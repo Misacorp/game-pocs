@@ -394,3 +394,23 @@ quest marker never appears over an empty spot in town.
 Verified by: `npm run validate` (0 errors/0 warnings, including the giver/turn-in "pacing" check),
 `npx vitest run` (level-gate + "≤ 3 offered quests at level 1" tests in `tests/reducer.test.ts`),
 and `npx tsx scripts/simulate-playthrough.ts <class>` for two classes (0 blockers, main story ~75–100 min).
+
+## 14. Illustrated art style (trial)
+
+Characters and creatures can render in two styles, switchable under Settings → Graphics → Character Art
+(stored in localStorage `driftwake:art`; switching restarts the world scene):
+
+- **Illustrated** (default): rigged vector paper-dolls (`src/client/gfx/rig/**`). A shared humanoid
+  skeleton plus pluggable outfits, headgear, hair and weapons, animated by deterministic pose clips
+  and baked at 2x into spritesheets (`SpriteInfo.texScale = 2`; entities apply it through
+  `spriteUtil.applySpriteInfo` and `applyBodyBottomAligned`, so physics and world sizes are unchanged).
+- **Pixel**: the original 1x procedural pixel art.
+
+The trial covers:
+- all four classes (with equipment tints and tier-2 job accents);
+- the slime, snail and mushroom monster bases (Puffmoss, Shellsnail and Sproutling, plus every
+  palette or variant built on those bases);
+- Old Pell.
+
+Anything else falls back to pixel art automatically. Style rules are in `gfx/rig/ART_BIBLE.md`.
+To view the lab, open `/rig-lab.html` under `npm run dev`, or run `node scripts/rig-lab-shot.mjs`.

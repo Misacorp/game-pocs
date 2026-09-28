@@ -111,10 +111,13 @@ registerHeadgear('stormhat', {
     const cloth = colors[0], band = colors[1] ?? '#d9b25a', jewel = colors[2] ?? lightOf(band, 0.5);
     const sx = -pose.sway * 3.2, fy = -pose.flutter * 3;
     r.headFrame(() => {
+      // sit the hat ON the crown (brim just above the brows) so the eyes stay visible,
+      // cocked back a touch for attitude
+      g.translate(-1, -8.6); g.rotate(-0.1);
       // bent conical crown
       const cone = path.blob([
-        [-8.4, -3.4], [-6 + sx * 0.28, -16 + fy * 0.3], [1.6 + sx, -33.5 + fy],
-        [6.4 + sx * 0.28, -16 + fy * 0.3], [8.4, -3.4],
+        [-9.6, -3.4], [-6 + sx * 0.28, -16 + fy * 0.3], [1.6 + sx, -33.5 + fy],
+        [6.4 + sx * 0.28, -16 + fy * 0.3], [9.6, -3.4],
       ], 0.32);
       shape(g, cone, cloth, { depth: 3, light: lightOf(cloth, 0.18) });
       stroke(g, [[0.4, -5], [1 + sx * 0.5, -20 + fy * 0.4], [1.4 + sx * 0.85, -30 + fy * 0.8]], shade(cloth, -0.3), 0.9);

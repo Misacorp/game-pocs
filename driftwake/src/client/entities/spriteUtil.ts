@@ -3,6 +3,7 @@
  */
 import Phaser from 'phaser';
 import type { SpriteInfo } from '../gfx';
+import { ensurePixelFontLoading, pixelFontFamily } from '../render/pixelFont';
 
 /** Size + offset the physics body so it's centered horizontally and flush with the bottom of the frame
  *  (sprites use origin 0.5,1 so x,y is the "feet" position). */
@@ -31,12 +32,16 @@ export function invulnAlpha(now: number, untilMs: number, periodMs = 90): number
  * so keep these small (7-9px) and let `resolution` keep the glyphs sharp once magnified, instead
  * of sizing for the final on-screen look (which doubles everything and blurs it).
  */
+/** World-space labels (NPC names/titles, quest markers, portal labels, speech-bubble barks, remote
+ *  player names, pet emotes...) all render in the brand's pixel font once it's loaded, falling
+ *  back to monospace gracefully until then — see render/pixelFont.ts. */
 export function makeCrispLabel(
   scene: Phaser.Scene, x: number, y: number, text: string,
   style: Phaser.Types.GameObjects.Text.TextStyle = {}, resolution = 3,
 ): Phaser.GameObjects.Text {
+  ensurePixelFontLoading();
   const t = scene.add.text(x, y, text, {
-    fontFamily: 'monospace', fontSize: '8px', color: '#ffe9b8', align: 'center', stroke: '#000', strokeThickness: 2,
+    fontFamily: pixelFontFamily(), fontSize: '8px', color: '#f1e6cf', align: 'center', stroke: '#000', strokeThickness: 2,
     ...style,
   });
   t.setResolution(resolution);

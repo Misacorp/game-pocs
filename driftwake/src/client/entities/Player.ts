@@ -72,9 +72,11 @@ export class Player implements PlayerHandle {
     worldCtx.lighting?.lit(this.sprite, this.info.key);
     // The player always carries a soft warm light with them — priority guarantees it always wins
     // a slot in the light budget over decor/vfx, however many of those are nearby.
+    // The player must always pop against the scene — a bit brighter/wider than a "realistic" torch
+    // glow would be, deliberately, so the character reads clearly even against a dim ambient.
     worldCtx.lighting?.addLight({
       id: Player.LIGHT_ID, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 0.6,
-      color: 0xffe6b0, radius: 130, intensity: 0.75, flicker: 0.06, priority: 3,
+      color: 0xffe9c2, radius: 155, intensity: 1.05, flicker: 0.06, priority: 3,
     });
     this.shadow = new ContactShadow(scene, this.info.bodyWidth * 1.5, 8);
   }

@@ -10,6 +10,9 @@ import { makeCrispLabel } from './spriteUtil';
 import type { WorldLighting } from '../render/lighting';
 import { ContactShadow } from '../render/ContactShadow';
 
+/** Quest marker colors: lantern (!) for available, tide (?) for turn-in, a dim tide-blue for "in progress". */
+const MARKER_COLOR: Record<'!' | '?' | '…', string> = { '!': '#ffb347', '?': '#5fe3c6', '…': '#9fd4ff' };
+
 export class NpcEntity {
   /** Global (map-wide) bark rate limit so at most one NPC talks at a time, ~12s apart. */
   private static nextGlobalBarkAt = 0;
@@ -26,8 +29,9 @@ export class NpcEntity {
   private curMarker: '!' | '?' | '…' | null = null;
   private near = false;
   private shadow: ContactShadow;
+  private lightId?: string;
 
-  constructor(private scene: Phaser.Scene, public def: NpcDef, public x: number, public y: number, flip = false, lighting?: WorldLighting | null) {
+  constructor(private scene: Phaser.Scene, public def: NpcDef, public x: number, public y: number, flip = false, private lighting?: WorldLighting | null) {
     this.id = def.id;
     const info = getNpcSprite(scene, def);
     this.sprite = scene.add.sprite(x, y, info.key, 0).setOrigin(0.5, 1).setDepth(9).setFlipX(flip);
@@ -37,6 +41,12 @@ export class NpcEntity {
     lighting?.lit(this.sprite, info.key);
     this.shadow = new ContactShadow(scene, info.bodyWidth * 1.4, 8);
     this.shadow.update(x, y, y);
+    if (lighting) {
+      // A small personal fill light so NPCs always read clearly against the scene's ambient,
+      // regardless of whether they happen to be standing near a decor light.
+      this.lightId = `npc_${this.id}_${x}_${y}`;
+      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - info.frameHeight * 0.6, color: 0xfff0d8, radius: 85, intensity: 0.5 });
+    }
 
     // Stack (top -> bottom, closest to the head last): marker, title (near-only), name.
     const nameY = y - info.frameHeight - 4;
@@ -47,7 +57,7 @@ export class NpcEntity {
         .setOrigin(0.5, 1).setDepth(11).setAlpha(0.85).setVisible(false);
     }
 
-    this.marker = makeCrispLabel(scene, x, (def.title ? titleY : nameY) - 11, '', { fontSize: '13px', color: '#ffe066', strokeThickness: 3 })
+    this.marker = makeCrispLabel(scene, x, (def.title ? titleY : nameY) - 11, '', { fontSize: '13px', color: MARKER_COLOR['!'], strokeThickness: 3 })
       .setOrigin(0.5, 1).setDepth(11);
   }
 
@@ -62,7 +72,7 @@ export class NpcEntity {
     if (m === this.curMarker) return;
     this.curMarker = m;
     this.marker.setText(m ?? '');
-    this.marker.setColor(m === '?' ? '#7dffb3' : m === '…' ? '#9fd4ff' : '#ffe066');
+    this.marker.setColor(m ? MARKER_COLOR[m] : MARKER_COLOR['!']);
     if (m) this.scene.tweens.add({ targets: this.marker, y: this.marker.y - 4, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     else this.scene.tweens.killTweensOf(this.marker);
   }
@@ -81,13 +91,14 @@ export class NpcEntity {
 
     const line = Phaser.Utils.Array.GetRandom(this.def.barks);
     const y = (this.titleTag ?? this.nameTag).y - 9;
-    this.barkText = makeCrispLabel(this.scene, this.x, y, line, { color: '#222', strokeThickness: 0, wordWrap: { width: 140 } })
+    // Styled as a small whale-hide plate rather than a generic pale speech bubble.
+    this.barkText = makeCrispLabel(this.scene, this.x, y, line, { color: '#f1e6cf', strokeThickness: 0, wordWrap: { width: 140 } })
       .setOrigin(0.5, 1).setDepth(12).setAlpha(0);
     const b = this.barkText.getBounds();
-    this.barkBg = this.scene.add.rectangle(this.x, y - b.height / 2, b.width + 10, b.height + 6, 0xfff6e0, 0.92)
-      .setStrokeStyle(1, 0x333333).setDepth(11.5).setOrigin(0.5, 0.5).setAlpha(0);
+    this.barkBg = this.scene.add.rectangle(this.x, y - b.height / 2, b.width + 10, b.height + 6, 0x16242b, 0.9)
+      .setStrokeStyle(1, 0xf1e6cf, 0.25).setDepth(11.5).setOrigin(0.5, 0.5).setAlpha(0);
     this.scene.tweens.add({ targets: this.barkText, alpha: { from: 0, to: 1 }, duration: 180 });
-    this.scene.tweens.add({ targets: this.barkBg, alpha: { from: 0, to: 0.92 }, duration: 180 });
+    this.scene.tweens.add({ targets: this.barkBg, alpha: { from: 0, to: 0.9 }, duration: 180 });
 
     NpcEntity.activeBarker = this;
     this.barkExpiresAt = now + 3000;
@@ -108,6 +119,7 @@ export class NpcEntity {
   destroy(): void {
     this.sprite.destroy(); this.nameTag.destroy(); this.titleTag?.destroy(); this.marker.destroy();
     this.shadow.destroy();
+    if (this.lightId) this.lighting?.removeLight(this.lightId);
     this.clearBark();
   }
 }

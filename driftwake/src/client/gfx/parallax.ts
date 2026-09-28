@@ -253,10 +253,10 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
   const whale = scene.add.tileSprite(0, 0, 10, 10, whaleKey).setOrigin(0).setDepth(-90);
   const mid = scene.add.tileSprite(0, 0, 10, 10, midKey).setOrigin(0).setDepth(-80).setAlpha(0.9);
   const near = scene.add.tileSprite(0, 0, 10, 10, nearKey).setOrigin(0).setDepth(-70).setAlpha(0.95);
-  // Foreground dressing passes in front of gameplay (depth above player/monsters/decor) at the
-  // bottom edge only, darker + softly blurred + semi-transparent so it reads as depth-of-field
-  // rather than obscuring the action.
-  const fg = scene.add.tileSprite(0, 0, 10, 10, fgKey).setOrigin(0).setDepth(500).setAlpha(0.55);
+  // Foreground dressing passes in front of gameplay (depth above player/monsters/decor), but only
+  // a thin sliver right at the very bottom screen edge and quite faint — readability (the player
+  // popping clearly) always wins over the depth-of-field effect.
+  const fg = scene.add.tileSprite(0, 0, 10, 10, fgKey).setOrigin(0).setDepth(500).setAlpha(0.32);
 
   let lightning: Phaser.GameObjects.Rectangle | undefined;
   let lightningTimer = 2000 + Math.random() * 3000;
@@ -277,7 +277,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
     whale.setPosition(tl.x, tl.y + h * 0.05).setSize(w, h * 0.55);
     mid.setPosition(tl.x, tl.y + h * 0.1).setSize(w, h * 0.6);
     near.setPosition(tl.x, tl.y + h * 0.72).setSize(w, h * 0.3);
-    fg.setPosition(tl.x, tl.y + h * 0.82).setSize(w, h * 0.22);
+    fg.setPosition(tl.x, tl.y + h * 0.9).setSize(w, h * 0.1);
     lightning?.setPosition(tl.x, tl.y).setDisplaySize(w, h);
   }
   layout(scene.cameras.main);

@@ -13,16 +13,19 @@ import { isWebGLAvailable, type Quality } from './quality';
  *  in caves and the reef, sickly violet/red in the Blight zones. Deliberately separate from
  *  gfx/palette.ts (owned by the sprite artist) since this is a lighting-only concern. */
 const AMBIENT: Record<ThemeId, number> = {
-  driftmoor: 0x4a3d52,
-  meadow: 0x8a9db8,
-  grotto: 0x0b1614,
-  kelpwood: 0x123024,
-  galeoutpost: 0x7c87a2,
-  stormspire: 0x24252f,
-  lanternreef: 0x0a1526,
-  galleon: 0x081a15,
-  hollow: 0x180b1f,
-  heart: 0x1d0709,
+  // Raised from the first pass: characters (player/NPCs) were reading too dark against the dusk
+  // town ambient. Player/NPC personal fill lights (Player.ts, Npc.ts) do the rest of the work —
+  // gameplay readability wins over moodier-but-dimmer ambient.
+  driftmoor: 0x6a5b74,
+  meadow: 0x92a5be,
+  grotto: 0x14211e,
+  kelpwood: 0x1a3a2c,
+  galeoutpost: 0x848fac,
+  stormspire: 0x2c2e3a,
+  lanternreef: 0x121e34,
+  galleon: 0x0e241c,
+  hollow: 0x22132a,
+  heart: 0x241012,
 };
 
 const normalMapped = new Set<string>();

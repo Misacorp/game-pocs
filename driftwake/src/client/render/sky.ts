@@ -51,12 +51,12 @@ float noise(vec2 p) {
   return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 float fbm(vec2 p) {
-  // 2 octaves: kept deliberately cheap — this runs on essentially every pixel of the sky, and
-  // SwiftShader (software WebGL, used in headless/CI) is dramatically more sensitive to per-pixel
-  // ALU cost than a real GPU is, so we err on the cheap side rather than the pretty side here.
-  float v = 0.0, amp = 0.6;
-  for (int i = 0; i < 2; i++) { v += amp * noise(p); p *= 2.1; amp *= 0.4; }
-  return v;
+  // A single noise() call, not a real multi-octave fbm: this runs on essentially every pixel of
+  // the sky (and, for the High-only cloud/aurora/storm/caustic passes, more than once per pixel),
+  // and SwiftShader (software WebGL, used in headless/CI) is dramatically more sensitive to
+  // per-pixel ALU cost than a real GPU is, so we err on the cheap side. One layer of value noise
+  // still reads as soft cloud/mist shapes at the scales this is used at.
+  return noise(p);
 }
 
 void main() {

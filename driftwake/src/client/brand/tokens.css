@@ -1,0 +1,80 @@
+/*
+ * DRIFTWAKE BRAND TOKENS — "Scrimshaw & Lanternlight"
+ * Single source of truth for the UI's visual identity. See /BRAND.md for the rules.
+ *
+ * Surfaces are whale hide (dark slate-teal), engraved with scrimshaw bone lines,
+ * lit by amber lanterns; tide-glow (bioluminescent teal) marks magic & selection.
+ */
+@import '@fontsource/im-fell-english-sc/400.css';
+@import '@fontsource/alegreya-sans/400.css';
+@import '@fontsource/alegreya-sans/500.css';
+@import '@fontsource/alegreya-sans/700.css';
+@import '@fontsource/alegreya-sans/400-italic.css';
+@import '@fontsource/alegreya-sans-sc/500.css';
+@import '@fontsource/alegreya-sans-sc/700.css';
+@import '@fontsource/pixelify-sans/400.css';
+@import '@fontsource/pixelify-sans/600.css';
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Palette ------------------------------------------------------- */
+  --dw-deep:        #0b1519;  /* Deep Current — backdrops, scrims */
+  --dw-hide:        #16242b;  /* Whale Hide — panel fill */
+  --dw-hide-2:      #1d3038;  /* Hide Ridge — raised surfaces, rows */
+  --dw-hide-3:      #27424c;  /* Hide Light — hover */
+  --dw-hide-edge:   #07100f;  /* outer edge line */
+  --dw-bone:        #f1e6cf;  /* Scrimshaw Bone — primary text & engraving */
+  --dw-bone-dim:    #b7aa90;  /* Bone Shadow — secondary text */
+  --dw-bone-faint:  rgba(241, 230, 207, 0.22); /* hairline engraving */
+  --dw-lantern:     #ffb347;  /* Lantern — primary accent, CTA, focus */
+  --dw-lantern-hot: #ffd27a;  /* lantern highlight */
+  --dw-lantern-deep:#c9731f;  /* lantern shade */
+  --dw-tide:        #5fe3c6;  /* Tideglow — magic, selection, success */
+  --dw-tide-deep:   #1f8f7f;
+  --dw-coral:       #ff6b6b;  /* Coral Heart — HP, danger */
+  --dw-coral-deep:  #b8324a;
+  --dw-mana:        #4cb8ff;  /* Tideglass — MP */
+  --dw-mana-deep:   #1d5fa8;
+  --dw-song-a:      #b58cff;  /* Whalesong gradient — XP */
+  --dw-song-b:      #5fe3c6;
+
+  /* rarity (tuned to sit on whale hide) */
+  --dw-r-common:    #e9e1cf;
+  --dw-r-uncommon:  #7ee08a;
+  --dw-r-rare:      #62b6ff;
+  --dw-r-epic:      #c98bff;
+  --dw-r-legendary: #ffb347;
+
+  /* ---- Type ---------------------------------------------------------- */
+  --dw-font-display: 'IM Fell English SC', 'IM FELL English SC', Georgia, 'Times New Roman', serif;
+  --dw-font-body:    'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  --dw-font-label:   'Alegreya Sans SC', 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  --dw-font-pixel:   'Pixelify Sans', 'Courier New', monospace;
+  /* scale (px): 11 / 13 / 15 / 18 / 22 / 30 / 48 / 72 */
+  --dw-fs-xs: 11px; --dw-fs-sm: 13px; --dw-fs-md: 15px; --dw-fs-lg: 18px;
+  --dw-fs-xl: 22px; --dw-fs-2xl: 30px; --dw-fs-3xl: 48px; --dw-fs-4xl: 72px;
+  --dw-track-label: 0.08em;
+
+  /* ---- Shape & depth ------------------------------------------------- */
+  --dw-radius-sm: 3px;
+  --dw-radius:    6px;     /* panels are softly squared — carved plates, not pills */
+  --dw-radius-vial: 999px; /* only bars are capsules */
+  --dw-shadow:    0 10px 28px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.35);
+  --dw-glow-lantern: 0 0 0 1px rgba(255, 179, 71, 0.55), 0 0 18px rgba(255, 179, 71, 0.35);
+  --dw-glow-tide:    0 0 0 1px rgba(95, 227, 198, 0.55), 0 0 16px rgba(95, 227, 198, 0.3);
+
+  /* ---- Motion -------------------------------------------------------- */
+  --dw-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dw-dur-fast: 120ms; --dw-dur: 200ms; --dw-dur-slow: 420ms;
+
+  /* ---- Motifs (SVG data URIs) --------------------------------------- */
+  /* barnacle speckle — subtle hide texture */
+  --dw-tex-hide: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 .8 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* the wake — three flowing lines (divider / flourish) */
+  --dw-wake: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14' fill='none' stroke='%23f1e6cf' stroke-linecap='round'%3E%3Cpath d='M2 7 C 22 1, 38 13, 60 7 S 98 1, 118 7' stroke-opacity='.85' stroke-width='1.3'/%3E%3Cpath d='M14 11 C 30 7, 44 14, 60 11 S 88 7, 106 11' stroke-opacity='.45'/%3E%3Cpath d='M14 3 C 30 -1, 44 6, 60 3 S 88 -1, 106 3' stroke-opacity='.45'/%3E%3C/svg%3E");
+  /* whale fluke glyph (brand mark, bullets) */
+  --dw-fluke: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath fill='%23f1e6cf' d='M16 19.5 14.9 12.3C11.6 11.7 5.6 10.4 1 3.6c4.6 2.3 9.6 2.6 13.2 4.9L16 6.4l1.8 2.1c3.6-2.3 8.6-2.6 13.2-4.9-4.6 6.8-10.6 8.1-13.9 8.7z'/%3E%3C/svg%3E");
+  /* scrimshaw corner ornament (compass star + curl), drawn for the top-left corner */
+  --dw-corner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none' stroke='%23f1e6cf' stroke-linecap='round'%3E%3Cpath d='M1 12 V5 a4 4 0 0 1 4 -4 H12' stroke-width='1.2'/%3E%3Cpath d='M4 16 V7 a3 3 0 0 1 3 -3 H16' stroke-opacity='.45'/%3E%3Cpath fill='%23f1e6cf' stroke='none' d='M9 6.2 9.7 8.3 11.8 9 9.7 9.7 9 11.8 8.3 9.7 6.2 9 8.3 8.3Z'/%3E%3C/svg%3E");
+}

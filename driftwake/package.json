@@ -16,6 +16,10 @@
     "simulate": "tsx scripts/simulate-playthrough.ts"
   },
   "dependencies": {
+    "@fontsource/alegreya-sans": "^5.3.0",
+    "@fontsource/alegreya-sans-sc": "^5.3.0",
+    "@fontsource/im-fell-english-sc": "^5.3.0",
+    "@fontsource/pixelify-sans": "^5.3.0",
     "phaser": "3.90.0",
     "ws": "^8.22.0"
   },

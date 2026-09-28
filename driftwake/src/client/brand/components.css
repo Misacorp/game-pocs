@@ -1,0 +1,200 @@
+/*
+ * DRIFTWAKE BRAND COMPONENTS — reference implementations of the core UI parts.
+ * Class prefix `dwb-` (brand). The in-game UI adopts these (or restyles its own classes to match).
+ */
+
+/* ---------------------------------------------------------------- panel */
+/* A carved whale-hide plate: speckle texture, inner scrimshaw line, corner ornaments. */
+.dwb-panel {
+  position: relative;
+  background:
+    var(--dw-tex-hide),
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 179, 71, 0.07), transparent 60%),
+    linear-gradient(180deg, var(--dw-hide-2), var(--dw-hide) 38%, #121e24);
+  color: var(--dw-bone);
+  border: 1px solid var(--dw-hide-edge);
+  border-radius: var(--dw-radius);
+  box-shadow: var(--dw-shadow), inset 0 1px 0 rgba(241, 230, 207, 0.08);
+  font-family: var(--dw-font-body);
+  font-size: var(--dw-fs-md);
+  line-height: 1.45;
+}
+/* inner engraved line */
+.dwb-panel::before {
+  content: ''; position: absolute; inset: 5px; pointer-events: none;
+  border: 1px solid var(--dw-bone-faint); border-radius: calc(var(--dw-radius) - 2px);
+}
+/* corner ornaments: add <span class="dwb-corners"><i></i><i></i><i></i><i></i></span> inside the panel */
+.dwb-corners { position: absolute; inset: 2px; pointer-events: none; }
+.dwb-corners i { position: absolute; width: 22px; height: 22px; background: var(--dw-corner) center / contain no-repeat; opacity: 0.8; }
+.dwb-corners i:nth-child(1) { top: 0; left: 0; }
+.dwb-corners i:nth-child(2) { top: 0; right: 0; transform: scaleX(-1); }
+.dwb-corners i:nth-child(3) { bottom: 0; left: 0; transform: scaleY(-1); }
+.dwb-corners i:nth-child(4) { bottom: 0; right: 0; transform: scale(-1, -1); }
+
+/* --------------------------------------------------------- nameplate header */
+.dwb-nameplate {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 10px 40px 8px; position: relative;
+  font-family: var(--dw-font-display); font-size: var(--dw-fs-lg); letter-spacing: 0.04em;
+  color: var(--dw-bone); text-shadow: 0 1px 0 #000, 0 0 12px rgba(255, 179, 71, 0.25);
+}
+.dwb-nameplate::before, .dwb-nameplate::after {
+  content: ''; width: 46px; height: 14px; flex: none;
+  background: var(--dw-wake) center / 100% 100% no-repeat; opacity: 0.55;
+}
+.dwb-nameplate::after { transform: scaleX(-1); }
+.dwb-close {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--dw-bone-faint);
+  background: radial-gradient(circle at 35% 30%, #3a5560, #16242b 70%);
+  color: var(--dw-bone-dim); font: 600 13px/1 var(--dw-font-body); cursor: pointer;
+  display: grid; place-items: center;
+}
+.dwb-close:hover { color: var(--dw-lantern-hot); box-shadow: var(--dw-glow-lantern); }
+
+/* --------------------------------------------------------------- divider */
+.dwb-wake { height: 14px; background: var(--dw-wake) center / 120px 14px no-repeat; opacity: 0.5; }
+.dwb-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--dw-bone-faint), transparent); }
+
+/* --------------------------------------------------------------- buttons */
+.dwb-btn {
+  --b-bg: linear-gradient(180deg, #2f4a54, #1d3038);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 32px; padding: 0 16px; border-radius: var(--dw-radius-sm);
+  font: 700 var(--dw-fs-sm) / 1 var(--dw-font-label); letter-spacing: var(--dw-track-label);
+  color: var(--dw-bone); background: var(--b-bg);
+  border: 1px solid rgba(241, 230, 207, 0.28);
+  box-shadow: inset 0 1px 0 rgba(241, 230, 207, 0.12), 0 2px 0 rgba(0, 0, 0, 0.45);
+  cursor: pointer; transition: transform var(--dw-dur-fast) var(--dw-ease), box-shadow var(--dw-dur) var(--dw-ease), filter var(--dw-dur);
+}
+.dwb-btn:hover { filter: brightness(1.12); }
+.dwb-btn:active { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(0,0,0,.3); }
+.dwb-btn:focus-visible { outline: none; box-shadow: var(--dw-glow-lantern); }
+.dwb-btn[disabled] { opacity: 0.45; cursor: default; filter: saturate(0.4); }
+/* primary: lantern glass */
+.dwb-btn.lantern {
+  --b-bg: linear-gradient(180deg, var(--dw-lantern-hot), var(--dw-lantern) 48%, var(--dw-lantern-deep));
+  color: #2a1606; border-color: #7a4212; text-shadow: 0 1px 0 rgba(255, 240, 200, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 0 #5e3310, 0 0 16px rgba(255, 179, 71, 0.25);
+}
+.dwb-btn.lantern:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #5e3310, 0 0 24px rgba(255, 179, 71, 0.5); }
+/* tide: magical / confirm-choice */
+.dwb-btn.tide { --b-bg: linear-gradient(180deg, #2c7f73, #17504a); border-color: rgba(95, 227, 198, 0.55); color: #e9fffa; }
+.dwb-btn.tide:hover { box-shadow: var(--dw-glow-tide); }
+/* danger */
+.dwb-btn.coral { --b-bg: linear-gradient(180deg, #d24e5c, #8e2438); border-color: #ff9a9a55; }
+/* ghost: engraved outline only */
+.dwb-btn.ghost { --b-bg: transparent; border-color: var(--dw-bone-faint); box-shadow: none; color: var(--dw-bone-dim); }
+.dwb-btn.ghost:hover { color: var(--dw-bone); border-color: rgba(241,230,207,.45); }
+.dwb-btn.sm { min-height: 24px; padding: 0 10px; font-size: var(--dw-fs-xs); }
+
+/* ----------------------------------------------------------------- vials */
+/* capsule glass bar with liquid, meniscus highlight and slow shimmer */
+.dwb-vial {
+  --fill: var(--dw-coral); --fill-deep: var(--dw-coral-deep); --pct: 60%;
+  position: relative; height: 16px; border-radius: var(--dw-radius-vial);
+  background: linear-gradient(180deg, #050b0d, #13232a);
+  border: 1px solid rgba(241, 230, 207, 0.3);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(241, 230, 207, 0.08);
+  overflow: hidden;
+}
+.dwb-vial > .liquid {
+  position: absolute; inset: 1px auto 1px 1px; width: calc(var(--pct) - 2px); border-radius: inherit;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fill) 70%, white), var(--fill) 40%, var(--fill-deep));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--fill) 55%, transparent);
+  transition: width var(--dw-dur-slow) var(--dw-ease);
+}
+.dwb-vial > .liquid::after { /* shimmer */
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.28) 45%, transparent 60%) -120% 0 / 60% 100% no-repeat;
+  animation: dwb-shimmer 4.5s linear infinite;
+}
+.dwb-vial::after { /* glass highlight */
+  content: ''; position: absolute; left: 8px; right: 8px; top: 2px; height: 4px; border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent);
+}
+.dwb-vial > .label {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font: 600 11px/1 var(--dw-font-pixel); color: #fff; text-shadow: 0 1px 0 #000, 0 0 3px #000; letter-spacing: 0.04em;
+}
+.dwb-vial.mana { --fill: var(--dw-mana); --fill-deep: var(--dw-mana-deep); }
+.dwb-vial.song { height: 8px; --fill: var(--dw-song-a); --fill-deep: #6a4bd0; }
+.dwb-vial.song > .liquid { background: linear-gradient(90deg, var(--dw-song-a), var(--dw-song-b)); }
+@keyframes dwb-shimmer { to { background-position: 220% 0; } }
+@media (prefers-reduced-motion: reduce) { .dwb-vial > .liquid::after { animation: none; } }
+
+/* ------------------------------------------------------------ item slots */
+.dwb-slot {
+  position: relative; width: 44px; height: 44px; border-radius: 5px;
+  background: radial-gradient(circle at 50% 35%, #22393f, #0c171b 75%);
+  border: 1px solid rgba(241, 230, 207, 0.22);
+  box-shadow: inset 0 0 0 2px #0a1215, inset 0 2px 6px rgba(0, 0, 0, 0.7);
+  display: grid; place-items: center;
+}
+.dwb-slot img { width: 32px; height: 32px; image-rendering: pixelated; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)); }
+.dwb-slot:hover { border-color: rgba(255, 179, 71, 0.6); box-shadow: inset 0 0 0 2px #0a1215, var(--dw-glow-lantern); }
+.dwb-slot .key {
+  position: absolute; left: 2px; top: 1px; font: 600 10px/1 var(--dw-font-pixel); color: var(--dw-bone-dim);
+  text-shadow: 0 1px 0 #000;
+}
+.dwb-slot .qty { position: absolute; right: 3px; bottom: 2px; font: 600 11px/1 var(--dw-font-pixel); color: #fff; text-shadow: 0 1px 0 #000, 0 0 2px #000; }
+/* rarity socket: a coloured inner ring */
+.dwb-slot[data-rarity='uncommon'] { box-shadow: inset 0 0 0 2px #0a1215, inset 0 0 0 3px color-mix(in srgb, var(--dw-r-uncommon) 55%, transparent); }
+.dwb-slot[data-rarity='rare']     { box-shadow: inset 0 0 0 2px #0a1215, inset 0 0 0 3px color-mix(in srgb, var(--dw-r-rare) 60%, transparent); }
+.dwb-slot[data-rarity='epic']     { box-shadow: inset 0 0 0 2px #0a1215, inset 0 0 0 3px color-mix(in srgb, var(--dw-r-epic) 60%, transparent), 0 0 10px color-mix(in srgb, var(--dw-r-epic) 30%, transparent); }
+.dwb-slot[data-rarity='legendary']{ box-shadow: inset 0 0 0 2px #0a1215, inset 0 0 0 3px var(--dw-r-legendary), 0 0 14px rgba(255, 179, 71, 0.45); }
+
+/* cooldown: conic sweep of dark ink */
+.dwb-slot .cd { position: absolute; inset: 0; border-radius: inherit; background: conic-gradient(rgba(5, 11, 13, 0.78) var(--cd, 40%), transparent 0); }
+
+/* ------------------------------------------------------------------ tabs */
+.dwb-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--dw-bone-faint); padding: 0 8px; }
+.dwb-tab {
+  padding: 7px 12px 6px; border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0;
+  font: 700 var(--dw-fs-xs) / 1 var(--dw-font-label); letter-spacing: var(--dw-track-label); color: var(--dw-bone-dim);
+  background: transparent; cursor: pointer;
+}
+.dwb-tab:hover { color: var(--dw-bone); }
+.dwb-tab[aria-selected='true'] {
+  color: var(--dw-lantern-hot); background: linear-gradient(180deg, rgba(255, 179, 71, 0.14), transparent);
+  border-color: var(--dw-bone-faint); box-shadow: 0 1px 0 var(--dw-hide-2);
+}
+
+/* --------------------------------------------------------------- tooltip */
+.dwb-tooltip {
+  width: 260px; padding: 12px 14px; border-radius: var(--dw-radius);
+  background: var(--dw-tex-hide), linear-gradient(180deg, #1b2c33, #0f1a1f);
+  border: 1px solid var(--rar, var(--dw-bone-faint)); color: var(--dw-bone);
+  box-shadow: var(--dw-shadow), 0 0 22px color-mix(in srgb, var(--rar, transparent) 25%, transparent);
+  font: 400 var(--dw-fs-sm) / 1.45 var(--dw-font-body);
+}
+.dwb-tooltip .name { font: 400 var(--dw-fs-lg) / 1.1 var(--dw-font-display); color: var(--rar, var(--dw-bone)); }
+.dwb-tooltip .kind { font: 500 var(--dw-fs-xs) / 1 var(--dw-font-label); letter-spacing: var(--dw-track-label); color: var(--dw-bone-dim); margin-top: 4px; }
+.dwb-tooltip .stat { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.dwb-tooltip .up { color: var(--dw-tide); } .dwb-tooltip .down { color: var(--dw-coral); }
+.dwb-tooltip .flavor { font-style: italic; color: var(--dw-bone-dim); }
+
+/* -------------------------------------------------------------- portrait */
+/* porthole: round brass-and-bone rim with rivets */
+.dwb-porthole {
+  width: 96px; height: 96px; border-radius: 50%; flex: none; position: relative; overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #2c4750, #0d181c);
+  box-shadow: 0 0 0 3px #0b1417, 0 0 0 5px #b58a4a, 0 0 0 6px #5d4122, 0 0 0 8px rgba(241,230,207,.25), var(--dw-shadow);
+}
+.dwb-porthole img { width: 100%; height: 100%; image-rendering: pixelated; }
+
+/* ---------------------------------------------------------------- misc */
+.dwb-label { font: 700 var(--dw-fs-xs) / 1 var(--dw-font-label); letter-spacing: var(--dw-track-label); color: var(--dw-bone-dim); }
+.dwb-num { font-family: var(--dw-font-pixel); font-variant-numeric: tabular-nums; }
+.dwb-fluke-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.dwb-fluke-list li { display: flex; gap: 8px; align-items: baseline; }
+.dwb-fluke-list li::before { content: ''; width: 14px; height: 10px; flex: none; background: var(--dw-fluke) center / contain no-repeat; opacity: 0.7; transform: translateY(1px); }
+.dwb-choice {
+  display: block; width: 100%; text-align: left; padding: 9px 12px 9px 34px; position: relative;
+  background: rgba(241, 230, 207, 0.03); border: 1px solid transparent; border-radius: var(--dw-radius-sm);
+  color: var(--dw-bone); font: 500 var(--dw-fs-md) / 1.3 var(--dw-font-body); cursor: pointer;
+}
+.dwb-choice::before { content: ''; position: absolute; left: 11px; top: 50%; width: 15px; height: 10px; transform: translateY(-50%); background: var(--dw-fluke) center / contain no-repeat; opacity: 0.55; }
+.dwb-choice:hover { background: rgba(255, 179, 71, 0.08); border-color: rgba(255, 179, 71, 0.35); }
+.dwb-choice:hover::before { opacity: 1; filter: sepia(1) saturate(4) hue-rotate(-5deg); }

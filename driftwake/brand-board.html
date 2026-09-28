@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Driftwake Brand Board</title>
+  <style>
+    body { margin: 0; background: radial-gradient(120% 90% at 70% 0%, #3a2a55 0%, #1a2233 45%, var(--dw-deep) 100%); color: var(--dw-bone); font-family: var(--dw-font-body); }
+    .wrap { max-width: 1240px; margin: 0 auto; padding: 36px 28px 60px; display: grid; gap: 28px; }
+    h2 { font: 400 var(--dw-fs-2xl)/1 var(--dw-font-display); margin: 0 0 12px; letter-spacing: .02em; }
+    .row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+    .swatch { width: 128px; border-radius: 6px; overflow: hidden; border: 1px solid var(--dw-bone-faint); }
+    .swatch b { display: block; height: 58px; }
+    .swatch span { display: block; padding: 7px 9px; font-size: 12px; line-height: 1.3; background: #0d171b; }
+    .swatch em { font-style: normal; color: var(--dw-bone-dim); font-family: var(--dw-font-pixel); font-size: 11px; }
+    /* ---- logo lockup ---- */
+    .logo { display: grid; justify-items: center; gap: 6px; padding: 40px 20px 30px; }
+    .logo .fluke { width: 78px; height: 52px; background: var(--dw-fluke) center/contain no-repeat; filter: drop-shadow(0 0 14px rgba(255,179,71,.55)); }
+    .logo .word { font: 400 96px/0.9 var(--dw-font-display); letter-spacing: .06em; color: var(--dw-bone);
+      text-shadow: 0 2px 0 #1b1208, 0 0 30px rgba(255,179,71,.35); }
+    .logo .word span { color: var(--dw-lantern); }
+    .logo .wake { width: 340px; height: 22px; background: var(--dw-wake) center/100% 100% no-repeat; opacity: .8; }
+    .logo .tag { font: 700 14px/1 var(--dw-font-label); letter-spacing: .32em; color: var(--dw-bone-dim); }
+    .type-spec { display: grid; gap: 10px; }
+    .type-spec .d { font: 400 40px/1 var(--dw-font-display); }
+    .type-spec .l { font: 700 13px/1 var(--dw-font-label); letter-spacing: .08em; color: var(--dw-bone-dim); }
+    .type-spec .b { font: 400 16px/1.5 var(--dw-font-body); max-width: 60ch; }
+    .type-spec .p { font: 600 18px/1 var(--dw-font-pixel); color: var(--dw-lantern-hot); }
+    /* HUD sample */
+    .hud { display: flex; gap: 14px; align-items: flex-end; padding: 16px; }
+    .medal { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; position: relative;
+      background: radial-gradient(circle at 40% 30%, #3b5a63, #0d181c 70%);
+      box-shadow: 0 0 0 2px #0b1417, 0 0 0 4px #b58a4a, 0 0 0 5px #4a3319, 0 0 18px rgba(255,179,71,.3); }
+    .medal b { font: 600 22px/1 var(--dw-font-pixel); color: var(--dw-lantern-hot); text-shadow: 0 1px 0 #000; }
+    .medal small { position: absolute; bottom: -9px; font: 700 9px/1 var(--dw-font-label); letter-spacing: .12em; background: #0b1417; padding: 2px 5px; border-radius: 3px; border: 1px solid var(--dw-bone-faint); }
+    .bars { display: grid; gap: 5px; width: 300px; }
+    .who { display: flex; justify-content: space-between; font: 400 16px/1 var(--dw-font-display); }
+    .who em { font: 700 11px/1 var(--dw-font-label); letter-spacing: .08em; color: var(--dw-bone-dim); font-style: normal; }
+    .hotbar { display: flex; gap: 4px; padding: 7px; border-radius: 8px; background: rgba(8,15,18,.7); border: 1px solid var(--dw-bone-faint); }
+    .dlg { display: flex; gap: 18px; padding: 18px 20px 16px; width: 640px; }
+    .dlg .speaker { font: 400 22px/1 var(--dw-font-display); }
+    .dlg .title { font: 700 11px/1 var(--dw-font-label); letter-spacing: .1em; color: var(--dw-tide); margin: 4px 0 8px; }
+    .dlg p { margin: 0 0 12px; }
+    .win { width: 300px; }
+    .win .body { padding: 10px 16px 16px; display: grid; gap: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(5, 44px); gap: 5px; }
+    .chip { font: 700 10px/1 var(--dw-font-label); letter-spacing: .08em; padding: 3px 7px; border-radius: 3px; border: 1px solid currentColor; }
+    .banner { text-align: center; padding: 24px; }
+    .banner .t { font: 400 56px/1 var(--dw-font-display); letter-spacing: .04em; text-shadow: 0 2px 0 #000, 0 0 24px rgba(255,179,71,.4); }
+    .banner .s { font: 400 italic 17px/1.4 var(--dw-font-body); color: var(--dw-bone-dim); margin-top: 8px; }
+  </style>
+  <script type="module">
+    import './src/client/brand/tokens.css';
+    import './src/client/brand/components.css';
+  </script>
+</head>
+<body>
+<div class="wrap">
+  <section class="logo">
+    <div class="fluke"></div>
+    <div class="word">DRIFT<span>W</span>AKE</div>
+    <div class="wake"></div>
+    <div class="tag">TALES OF THE SKYWHALES</div>
+  </section>
+
+  <section>
+    <h2>Palette</h2>
+    <div class="row">
+      <div class="swatch"><b style="background:#0b1519"></b><span>Deep Current<br><em>#0B1519</em></span></div>
+      <div class="swatch"><b style="background:#16242b"></b><span>Whale Hide<br><em>#16242B</em></span></div>
+      <div class="swatch"><b style="background:#27424c"></b><span>Hide Light<br><em>#27424C</em></span></div>
+      <div class="swatch"><b style="background:#f1e6cf"></b><span>Scrimshaw Bone<br><em>#F1E6CF</em></span></div>
+      <div class="swatch"><b style="background:#ffb347"></b><span>Lantern<br><em>#FFB347</em></span></div>
+      <div class="swatch"><b style="background:#5fe3c6"></b><span>Tideglow<br><em>#5FE3C6</em></span></div>
+      <div class="swatch"><b style="background:#ff6b6b"></b><span>Coral Heart · HP<br><em>#FF6B6B</em></span></div>
+      <div class="swatch"><b style="background:#4cb8ff"></b><span>Tideglass · MP<br><em>#4CB8FF</em></span></div>
+      <div class="swatch"><b style="background:linear-gradient(90deg,#b58cff,#5fe3c6)"></b><span>Whalesong · XP<br><em>#B58CFF→#5FE3C6</em></span></div>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="type-spec">
+      <h2>Type</h2>
+      <div class="d">The Blight Heart Stirs</div>
+      <div class="l">ALEGREYA SANS SC · LABELS, TABS, BUTTONS</div>
+      <div class="b">Alegreya Sans carries dialogue and descriptions. "Ah, good — you're back. Or new. Hard to tell some days; everyone looks the same size from up here on Grandmother Oma's back."</div>
+      <div class="p">Lv 12 · 1,284 / 3,696 · 58g · Q W E R</div>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="dwb-panel hud">
+      <div class="medal"><b>12</b><small>REAVER</small></div>
+      <div class="bars">
+        <div class="who">Misa <em>GRANDMOTHER OMA · DRIFTMOOR</em></div>
+        <div class="dwb-vial" style="--pct:78%"><div class="liquid"></div><div class="label">318 / 410</div></div>
+        <div class="dwb-vial mana" style="--pct:46%"><div class="liquid"></div><div class="label">37 / 81</div></div>
+        <div class="dwb-vial song" style="--pct:35%"><div class="liquid"></div></div>
+      </div>
+      <div class="hotbar">
+        <div class="dwb-slot"><span class="key">Q</span></div>
+        <div class="dwb-slot"><span class="key">W</span><div class="cd" style="--cd:62%"></div></div>
+        <div class="dwb-slot" data-rarity="rare"><span class="key">E</span></div>
+        <div class="dwb-slot" data-rarity="epic"><span class="key">R</span></div>
+        <div class="dwb-slot" data-rarity="legendary"><span class="key">1</span><span class="qty">24</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="dwb-panel win">
+      <span class="dwb-corners"><i></i><i></i><i></i><i></i></span>
+      <div class="dwb-nameplate">Inventory<button class="dwb-close">✕</button></div>
+      <div class="dwb-tabs"><button class="dwb-tab" aria-selected="true">EQUIP</button><button class="dwb-tab">USE</button><button class="dwb-tab">ETC</button></div>
+      <div class="body">
+        <div class="grid">
+          <div class="dwb-slot" data-rarity="rare"></div><div class="dwb-slot"></div><div class="dwb-slot" data-rarity="uncommon"></div><div class="dwb-slot"></div><div class="dwb-slot"></div>
+          <div class="dwb-slot"></div><div class="dwb-slot" data-rarity="epic"></div><div class="dwb-slot"></div><div class="dwb-slot"></div><div class="dwb-slot"></div>
+        </div>
+        <div class="dwb-rule"></div>
+        <div class="row" style="justify-content:space-between;align-items:center"><span class="dwb-label">GOLD <span class="dwb-num" style="color:var(--dw-lantern-hot)">1,284</span></span><button class="dwb-btn sm ghost">SORT</button></div>
+      </div>
+    </div>
+
+    <div class="dwb-tooltip" style="--rar: var(--dw-r-epic)">
+      <div class="name">Tangleroot Blade <span style="color:var(--dw-lantern)">★★★</span></div>
+      <div class="kind">EPIC SWORD · VANGUARD · LV 17</div>
+      <div class="dwb-rule" style="margin:9px 0"></div>
+      <div class="stat"><span>Attack</span><span class="dwb-num">52 <span class="up">▲8</span></span></div>
+      <div class="stat"><span>STR</span><span class="dwb-num">+3</span></div>
+      <div class="stat"><span>Crit Rate</span><span class="dwb-num">+2% <span class="down">▼1%</span></span></div>
+      <div class="dwb-rule" style="margin:9px 0"></div>
+      <div class="flavor">Grown and shaped by Fenna's kelp-wardens from Old Tangle's own heartwood.</div>
+    </div>
+
+    <div style="display:grid;gap:12px">
+      <div class="row"><button class="dwb-btn lantern">ACCEPT QUEST</button><button class="dwb-btn">DECLINE</button></div>
+      <div class="row"><button class="dwb-btn tide">SING TOGETHER</button><button class="dwb-btn coral">ABANDON</button><button class="dwb-btn ghost">BACK</button></div>
+      <div class="row"><span class="chip" style="color:var(--dw-r-uncommon)">UNCOMMON</span><span class="chip" style="color:var(--dw-r-rare)">RARE</span><span class="chip" style="color:var(--dw-r-epic)">EPIC</span><span class="chip" style="color:var(--dw-r-legendary)">LEGENDARY</span></div>
+      <div class="dwb-wake" style="width:260px"></div>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="dwb-panel dlg">
+      <span class="dwb-corners"><i></i><i></i><i></i><i></i></span>
+      <div class="dwb-porthole"></div>
+      <div style="flex:1">
+        <div class="speaker">Old Pell</div>
+        <div class="title">RETIRED WHALEWATCHER</div>
+        <p>Old Pell squints up at the sky like he's reading it. "Ah, good — you're back. Or new. Hard to tell some days."</p>
+        <div style="display:grid;gap:4px">
+          <button class="dwb-choice">A Letter for the Captain</button>
+          <button class="dwb-choice">Tell me about Grandmother Oma.</button>
+          <button class="dwb-choice">Goodbye.</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="banner">
+    <div class="t">Mossback Meadows</div>
+    <div class="s">Where the whale's back turns soft and green.</div>
+    <div class="dwb-wake" style="width:280px;margin:12px auto 0"></div>
+  </section>
+</div>
+</body>
+</html>

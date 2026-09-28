@@ -6,10 +6,11 @@
 import Phaser from 'phaser';
 import type { WeaponType, ClassId, JobId } from '@shared/types';
 import {
-  makeCanvas, ctx2d, outlined, rect, rrect, circle, ellipse, line, poly,
-  registerSpriteSheet, ensureAnim, shade, hashStr,
+  makeCanvas, ctx2d, rect, rrect, circle, ellipse, line, poly,
+  registerSpriteSheet, ensureAnim, shade, hashStr, withAlpha,
 } from './canvasKit';
-import { CLASS_COLORS, OUTLINE } from './palette';
+import { CLASS_COLORS } from './palette';
+import { outlineHued, coolShadow, warmHighlight, emissiveDab } from './shading';
 import type { CharacterLook, SpriteInfo } from './spec';
 
 const FW = 32, FH = 40, CX = 16;
@@ -21,6 +22,11 @@ interface Pose {
   weaponDeg: number; weaponHand: 'front' | 'back' | 'both';
   mouth: 'smile' | 'open' | 'flat' | 'x';
   glow?: boolean;
+  /** vertical squash (0..1): >0 flattens the body a touch (hurt recoil). */
+  squashY?: number;
+  /** when set, the weapon swing frame also draws a fading motion arc from this start
+   *  angle (deg) to the frame's weaponDeg — a 1-frame "smear" baked into the attack anim. */
+  smearFrom?: number;
 }
 
 function basePose(): Pose {
@@ -78,14 +84,12 @@ function drawWeapon(ctx: CanvasRenderingContext2D, hx: number, hy: number, type:
       break;
     case 'staff':
       rect(ctx, 0, -1, 15, 2, secondary ?? '#7a5636');
-      circle(ctx, 16, 0, 3.4, accent ?? primary);
-      circle(ctx, 16, 0, 1.6, '#ffffff');
+      emissiveDab(ctx, 16, 0, 4.4, accent ?? primary, { coreStop: 0.26 }); // glowing orb — bloom pickup
       poly(ctx, [[2, 1], [1, 4], [3, 4]], shade(secondary ?? '#7a5636', -0.2)); // dangling cord/tassel
       break;
     case 'wand':
       rect(ctx, 0, -1, 8, 2, secondary ?? '#8a6a4a');
-      circle(ctx, 9, 0, 2.4, accent ?? primary);
-      circle(ctx, 8.2, -0.8, 0.7, '#ffffff');
+      emissiveDab(ctx, 9, 0, 3.2, accent ?? primary, { coreStop: 0.3 }); // glowing tip
       break;
     case 'bow':
       ctx.strokeStyle = primary; ctx.lineWidth = 1.6;
@@ -119,6 +123,24 @@ function drawWeapon(ctx: CanvasRenderingContext2D, hx: number, hy: number, type:
       break;
   }
   ctx.restore();
+}
+
+/** Bakes a 1-frame motion arc (a fading fan of blade positions) into an attack peak frame,
+ *  from `fromDeg` to `toDeg` — cheap "smear" that reads as a fast swing without extra frames. */
+function drawSmear(ctx: CanvasRenderingContext2D, hx: number, hy: number, fromDeg: number, toDeg: number, len: number, color: string): void {
+  const steps = 5;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const deg = fromDeg + (toDeg - fromDeg) * t;
+    const rad = (deg * Math.PI) / 180;
+    const ex = hx + Math.sin(rad) * len, ey = hy + Math.cos(rad) * len;
+    ctx.save();
+    ctx.strokeStyle = withAlpha(color, 0.05 + 0.15 * t * t);
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawHair(ctx: CanvasRenderingContext2D, style: number, cx: number, cy: number, r: number, color: string): void {
@@ -245,29 +267,39 @@ function drawJobAccent(ctx: CanvasRenderingContext2D, jobId: JobId, cx: number, 
   }
 }
 
-function classSilhouette(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors, cx: number, torsoTop: number, torsoBot: number, crouch: number): void {
+function classSilhouette(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors, cx: number, torsoTop: number, torsoBot: number, crouch: number, swayPhase = 0): void {
   const w = 11 - crouch * 1.5;
   const armor = c.armor, acc = c.armorAcc;
-  const rim = shade(armor, 0.32);
+  // form-describing tone ramp: warm rim toward the top-left key light, cool hue-shifted
+  // shadow on the trailing (right) edge — instead of one flat lighten-toward-white rim.
+  const rim = warmHighlight(armor, 0.4);
+  const shadowEdge = coolShadow(armor, 0.4);
+  // secondary motion: cloth (scarf/robe hem/quiver) lags the current stride by trailing the
+  // *opposite*-phase leg angle a touch, so it reads as trailing inertia rather than rigidly
+  // following the torso — a cheap approximation of a one-frame animation lag.
+  const trail = -swayPhase * 0.22;
   switch (look.classId) {
     case 'vanguard':
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, armor);
       rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, rim); // rim light, left edge
+      rect(ctx, cx + w / 2 - 1, torsoTop, 1, torsoBot - torsoTop, shadowEdge); // cool shadow, right edge
       rect(ctx, cx - 1.4, torsoTop + 2, 2.8, torsoBot - torsoTop - 3, acc); // tabard band
       rect(ctx, cx - w / 2 - 2, torsoTop, 3.4, 4, acc); rect(ctx, cx - w / 2 - 2, torsoTop, 3.4, 1.2, rim); // pauldron L (+ rim)
       rect(ctx, cx + w / 2 - 1.4, torsoTop, 3.4, 4, acc); rect(ctx, cx + w / 2 - 1.4, torsoTop, 3.4, 1.2, rim); // pauldron R (+ rim)
       rect(ctx, cx - w / 2 + 1, torsoTop + 4, w - 2, 1.5, shade(acc, -0.15)); // belt/plate seam
       break;
     case 'stormcaller':
-      poly(ctx, [[cx - w * 0.5, torsoTop], [cx + w * 0.5, torsoTop], [cx + w * 0.85, torsoBot], [cx - w * 0.85, torsoBot]], armor);
-      poly(ctx, [[cx - w * 0.5, torsoTop], [cx - w * 0.42, torsoTop], [cx - w * 0.72, torsoBot], [cx - w * 0.85, torsoBot]], rim); // robe fold rim light
+      poly(ctx, [[cx - w * 0.5, torsoTop], [cx + w * 0.5, torsoTop], [cx + w * 0.85 + trail, torsoBot], [cx - w * 0.85 + trail, torsoBot]], armor);
+      poly(ctx, [[cx - w * 0.5, torsoTop], [cx - w * 0.42, torsoTop], [cx - w * 0.72 + trail, torsoBot], [cx - w * 0.85 + trail, torsoBot]], rim); // robe fold rim light
+      poly(ctx, [[cx + w * 0.42, torsoTop], [cx + w * 0.5, torsoTop], [cx + w * 0.85 + trail, torsoBot], [cx + w * 0.72 + trail, torsoBot]], shadowEdge); // robe fold shadow
       rect(ctx, cx - w / 2, torsoTop + 2, w, 1.4, acc);
       line(ctx, cx, torsoTop + 3, cx, torsoBot - 1, 1, shade(acc, -0.2)); // clasp trim
       break;
     case 'windrunner':
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, armor);
       rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, rim);
-      poly(ctx, [[cx - w / 2 - 1, torsoTop - 1], [cx - 1, torsoTop - 4], [cx - 1, torsoTop + 1]], acc); // hood point back
+      rect(ctx, cx + w / 2 - 1, torsoTop, 1, torsoBot - torsoTop, shadowEdge);
+      poly(ctx, [[cx - w / 2 - 1, torsoTop - 1], [cx - 1, torsoTop - 4], [cx - 1 + trail, torsoTop + 1]], acc); // hood point back, trailing
       poly(ctx, [[cx - w * 0.3, torsoTop], [cx, torsoTop + 2], [cx + w * 0.3, torsoTop]], acc); // scarf knot at collar
       // quiver of fletched arrows peeking over the back shoulder
       for (let i = -1; i <= 1; i++) line(ctx, cx + w * 0.42 + i * 1.1, torsoTop + 1, cx + w * 0.55 + i * 1.4, torsoTop - 5, 0.9, i === 0 ? acc : shade(acc, -0.15));
@@ -278,8 +310,9 @@ function classSilhouette(ctx: CanvasRenderingContext2D, look: CharacterLook, c: 
     default:
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, armor);
       rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, rim);
-      // long scarf, trailing well past the hips for a dramatic silhouette
-      poly(ctx, [[cx - w / 2, torsoTop + 1], [cx + w / 2 + 2, torsoTop + 3], [cx + w / 2 + 4, torsoBot + 6], [cx + w / 2 - 2, torsoBot + 7], [cx + w / 2 - 3, torsoTop + 6], [cx + w / 2 - 1, torsoTop + 5]], acc);
+      rect(ctx, cx + w / 2 - 1, torsoTop, 1, torsoBot - torsoTop, shadowEdge);
+      // long scarf, trailing well past the hips — its tail lags the stride for secondary motion
+      poly(ctx, [[cx - w / 2, torsoTop + 1], [cx + w / 2 + 2, torsoTop + 3], [cx + w / 2 + 4 + trail, torsoBot + 6], [cx + w / 2 - 2 + trail, torsoBot + 7], [cx + w / 2 - 3, torsoTop + 6], [cx + w / 2 - 1, torsoTop + 5]], acc);
       break;
   }
   drawJobAccent(ctx, look.jobId, cx, torsoTop, torsoBot, w);
@@ -300,7 +333,7 @@ function drawBody(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors,
   limb(ctx, cx - 3, hipY, pose.legBackA, pose.legBackL, 3.2, c.boots, c.boots);
   limb(ctx, cx - 4.2, shoulderY, pose.armBackA, 8.6, 2.6, c.outfit === c.armor ? c.armor : c.armor, c.gloves);
 
-  classSilhouette(ctx, look, c, cx, torsoTop, torsoBot, pose.crouch);
+  classSilhouette(ctx, look, c, cx, torsoTop, torsoBot, pose.crouch, pose.legFrontA);
 
   // front leg
   const [footX, footY] = limb(ctx, cx + 3, hipY, pose.legFrontA, pose.legFrontL, 3.2, c.boots, c.boots);
@@ -327,7 +360,10 @@ function drawBody(ctx: CanvasRenderingContext2D, look: CharacterLook, c: Colors,
 
   // front arm + weapon
   const [handX, handY] = limb(ctx, cx + 4.2, shoulderY, pose.armFrontA, 8.6, 2.6, c.armor, c.gloves);
-  if (pose.weaponHand !== 'back') drawWeapon(ctx, handX, handY, look.weaponType, c.weapon, pose.weaponDeg);
+  if (pose.weaponHand !== 'back') {
+    if (pose.smearFrom !== undefined) drawSmear(ctx, handX, handY, pose.smearFrom, pose.weaponDeg, 13, c.weapon[0] ?? '#ffffff');
+    drawWeapon(ctx, handX, handY, look.weaponType, c.weapon, pose.weaponDeg);
+  }
   if (pose.glow) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; circle(ctx, handX, handY, 5, 'rgba(255,255,255,0.35)'); ctx.restore(); }
 }
 
@@ -346,16 +382,23 @@ function render(look: CharacterLook, pose: Pose): HTMLCanvasElement {
     // back view: simplified — head, back, alternating arms/legs reaching
     ctx.save();
     circle(ctx, CX, 12 + pose.headBob, 7.2, shade(c.hair, -0.1));
-    classSilhouette(ctx, look, c, CX, 18, 29, 0);
+    classSilhouette(ctx, look, c, CX, 18, 29, 0, pose.legFrontA);
     limb(ctx, CX - 4, 19, pose.armBackA, 8, 2.6, c.armor, c.gloves);
     limb(ctx, CX + 4, 19, pose.armFrontA, 8, 2.6, c.armor, c.gloves);
     limb(ctx, CX - 3, 29, pose.legBackA, 9, 3.2, c.boots, c.boots);
     limb(ctx, CX + 3, 29, pose.legFrontA, 9, 3.2, c.boots, c.boots);
     ctx.restore();
+  } else if (pose.squashY) {
+    // hurt recoil: a brief, bloom-friendly-safe squash (no glow), anchored at the feet
+    ctx.save();
+    const sq = pose.squashY;
+    ctx.translate(CX, FH); ctx.scale(1 + sq * 0.1, 1 - sq * 0.14); ctx.translate(-CX, -FH);
+    drawBody(ctx, look, c, pose);
+    ctx.restore();
   } else {
     drawBody(ctx, look, c, pose);
   }
-  return outlined(art, OUTLINE);
+  return outlineHued(art);
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +432,7 @@ function buildAnims(weaponType?: WeaponType): AnimTable[] {
     { name: 'crouch', frameRate: 1, repeat: -1, poses: [{ ...p(), crouch: 1, legFrontA: 12, legBackA: -12, armFrontA: 20, armBackA: -20, weaponDeg: 110 }] },
     {
       name: 'attack', frameRate: 11, repeat: 0,
-      poses: swing.map((deg, i) => ({ ...p(), legFrontA: 14 - i * 6, legBackA: -10 + i * 4, armFrontA: deg * 0.35, weaponDeg: deg, mouth: i === 1 ? 'open' : 'flat' as const })),
+      poses: swing.map((deg, i) => ({ ...p(), legFrontA: 14 - i * 6, legBackA: -10 + i * 4, armFrontA: deg * 0.35, weaponDeg: deg, mouth: i === 1 ? 'open' : 'flat' as const, smearFrom: i > 0 ? swing[i - 1] : undefined })),
     },
     {
       name: 'cast', frameRate: 6, repeat: 0,
@@ -400,7 +443,7 @@ function buildAnims(weaponType?: WeaponType): AnimTable[] {
       poses: [{ ...p(), armFrontA: 60, armBackA: -70, weaponDeg: isRanged ? 15 : 100, mouth: 'flat' as const }, { ...p(), armFrontA: 75, armBackA: -85, weaponDeg: isRanged ? 5 : 100, mouth: 'open' as const, glow: true }],
     },
     { name: 'climb', frameRate: 5, repeat: -1, poses: [-25, 25].map((a) => ({ ...p(), climb: true, armFrontA: a, armBackA: -a, legFrontA: -a * 0.6, legBackA: a * 0.6 })) },
-    { name: 'hurt', frameRate: 8, repeat: 0, poses: [{ ...p(), headBob: -1, armFrontA: -30, armBackA: 30, legFrontA: -10, legBackA: 10, mouth: 'x' as const }] },
+    { name: 'hurt', frameRate: 8, repeat: 0, poses: [{ ...p(), headBob: -1, armFrontA: -30, armBackA: 30, legFrontA: -10, legBackA: 10, mouth: 'x' as const, squashY: 0.8 }] },
     { name: 'dead', frameRate: 1, repeat: 0, poses: [{ ...p(), lying: true, armFrontA: 20, armBackA: -20, legFrontA: 10, legBackA: -10, mouth: 'x' as const }] },
   ];
 }

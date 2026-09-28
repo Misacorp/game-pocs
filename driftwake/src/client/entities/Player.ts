@@ -16,12 +16,17 @@ import { isGodmode } from '../dev/debug';
 import type { DamageTextPool } from '../combat/DamageText';
 import type { PlayerHandle } from '../combat/SkillRunner';
 import { applyBodyBottomAligned, playAnim, invulnAlpha } from './spriteUtil';
+import type { WorldLighting } from '../render/lighting';
+import { ContactShadow } from '../render/ContactShadow';
 
 export interface PlayerWorldCtx {
   ropeAt: (x: number, y: number) => RopeDef | null;
   inTown: () => boolean;
   cameraShake: (ms: number, intensity: number) => void;
   damageText: DamageTextPool;
+  lighting?: WorldLighting | null;
+  groundYAt?: (x: number, fromY: number) => number;
+  pulseChromatic?: (amount: number) => void;
 }
 
 export interface PlayerInputState {
@@ -54,6 +59,8 @@ export class Player implements PlayerHandle {
   private lastDamageAt = 0;
   private regenAccumMs = 0;
   dead = false;
+  private shadow: ContactShadow;
+  private static readonly LIGHT_ID = 'player';
 
   constructor(private scene: Phaser.Scene, x: number, y: number, private worldCtx: PlayerWorldCtx) {
     const look = Player.buildLook(session.state, session.job);
@@ -62,6 +69,14 @@ export class Player implements PlayerHandle {
     this.sprite = scene.physics.add.sprite(x, y, this.info.key, 0).setOrigin(0.5, 1).setDepth(15).setCollideWorldBounds(true);
     applyBodyBottomAligned(this.sprite, this.info);
     playAnim(this.sprite, this.info, 'idle');
+    worldCtx.lighting?.lit(this.sprite, this.info.key);
+    // The player always carries a soft warm light with them — priority guarantees it always wins
+    // a slot in the light budget over decor/vfx, however many of those are nearby.
+    worldCtx.lighting?.addLight({
+      id: Player.LIGHT_ID, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 0.6,
+      color: 0xffe6b0, radius: 130, intensity: 0.75, flicker: 0.06, priority: 3,
+    });
+    this.shadow = new ContactShadow(scene, this.info.bodyWidth * 1.5, 8);
   }
 
   get x() { return this.sprite.x; }
@@ -100,6 +115,7 @@ export class Player implements PlayerHandle {
     const anim = this.sprite.anims?.currentAnim?.key;
     this.sprite.setTexture(this.info.key, 0);
     applyBodyBottomAligned(this.sprite, this.info);
+    this.worldCtx.lighting?.lit(this.sprite, this.info.key);
     if (anim) { /* anim keys are namespaced per-texture; replay idle to avoid a stale frame */ }
     playAnim(this.sprite, this.info, 'idle');
   }
@@ -156,6 +172,7 @@ export class Player implements PlayerHandle {
 
     this.updateAnim(now, dashing);
     this.updateRegen(dtMs, stats);
+    if (this.worldCtx.groundYAt) this.shadow.update(this.sprite.x, this.worldCtx.groundYAt(this.sprite.x, this.sprite.y), this.sprite.y);
     session.position.x = this.sprite.x;
     session.position.y = this.sprite.y;
   }
@@ -274,6 +291,9 @@ export class Player implements PlayerHandle {
     this.worldCtx.cameraShake(120, 0.004);
     this.worldCtx.damageText.spawn(this.sprite.x, this.sprite.y - this.sprite.displayHeight, Math.round(amount), 'playerHurt');
     playAnim(this.sprite, this.info, 'hurt');
+    this.worldCtx.pulseChromatic?.(Math.min(0.012, 0.004 + amount / 4000));
+    const fx = this.sprite.x, fy = this.sprite.y - this.sprite.displayHeight * 0.6;
+    this.worldCtx.lighting?.addLight({ id: `hurtflash${now}`, x: () => fx, y: () => fy, color: 0xff5566, radius: 90, intensity: 1.1, ttl: 140 });
     if (session.hp <= 0) this.die();
   }
 
@@ -325,5 +345,9 @@ export class Player implements PlayerHandle {
     session.setVitals(hp, mp);
   }
 
-  destroy(): void { this.sprite.destroy(); }
+  destroy(): void {
+    this.worldCtx.lighting?.removeLight(Player.LIGHT_ID);
+    this.shadow.destroy();
+    this.sprite.destroy();
+  }
 }

@@ -56,9 +56,9 @@ export function showContextMenu(x: number, y: number, items: { label: string; on
     menu.appendChild(el('div', {
       style: {
         padding: '6px 10px', fontSize: '12px', cursor: it.disabled ? 'not-allowed' : 'pointer',
-        opacity: it.disabled ? '0.4' : '1', borderRadius: '4px', color: it.danger ? '#ff9a9a' : undefined,
+        opacity: it.disabled ? '0.4' : '1', borderRadius: '4px', color: it.danger ? 'var(--dw-coral)' : undefined,
       },
-      onmouseenter: (e: MouseEvent) => { if (!it.disabled) (e.target as HTMLElement).style.background = 'rgba(232,196,119,0.15)'; },
+      onmouseenter: (e: MouseEvent) => { if (!it.disabled) (e.target as HTMLElement).style.background = 'rgba(255,179,71,0.14)'; },
       onmouseleave: (e: MouseEvent) => { (e.target as HTMLElement).style.background = ''; },
       onclick: (e: MouseEvent) => { e.stopPropagation(); if (it.disabled) return; closeContextMenu(); it.onClick(); },
     }, it.label));

@@ -5,7 +5,8 @@
  */
 import Phaser from 'phaser';
 import type { VfxStyle } from '@shared/types';
-import { makeCanvas, ctx2d, outlined, rect, circle, ellipse, line, poly, registerCanvasTexture, hexNum, withAlpha } from './canvasKit';
+import { makeCanvas, ctx2d, rect, circle, ellipse, line, poly, registerCanvasTexture, hexNum, withAlpha } from './canvasKit';
+import { outlineHued, emissiveDab } from './shading';
 import type { VfxOpts } from './spec';
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,24 @@ function ensureBase(scene: Phaser.Scene): void {
     circle(ctx, 4, 4, 4, '#ffffff');
     registerCanvasTexture(scene, 'vfx_dot', c);
   }
+  {
+    // a tight, near-opaque white core (vs. vfx_soft's wide gentle falloff) — layered untinted
+    // on top of a tinted glow so a hit reads as "white-hot center fading to saturated color"
+    // instead of one flat tint, which is what actually sells bloom on an effect.
+    const c = makeCanvas(20, 20); const ctx = ctx2d(c);
+    const g = ctx.createRadialGradient(10, 10, 0, 10, 10, 10);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 20, 20);
+    registerCanvasTexture(scene, 'vfx_hotcore', c);
+  }
   baseReady = true;
+}
+
+/** Drops a small, untinted white-hot flash on top of a (usually tinted) effect — the "core"
+ *  that fades into its saturated color halo, instead of one flat-colored blob. */
+function hotCore(scene: Phaser.Scene, x: number, y: number, scale: number, life = 140): void {
+  const h = scene.add.image(x, y, 'vfx_hotcore').setDepth(62).setScale(scale).setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({ targets: h, scale: scale * 1.4, alpha: 0, duration: life, onComplete: () => h.destroy() });
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +132,7 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       const glow = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.9 });
       glow.setAlpha(0.55);
       scene.tweens.add({ targets: glow, scale: scale * 1.3, alpha: 0, duration: dur * 0.8, onComplete: () => glow.destroy() });
+      hotCore(scene, x, y, scale * 0.5, 120); // white-hot edge fading to color
       const s = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.1 });
       s.setRotation(rot);
       // a fainter, larger "smear" crescent lags one tick behind for a motion-blur trail
@@ -128,6 +147,7 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       const glow = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.1, color: color2 });
       glow.setAlpha(0.6);
       scene.tweens.add({ targets: glow, scale: scale * 1.7, alpha: 0, duration: dur, onComplete: () => glow.destroy() });
+      hotCore(scene, x, y, scale * 0.7, 150);
       const s1 = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.5 });
       const s2 = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.1, color: color2 });
       s2.setAlpha(0.7);
@@ -171,12 +191,18 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
     case 'orb': {
       const g = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.3 });
       scene.tweens.add({ targets: g, scale: scale * 1.7, alpha: 0, duration: dur, onComplete: () => g.destroy() });
+      // rim glow: a bright ring plus a small hot core reads as an orb with real depth, not a flat disc
+      const rim = glowImg(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.45, color: color2 });
+      rim.setAlpha(0.7);
+      scene.tweens.add({ targets: rim, scale: scale * 0.6, alpha: 0.9, yoyo: true, duration: dur * 0.5, repeat: 1, onComplete: () => rim.destroy() });
+      hotCore(scene, x, y, scale * 0.35, dur);
       break;
     }
     case 'explosion': {
       // snappy: the flash reads instantly, the ring/sparks finish just after — under 350ms total
       const g = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.6, color: opts.color });
       scene.tweens.add({ targets: g, scale: scale * 2.4, alpha: 0, duration: Math.min(dur + 70, 300), onComplete: () => g.destroy() });
+      hotCore(scene, x, y, scale * 0.9, 160); // hot white core at the heart of the blast
       const ring = glowImg(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.3, color: color2 });
       scene.tweens.add({ targets: ring, scale: scale * 2.1, alpha: 0, duration: Math.min(dur + 90, 340), onComplete: () => ring.destroy() });
       burst(scene, x, y, 'vfx_spark', hexNum(opts.color), 14, 150 * scale, 300);
@@ -186,6 +212,7 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       const b = glowImg(scene, 'vfx_bolt', x, y - 16 * scale, { ...opts, scale });
       b.setOrigin(0.5, 0);
       scene.tweens.add({ targets: b, alpha: 0, duration: 220, onComplete: () => b.destroy() });
+      hotCore(scene, x, y - 16 * scale, scale * 0.5, 110); // white core at the strike point
       const flash = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.2 });
       fadeOut(scene, flash, 180);
       break;
@@ -293,16 +320,16 @@ export function getProjectileTexture(scene: Phaser.Scene, style: VfxStyle, color
       art = makeCanvas(12, 4); { const c = ctx2d(art); rect(c, 0, 1, 3, 2, '#6b5438'); poly(c, [[3, 0], [11, 1.5], [11, 2.5], [3, 4]], color); }
       break;
     case 'ice':
-      art = makeCanvas(8, 10); { const c = ctx2d(art); poly(c, [[4, 0], [8, 5], [5, 5], [4, 10], [3, 5], [0, 5]], color); }
+      art = makeCanvas(8, 10); { const c = ctx2d(art); poly(c, [[4, 0], [8, 5], [5, 5], [4, 10], [3, 5], [0, 5]], color); emissiveDab(c, 4, 5, 3, '#cdefff', { coreStop: 0.3, alpha: 0.7 }); }
       break;
     case 'fire':
-      art = makeCanvas(8, 10); { const c = ctx2d(art); ellipse(c, 4, 6, 3.5, 4.5, color); circle(c, 4, 3, 1.8, '#ffe07a'); }
+      art = makeCanvas(8, 10); { const c = ctx2d(art); ellipse(c, 4, 6, 3.5, 4.5, color); emissiveDab(c, 4, 4, 3, '#ffe07a', { coreStop: 0.3 }); }
       break;
     case 'orb': default:
-      art = makeCanvas(8, 8); { const c = ctx2d(art); circle(c, 4, 4, 3.6, color); circle(c, 3, 3, 1.2, '#ffffff'); }
+      art = makeCanvas(10, 10); { const c = ctx2d(art); emissiveDab(c, 5, 5, 4.4, color, { coreStop: 0.3 }); }
       break;
   }
-  registerCanvasTexture(scene, key, outlined(art, '#1a1218', false));
+  registerCanvasTexture(scene, key, outlineHued(art, false));
   projCache.set(key, key);
   return key;
 }
@@ -335,5 +362,5 @@ export function spawnHitSpark(scene: Phaser.Scene, x: number, y: number, crit: b
   // spark alone, is what sells a hit as having landed with real weight
   const ring = scene.add.image(x, y, 'vfx_ring').setTint(tint).setDepth(69).setScale(crit ? 0.35 : 0.2).setAlpha(crit ? 0.9 : 0.6).setBlendMode(Phaser.BlendModes.ADD);
   scene.tweens.add({ targets: ring, scale: crit ? 1.1 : 0.7, alpha: 0, duration: crit ? 240 : 160, onComplete: () => ring.destroy() });
-  if (crit) burst(scene, x, y, 'vfx_dot', tint, 6, 70, 200, 0.7, 0);
+  if (crit) { burst(scene, x, y, 'vfx_dot', tint, 6, 70, 200, 0.7, 0); hotCore(scene, x, y, 0.5, 130); }
 }

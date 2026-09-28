@@ -19,7 +19,7 @@ const TABS: { id: InventoryTab; label: string }[] = [
 ];
 
 export function createInventoryWindow(wm: WindowManager, session: GameSession) {
-  const goldEl = el('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: '#ffd24a' } }, el('img', { src: goldIconUrl(16), style: { width: '16px', height: '16px' } }), '0');
+  const goldEl = el('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '700', color: 'var(--dw-lantern-hot)' } }, el('img', { src: goldIconUrl(16), style: { width: '16px', height: '16px' } }), '0');
   const grid = el('div', { class: 'dw-grid' });
   let currentTab: InventoryTab = 'equip';
 

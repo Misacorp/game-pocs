@@ -7,6 +7,8 @@ import type { NpcDef } from '@shared/types';
 import { getNpcSprite } from '../gfx';
 import { bus } from '../events';
 import { makeCrispLabel } from './spriteUtil';
+import type { WorldLighting } from '../render/lighting';
+import { ContactShadow } from '../render/ContactShadow';
 
 export class NpcEntity {
   /** Global (map-wide) bark rate limit so at most one NPC talks at a time, ~12s apart. */
@@ -23,14 +25,18 @@ export class NpcEntity {
   private barkExpiresAt = 0;
   private curMarker: '!' | '?' | '…' | null = null;
   private near = false;
+  private shadow: ContactShadow;
 
-  constructor(private scene: Phaser.Scene, public def: NpcDef, public x: number, public y: number, flip = false) {
+  constructor(private scene: Phaser.Scene, public def: NpcDef, public x: number, public y: number, flip = false, lighting?: WorldLighting | null) {
     this.id = def.id;
     const info = getNpcSprite(scene, def);
     this.sprite = scene.add.sprite(x, y, info.key, 0).setOrigin(0.5, 1).setDepth(9).setFlipX(flip);
     if (info.anims.idle) this.sprite.play(info.anims.idle);
     this.sprite.setInteractive({ useHandCursor: true });
     this.sprite.on('pointerdown', () => bus.emit('ui:dialogue', { npcId: this.id }));
+    lighting?.lit(this.sprite, info.key);
+    this.shadow = new ContactShadow(scene, info.bodyWidth * 1.4, 8);
+    this.shadow.update(x, y, y);
 
     // Stack (top -> bottom, closest to the head last): marker, title (near-only), name.
     const nameY = y - info.frameHeight - 4;
@@ -101,6 +107,7 @@ export class NpcEntity {
 
   destroy(): void {
     this.sprite.destroy(); this.nameTag.destroy(); this.titleTag?.destroy(); this.marker.destroy();
+    this.shadow.destroy();
     this.clearBark();
   }
 }

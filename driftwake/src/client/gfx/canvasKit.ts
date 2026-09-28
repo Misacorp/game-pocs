@@ -183,6 +183,93 @@ export function ensureAnim(scene: Phaser.Scene, key: string, animKey: string, st
   return animKey;
 }
 
+// ---------------------------------------------------------------------------
+// normal-map generation (rendering pipeline hook — see src/client/render/lighting.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds a tangent-space normal map from a canvas's alpha channel: a shallow bevel derived from
+ * distance-to-edge (via a few cheap erosion passes, not a full distance transform) plus a little
+ * luminance-based relief on top, so flat pixel art picks up a believable rounded-edge response to
+ * Phaser's Light2D pipeline without needing hand-authored normal maps. Fully opaque interior pixels
+ * flatten out to a "top" normal; transparent pixels stay flat/alpha-0 (excluded from lighting).
+ * Cheap enough to run once per texture (O(bevel * w * h)) — callers should cache by texture key
+ * (see `render/lighting.ts`'s `ensureNormalMap`), never regenerate per frame.
+ */
+export function buildNormalMapFromAlpha(
+  src: HTMLCanvasElement,
+  opts: { bevel?: number; strength?: number; relief?: number } = {},
+): HTMLCanvasElement {
+  const bevel = Math.max(1, Math.round(opts.bevel ?? 3));
+  const strength = opts.strength ?? 1.6;
+  const relief = opts.relief ?? 0.35;
+  const w = src.width, h = src.height;
+  const sctx = ctx2d(src);
+  const data = sctx.getImageData(0, 0, w, h).data;
+
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) mask[i] = data[i * 4 + 3] > 20 ? 1 : 0;
+
+  // Height field: iterative erosion gives a cheap approximate distance-to-edge (bevel depth),
+  // capped at `bevel` px; interior pixels beyond that stay at the max (flat "top").
+  const height = new Float32Array(w * h);
+  let cur = mask;
+  for (let pass = 1; pass <= bevel; pass++) {
+    const next = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = y * w + x;
+        if (!cur[idx]) continue;
+        const up = y > 0 ? cur[idx - w] : 0, down = y < h - 1 ? cur[idx + w] : 0;
+        const left = x > 0 ? cur[idx - 1] : 0, right = x < w - 1 ? cur[idx + 1] : 0;
+        if (!up || !down || !left || !right) height[idx] = pass;
+        else next[idx] = 1;
+      }
+    }
+    cur = next;
+  }
+  for (let i = 0; i < w * h; i++) if (cur[i]) height[i] = bevel + 1;
+
+  // subtle luminance-based relief on top of the bevel
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (!mask[idx]) continue;
+      const i = idx * 4;
+      const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      height[idx] += (lum - 0.5) * relief * bevel;
+    }
+  }
+
+  const hAt = (x: number, y: number): number => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return 0;
+    return height[y * w + x];
+  };
+
+  const out = makeCanvas(w, h);
+  const octx = ctx2d(out);
+  const outData = octx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const i = idx * 4;
+      if (!mask[idx]) { outData.data[i] = 128; outData.data[i + 1] = 128; outData.data[i + 2] = 255; outData.data[i + 3] = 0; continue; }
+      let nx = -(hAt(x + 1, y) - hAt(x - 1, y)) * strength;
+      let ny = -(hAt(x, y + 1) - hAt(x, y - 1)) * strength;
+      const nz = Math.sqrt(Math.max(0.05, 1 - nx * nx - ny * ny));
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      nx /= len; ny /= len;
+      const nzz = nz / len;
+      outData.data[i] = Math.round((nx * 0.5 + 0.5) * 255);
+      outData.data[i + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+      outData.data[i + 2] = Math.round((nzz * 0.5 + 0.5) * 255);
+      outData.data[i + 3] = data[i + 3];
+    }
+  }
+  octx.putImageData(outData, 0, 0);
+  return out;
+}
+
 let seedState = 1;
 export function seedRandom(seed: number): () => number {
   let s = seed % 2147483647; if (s <= 0) s += 2147483646;

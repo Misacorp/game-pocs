@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 import type { ThemeId } from '@shared/types';
 import { makeCanvas, ctx2d, rect, circle, ellipse, poly, registerCanvasTexture, shade, seedRandom } from './canvasKit';
 import { THEMES } from './palette';
+import { warmHighlight, coolShadow } from './shading';
 import type { PlatformTextures } from './spec';
 
 const T = 16;
@@ -117,6 +118,35 @@ function groundFill(family: Family, fill: string, accent: string, seed: number):
   return c;
 }
 
+/** Underside hanging detail drawn below a one-way platform's structural top (y >= fromY),
+ *  themed per family — moss drips, icicle-like barnacles, coral fringe, dangling roots... —
+ *  so platforms read as something with an underside, not just a floating bar. */
+function underside(ctx: CanvasRenderingContext2D, family: Family, color: string, accent: string, rnd: () => number, fromY: number): void {
+  switch (family) {
+    case 'mossRock': // hanging moss drips
+      for (let i = 0; i < 4; i++) { const x = 1 + rnd() * (T - 2); rect(ctx, x, fromY, 1, 2 + rnd() * 3, shade(accent, -0.1)); }
+      circle(ctx, T * 0.3, fromY + 3, 1, shade(accent, 0.1));
+      break;
+    case 'rock': // icicle-like barnacle spikes
+      for (let i = 0; i < 3; i++) { const x = 2 + i * 4.5; poly(ctx, [[x - 1.3, fromY], [x, fromY + 3 + (i % 2)], [x + 1.3, fromY]], shade(color, -0.1)); }
+      break;
+    case 'coral': // coral fringe knuckles
+      for (let i = 0; i < 4; i++) ellipse(ctx, 2 + i * 3.6, fromY + 1.5, 1.5, 2.4 + (i % 2), i % 2 ? color : accent);
+      break;
+    case 'kelp': // thin dangling kelp strands
+      for (let i = 0; i < 3; i++) { const x = 2 + i * 5; rect(ctx, x + Math.sin(i) * 1, fromY, 1.2, 3 + (i % 2) * 2, i % 2 ? color : accent); }
+      break;
+    case 'grass': // dangling roots
+      for (let i = 0; i < 3; i++) { const x = 3 + i * 5; rect(ctx, x, fromY, 1, 2 + rnd() * 2, shade('#6b5438', -0.1)); }
+      break;
+    case 'flesh': // slow drips of the pulsing vein color
+      for (let i = 0; i < 3; i++) circle(ctx, 2 + i * 5.5, fromY + 1 + rnd(), 1, shade(accent, 0.15));
+      break;
+    default: // planks — a crossbeam shadow suggests real structure underneath
+      rect(ctx, 2, fromY, T - 4, 1, shade(color, -0.3));
+  }
+}
+
 function oneway(family: Family, color: string, accent: string, seed: number): HTMLCanvasElement {
   const c = makeCanvas(T, T); const ctx = ctx2d(c);
   const rnd = seedRandom(seed + 13);
@@ -124,22 +154,27 @@ function oneway(family: Family, color: string, accent: string, seed: number): HT
     case 'kelp':
       fillBase(ctx, 'rgba(0,0,0,0)');
       rect(ctx, 2, 0, 3, 12, color); rect(ctx, 9, 0, 3, 12, shade(color, -0.1));
+      rect(ctx, 2, 0, 3, 1.4, warmHighlight(color, 0.25)); rect(ctx, 9, 0, 3, 1.4, warmHighlight(shade(color, -0.1), 0.2));
       wrapDot(ctx, 3, 4, 1, accent); wrapDot(ctx, 10, 8, 1, accent);
+      underside(ctx, family, color, accent, rnd, 12);
       break;
     case 'coral':
       fillBase(ctx, 'rgba(0,0,0,0)');
       for (let i = 0; i < 4; i++) circle(ctx, 2 + i * 4, 8 + (i % 2) * 2, 3, i % 2 ? color : shade(color, 0.15));
+      underside(ctx, family, color, accent, rnd, 11);
       break;
     case 'flesh':
       fillBase(ctx, color);
-      rect(ctx, 0, 4, T, 1, shade(accent, 0.2));
-      rect(ctx, 0, 9, T, 1, shade(accent, 0.2));
+      rect(ctx, 0, 4, T, 1, warmHighlight(accent, 0.3));
+      rect(ctx, 0, 9, T, 1, coolShadow(accent, 0.25));
+      underside(ctx, family, color, accent, rnd, 13);
       break;
     default:
       fillBase(ctx, color);
-      rect(ctx, 0, 0, T, 2, shade(color, 0.2));
-      rect(ctx, 4, 0, 1, 12, shade(color, -0.25));
-      rect(ctx, 11, 0, 1, 12, shade(color, -0.25));
+      rect(ctx, 0, 0, T, 2, warmHighlight(color, 0.3)); // top-lit edge
+      rect(ctx, 4, 0, 1, 12, coolShadow(color, 0.3));
+      rect(ctx, 11, 0, 1, 12, coolShadow(color, 0.3));
+      underside(ctx, family, color, accent, rnd, 12);
   }
   return c;
 }
@@ -147,11 +182,11 @@ function oneway(family: Family, color: string, accent: string, seed: number): HT
 function solid(family: Family, color: string, accent: string, seed: number): HTMLCanvasElement {
   const c = makeCanvas(T, T); const ctx = ctx2d(c);
   fillBase(ctx, color);
-  rect(ctx, 0, 0, T, 1, shade(color, 0.2));
-  rect(ctx, 0, T - 1, T, 1, shade(color, -0.25));
-  rect(ctx, 0, 8, T, 1, shade(color, -0.15));
-  rect(ctx, 8, 0, 1, 8, shade(color, -0.1));
-  rect(ctx, 0, 9, 8, 1, shade(color, -0.1));
+  rect(ctx, 0, 0, T, 1, warmHighlight(color, 0.3)); // top-lit edge
+  rect(ctx, 0, T - 1, T, 1, coolShadow(color, 0.3));
+  rect(ctx, 0, 8, T, 1, coolShadow(color, 0.2));
+  rect(ctx, 8, 0, 1, 8, coolShadow(color, 0.15));
+  rect(ctx, 0, 9, 8, 1, coolShadow(color, 0.15));
   if (family === 'flesh') wrapDot(ctx, 8, 8, 1.4, accent);
   return c;
 }

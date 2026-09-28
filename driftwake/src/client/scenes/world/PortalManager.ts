@@ -9,20 +9,26 @@ import { session } from '../../session';
 import { bus } from '../../events';
 import { getPortalSprite } from '../../gfx';
 import { makeCrispLabel } from '../../entities/spriteUtil';
+import type { WorldLighting } from '../../render/lighting';
 
-interface PortalEntry { def: PortalDef; sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text }
+interface PortalEntry { def: PortalDef; sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text; lightId: string }
+
+let portalLightSeq = 0;
 
 export class PortalManager {
   private entries: PortalEntry[] = [];
 
-  constructor(private scene: Phaser.Scene, map: MapDef) {
+  constructor(private scene: Phaser.Scene, map: MapDef, private lighting?: WorldLighting | null) {
     const info = getPortalSprite(scene);
     for (const p of map.portals) {
       const sprite = scene.add.sprite(p.x, p.y, info.key, 0).setOrigin(0.5, 1).setDepth(3);
       if (info.anims.idle) sprite.play(info.anims.idle);
+      lighting?.lit(sprite, info.key);
       const label = makeCrispLabel(scene, p.x, p.y - info.frameHeight - 4, p.label ?? p.to, { color: '#bfe9ff' })
         .setOrigin(0.5, 1).setDepth(3.1);
-      this.entries.push({ def: p, sprite, label });
+      const lightId = `portal${portalLightSeq++}`;
+      lighting?.addLight({ id: lightId, x: () => sprite.x, y: () => sprite.y - info.frameHeight * 0.5, color: 0x66ccff, radius: 75, intensity: 0.9, flicker: 0.15 });
+      this.entries.push({ def: p, sprite, label, lightId });
     }
   }
 
@@ -45,5 +51,8 @@ export class PortalManager {
     session.dispatch({ type: 'changeMap', mapId: p.to, portalId: p.toPortal, fromPortalId: p.id });
   }
 
-  destroy(): void { for (const e of this.entries) { e.sprite.destroy(); e.label.destroy(); } this.entries = []; }
+  destroy(): void {
+    for (const e of this.entries) { e.sprite.destroy(); e.label.destroy(); this.lighting?.removeLight(e.lightId); }
+    this.entries = [];
+  }
 }

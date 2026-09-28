@@ -7,6 +7,7 @@ import type { ItemDef, Rarity } from '@shared/types';
 import type { LootDrop } from '@shared/protocol';
 import { DROP_LIFETIME_MS, RARITY_COLORS } from '@shared/constants';
 import { getDropTexture } from '../gfx';
+import type { WorldLighting } from '../render/lighting';
 
 export interface DropEntry {
   dropId: string;
@@ -17,7 +18,10 @@ export interface DropEntry {
   landY: number;
   bornAt: number;
   pickedUp: boolean;
+  lightId?: string;
 }
+
+let dropLightSeq = 0;
 
 export class DropManager {
   private drops: DropEntry[] = [];
@@ -27,6 +31,7 @@ export class DropManager {
     private scene: Phaser.Scene,
     /** find the platform surface y directly below (x, fromY); returns fromY+300 if none found */
     private groundYAt: (x: number, fromY: number) => number,
+    private lighting?: WorldLighting | null,
   ) {}
 
   spawnMany(drops: LootDrop[], x: number, y: number, itemOf: (itemId: string) => ItemDef | undefined, rarityOf: (d: LootDrop) => Rarity | undefined): void {
@@ -40,6 +45,7 @@ export class DropManager {
   private spawnOne(drop: LootDrop, x: number, y: number, def: ItemDef | undefined, rarity: Rarity | undefined, seq: number): void {
     const key = def ? getDropTexture(this.scene, def) : getDropTexture(this.scene, 'gold');
     const sprite = this.scene.add.image(x, y - 6, key).setDepth(6);
+    this.lighting?.lit(sprite, key);
     const now = performance.now();
     const entry: DropEntry = { dropId: drop.dropId, sprite, landed: false, landY: y, bornAt: now, pickedUp: false };
 
@@ -52,6 +58,8 @@ export class DropManager {
         const beam = this.scene.add.rectangle(x, y - 40, 6, 80, color, 0.25).setDepth(4);
         this.scene.tweens.add({ targets: beam, alpha: 0.08, duration: 700, yoyo: true, repeat: -1 });
         entry.beam = beam;
+        entry.lightId = `drop${dropLightSeq++}`;
+        this.lighting?.addLight({ id: entry.lightId, x: () => sprite.x, y: () => sprite.y, color, radius: 70, intensity: 0.8, flicker: 0.15 });
       }
     }
 
@@ -120,6 +128,7 @@ export class DropManager {
 
   private flyToAndRemove(d: DropEntry, px: number, py: number): void {
     const targets = [d.sprite, d.glow, d.beam].filter(Boolean) as Phaser.GameObjects.GameObject[];
+    if (d.lightId) this.lighting?.removeLight(d.lightId);
     this.scene.tweens.add({
       targets, x: px, y: py - 20, alpha: 0, scale: 0.4, duration: 220, ease: 'Quad.easeIn',
       onComplete: () => { d.sprite.destroy(); d.glow?.destroy(); d.beam?.destroy(); },
@@ -129,12 +138,13 @@ export class DropManager {
 
   private expire(d: DropEntry): void {
     const targets = [d.sprite, d.glow, d.beam].filter(Boolean) as Phaser.GameObjects.GameObject[];
+    if (d.lightId) this.lighting?.removeLight(d.lightId);
     this.scene.tweens.add({ targets, alpha: 0, duration: 400, onComplete: () => { d.sprite.destroy(); d.glow?.destroy(); d.beam?.destroy(); } });
     this.drops = this.drops.filter((e) => e !== d);
   }
 
   destroy(): void {
-    for (const d of this.drops) { d.sprite.destroy(); d.glow?.destroy(); d.beam?.destroy(); }
+    for (const d of this.drops) { d.sprite.destroy(); d.glow?.destroy(); d.beam?.destroy(); if (d.lightId) this.lighting?.removeLight(d.lightId); }
     this.drops = [];
   }
 }

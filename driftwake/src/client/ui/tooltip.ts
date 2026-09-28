@@ -37,6 +37,12 @@ export function showTooltipAt(x: number, y: number, children: (Node | string)[])
   const t = ensure();
   t.innerHTML = '';
   for (const c of children) t.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  // Rarity-colored border: item tooltips (buildItemTooltip) color their name span inline —
+  // reuse that color for the whole tooltip's frame/glow (BRAND.md tooltip spec) without every
+  // caller having to thread a rarity color through separately.
+  const nameEl = t.querySelector<HTMLElement>('.dw-tt-name');
+  const rarColor = nameEl?.style.color || '';
+  if (rarColor) t.style.setProperty('--rar', rarColor); else t.style.removeProperty('--rar');
   t.style.display = 'block';
   position(x, y);
 }

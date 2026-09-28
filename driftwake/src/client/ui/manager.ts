@@ -113,12 +113,15 @@ export interface WindowOpts {
 /** Creates window chrome (titlebar/close/draggable/position-persisted) around `body`. */
 export function createWindow(wm: WindowManager, opts: WindowOpts, body: HTMLElement): WindowController {
   const titleIconEl = opts.titleIcon ? el('img', { class: 'dw-icon', src: opts.titleIcon }) : null;
-  const closeBtn = el('button', { class: 'dw-close', title: 'Close' }, '✕');
+  const closeBtn = el('button', { class: 'dw-close dwb-close', title: 'Close' }, '✕');
   const titlebar = el('div', { class: 'dw-titlebar' }, titleIconEl, el('div', { class: 'dw-title dw-caps' }, opts.title), closeBtn);
+  // Corner ornaments: every carved whale-hide window gets the four scrimshaw curls (BRAND.md rule 1).
+  // Reuses the brand's own .dwb-corners piece so we don't duplicate its artwork/CSS here.
+  const corners = el('span', { class: 'dwb-corners' }, el('i'), el('i'), el('i'), el('i'));
   const root = el('div', {
     class: `dw-panel dw-window ${opts.className ?? ''}`,
     style: { width: opts.width ? `${opts.width}px` : undefined, display: 'none' },
-  }, titlebar, body);
+  }, corners, titlebar, body);
   wm.container.appendChild(root);
 
   const positions = loadPos();

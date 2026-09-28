@@ -1,5 +1,7 @@
 /**
- * Title screen: logo, character select and character creation.
+ * Title screen: logo lockup, character select and character creation.
+ * The background is a translucent vignette only (BRAND.md) — the Phaser "Title" scene's shader
+ * sky (see scenes/TitleScene.ts) is what actually paints behind the DOM here.
  */
 import { el } from './dom';
 import type { Backend } from '../net';
@@ -17,6 +19,14 @@ const FALLBACK_CLASSES: Record<ClassId, { name: string; description: string; pla
   shade: { name: 'Shade', description: 'Fast, crit-heavy assassin.', playstyle: 'Melee burst / crit', mainStat: 'LUK', weapons: 'Dagger, Knives', color: '#c77dff' },
 };
 
+// Small scrimshaw-style sigils, one per class, drawn in bone line-work (BRAND.md: engraved bone tablets).
+const CLASS_SIGILS: Record<ClassId, string> = {
+  vanguard: `<path d="M5 20 17 4" stroke="var(--dw-bone)" stroke-width="2" stroke-linecap="round"/><path d="M13 2 21 8" stroke="var(--dw-bone)" stroke-width="2" stroke-linecap="round"/><circle cx="5" cy="20" r="2" fill="var(--dw-bone)"/>`,
+  stormcaller: `<path d="M13 1 5 13 h5 L8 23 19 9 h-5Z" fill="var(--dw-bone)"/>`,
+  windrunner: `<path d="M2 9c4-6 16-6 20 0M2 15c4 6 16 6 20 0" stroke="var(--dw-bone)" fill="none" stroke-width="1.6" stroke-linecap="round"/>`,
+  shade: `<path d="M12 1 14.5 13 12 23 9.5 13Z" fill="var(--dw-bone)"/><path d="M4 8h16" stroke="var(--dw-bone)" stroke-width="1.4"/>`,
+};
+
 const SKIN_TONES = ['#ffe0bd', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5a3825'];
 const HAIR_COLORS = ['#1c130d', '#4a2c16', '#8a5a2a', '#c9a227', '#e8e2d0', '#8a2e2e', '#2e4f7a', '#6a2e7a'];
 const EYE_COLORS = ['#223344', '#3a6ea5', '#4a7a3a', '#7a3a3a', '#7a5a2a', '#161616'];
@@ -28,37 +38,33 @@ function randomAppearance(): Appearance {
   return { skin: rand(SKIN_TONES), hair: rand(HAIR_COLORS), hairStyle: Math.floor(Math.random() * HAIR_STYLE_COUNT), eyes: rand(EYE_COLORS), outfit: rand(OUTFIT_COLORS) };
 }
 
-function skyBackdrop(): HTMLElement {
-  const layer = el('div', { class: 'dw-title-sky-layer' });
-  for (let i = 0; i < 9; i++) {
-    const w = 90 + Math.random() * 160;
-    const h = w * 0.34;
-    const cloud = el('div', {
-      class: 'dw-cloud',
-      style: {
-        width: `${w}px`, height: `${h}px`, top: `${5 + Math.random() * 55}%`, left: `${Math.random() * 100}%`,
-        animationDuration: `${40 + Math.random() * 50}s`, animationDelay: `-${Math.random() * 40}s`, opacity: String(0.3 + Math.random() * 0.4),
-      },
-    });
-    layer.appendChild(cloud);
-  }
-  const whale = el('div', {
-    class: 'dw-whale', style: { width: '220px', height: '90px', top: '30%', background: 'radial-gradient(ellipse at 35% 35%, #4a5f8a, #253154 70%)', borderRadius: '50% 50% 45% 45% / 60% 60% 40% 40%' },
-  });
-  layer.appendChild(whale);
-  return layer;
+/** The fluke-rises / wake-draws-itself logo lockup (BRAND.md). Re-runs its entrance animation
+ *  every time it's (re)built, since CSS animations restart on element (re)insertion. */
+function logoLockup(size: 'lg' | 'sm' = 'lg'): HTMLElement {
+  const wakeSvg = `<svg viewBox="0 0 120 14" fill="none" stroke="#f1e6cf" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 7 C 22 1, 38 13, 60 7 S 98 1, 118 7" stroke-opacity=".85" stroke-width="1.3"/>
+    <path d="M14 11 C 30 7, 44 14, 60 11 S 88 7, 106 11" stroke-opacity=".45"/>
+    <path d="M14 3 C 30 -1, 44 6, 60 3 S 88 -1, 106 3" stroke-opacity=".45"/>
+  </svg>`;
+  const wakeHost = el('div', { class: 'dw-logo-wake', html: wakeSvg });
+  const lockup = el('div', { class: 'dw-logo-lockup' },
+    el('div', { class: 'dw-logo-fluke' }),
+    el('div', { class: 'dw-logo-word', style: size === 'sm' ? { fontSize: '30px' } : undefined },
+      'DRIFT', el('span', { class: 'dw-logo-w' }, 'W'), 'AKE'),
+    wakeHost);
+  if (size === 'lg') lockup.appendChild(el('div', { class: 'dw-logo-tag' }, 'Tales of the Skywhales'));
+  return lockup;
 }
 
 export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (characterId: string) => void): void {
   root.innerHTML = '';
-  const screen = el('div', { class: 'dw-title-screen' }, skyBackdrop());
+  const screen = el('div', { class: 'dw-title-screen' });
   root.appendChild(screen);
   showMenu();
 
   function showMenu() {
     const content = el('div', { class: 'dw-title-content' },
-      el('div', { class: 'dw-logo' }, 'DRIFTWAKE'),
-      el('div', { class: 'dw-subtitle' }, 'Tales of the Skywhales'),
+      logoLockup('lg'),
       el('div', { class: 'dw-title-menu' },
         el('button', { class: 'dw-btn dw-btn-primary', onclick: () => { audio.playSfx('uiClick'); showCharSelect(); } }, 'Play')));
     setContent(content);
@@ -71,9 +77,10 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
   }
 
   async function showCharSelect() {
-    const listWrap = el('div', { class: 'dw-charlist' }, el('div', { style: { color: '#a7b0c4' } }, 'Loading...'));
+    const listWrap = el('div', { class: 'dw-charlist' }, el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'Loading...'));
     const panel = el('div', { class: 'dw-panel dw-charselect' },
-      el('div', { class: 'dw-logo', style: { fontSize: '30px' } }, 'Choose Your Wayfarer'),
+      el('span', { class: 'dwb-corners' }, el('i'), el('i'), el('i'), el('i')),
+      logoLockup('sm'),
       listWrap,
       el('div', { style: { display: 'flex', justifyContent: 'center', marginTop: '6px' } },
         el('button', { class: 'dw-btn dw-btn-ghost', onclick: showMenu }, 'Back')));
@@ -88,11 +95,12 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
       listWrap.innerHTML = '';
       for (const c of chars) {
         const jobName = JOBS[c.jobId]?.name ?? FALLBACK_CLASSES[c.classId]?.name ?? c.classId;
+        const porthole = el('div', { class: 'dw-cc-porthole' }, el('img', { src: characterPreviewUrlSafe({ classId: c.classId, jobId: c.jobId, appearance: c.appearance }, 3) }));
         const card = el('div', { class: `dw-charcard ${selected === c.id ? 'dw-selected' : ''}`, onclick: () => { selected = c.id; renderCards(); } },
-          el('img', { src: characterPreviewUrlSafe({ classId: c.classId, jobId: c.jobId, appearance: c.appearance }, 3) }),
+          porthole,
           el('div', { class: 'dw-cc-name' }, c.name),
           el('div', { class: 'dw-cc-sub' }, `Lv.${c.level} ${jobName}`),
-          el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', justifyContent: 'center' } },
+          el('div', { style: { display: 'flex', gap: '6px', marginTop: '9px', justifyContent: 'center' } },
             el('button', { class: 'dw-btn dw-btn-sm dw-btn-primary', onclick: (e: MouseEvent) => { e.stopPropagation(); enter(c.id); } }, 'Play'),
             el('button', {
               class: 'dw-btn dw-btn-sm dw-btn-danger', onclick: async (e: MouseEvent) => {
@@ -106,7 +114,7 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
             }, 'Delete')));
         listWrap.appendChild(card);
       }
-      listWrap.appendChild(el('div', { class: 'dw-charcard', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '150px', fontSize: '13px', color: '#e8c477', fontWeight: '700' }, onclick: () => showCreate() }, '+ Create New'));
+      listWrap.appendChild(el('div', { class: 'dw-charcard', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '150px', fontFamily: 'var(--dw-font-display)', fontSize: '15px', color: 'var(--dw-lantern-hot)' }, onclick: () => showCreate() }, '+ Create New'));
     }
     renderCards();
 
@@ -124,7 +132,11 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
     function classCard(id: ClassId): HTMLElement {
       const job = JOBS[id];
       const fb = FALLBACK_CLASSES[id];
-      const card = el('div', { class: `dw-class-card ${classId === id ? 'dw-selected' : ''}`, onclick: () => { classId = id; rebuild(); } },
+      const card = el('div', {
+        class: `dw-class-card ${classId === id ? 'dw-selected' : ''}`, onclick: () => { classId = id; rebuild(); },
+        style: { '--dw-class-color': fb.color } as any,
+      },
+        el('div', { class: 'dw-class-sigil', html: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${CLASS_SIGILS[id]}</svg>` }),
         el('h3', null, job?.name ?? fb.name),
         el('p', null, job?.description ?? fb.description),
         el('p', null, el('b', null, 'Playstyle: '), job?.playstyle ?? fb.playstyle),
@@ -146,13 +158,14 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
         }, String(i + 1)))));
     }
 
-    const body = el('div', { class: 'dw-panel dw-create-flow' });
+    const body = el('div', { class: 'dw-panel dw-create-flow' }, el('span', { class: 'dwb-corners' }, el('i'), el('i'), el('i'), el('i')));
 
     function rebuild() {
       preview.src = characterPreviewUrlSafe({ classId, jobId: classId, appearance }, 5);
       const nameVal = nameInput.value;
       body.innerHTML = '';
-      body.appendChild(el('div', { class: 'dw-logo', style: { fontSize: '26px' } }, 'Create Your Wayfarer'));
+      body.appendChild(el('span', { class: 'dwb-corners' }, el('i'), el('i'), el('i'), el('i')));
+      body.appendChild(logoLockup('sm'));
       body.appendChild(el('div', { class: 'dw-class-cards' }, ...CLASS_IDS.map(classCard)));
       body.appendChild(el('div', { class: 'dw-appearance-row' },
         el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' } }, preview,
@@ -165,7 +178,7 @@ export function buildTitleScreen(root: HTMLElement, backend: Backend, onEnter: (
           swatchRow('Eye Color', EYE_COLORS, appearance.eyes, (c) => appearance = { ...appearance, eyes: c }),
           swatchRow('Outfit Color', OUTFIT_COLORS, appearance.outfit, (c) => appearance = { ...appearance, outfit: c }))));
       nameInput.value = nameVal;
-      body.appendChild(el('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' } },
+      body.appendChild(el('div', { class: 'dw-name-plate', style: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px', justifyContent: 'center' } },
         el('div', { class: 'dw-field-label' }, ''), nameInput));
       body.appendChild(errorEl);
       body.appendChild(el('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },

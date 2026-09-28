@@ -7,6 +7,7 @@
  *  - white/gold: "+N EXP"
  */
 import Phaser from 'phaser';
+import { ensurePixelFontLoading, pixelFontFamily } from '../render/pixelFont';
 
 export type DamageTextKind = 'normal' | 'crit' | 'playerHurt' | 'heal' | 'xp' | 'info';
 
@@ -26,17 +27,18 @@ export class DamageTextPool {
   /** Small per-target stack offset so repeated hits don't overlap exactly. */
   private stackOffsets = new Map<string, number>();
 
-  constructor(private scene: Phaser.Scene) {}
+  constructor(private scene: Phaser.Scene) { ensurePixelFontLoading(); }
 
   private acquire(): Phaser.GameObjects.Text {
     let p = this.pool.find((e) => !e.inUse);
     if (!p) {
-      const text = this.scene.add.text(0, 0, '', { fontFamily: 'monospace', fontStyle: 'bold' }).setOrigin(0.5).setDepth(120);
+      const text = this.scene.add.text(0, 0, '', { fontFamily: pixelFontFamily(), fontStyle: 'bold' }).setOrigin(0.5).setDepth(120);
       text.setResolution(3);
       p = { text, inUse: false };
       this.pool.push(p);
     }
     p.inUse = true;
+    p.text.setFontFamily(pixelFontFamily());
     p.text.setVisible(true).setActive(true);
     return p.text;
   }

@@ -8,6 +8,7 @@ import Phaser from 'phaser';
 import type { ItemDef } from '@shared/types';
 import { getPetSprite } from '../gfx';
 import { playAnim, makeCrispLabel } from './spriteUtil';
+import type { WorldLighting } from '../render/lighting';
 
 const FOLLOW_LERP = 3.2; // per second, exponential smoothing toward the anchor point
 const CHASE_SPEED = 165; // px/s while flying to a drop
@@ -28,13 +29,14 @@ export class Pet {
   private nextEmoteAt = performance.now() + EMOTE_MIN_MS + Math.random() * EMOTE_MAX_MS;
   private readonly info: ReturnType<typeof getPetSprite>;
 
-  constructor(private scene: Phaser.Scene, def: ItemDef, x: number, y: number) {
+  constructor(private scene: Phaser.Scene, def: ItemDef, x: number, y: number, lighting?: WorldLighting | null) {
     if (!def.pet) throw new Error(`Pet entity built from non-pet item '${def.id}'`);
     this.itemId = def.id;
     this.lootRadius = def.pet.lootRadius;
     this.info = getPetSprite(scene, def.pet.species, def.icon.colors);
     this.sprite = scene.add.sprite(x, y, this.info.key, 0).setOrigin(0.5, 1).setDepth(14);
     playAnim(this.sprite, this.info, 'idle');
+    lighting?.lit(this.sprite, this.info.key);
   }
 
   teleport(x: number, y: number): void {

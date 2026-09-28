@@ -23,7 +23,7 @@ export function createQuestTracker(session: GameSession, wm: WindowManager): { r
         el('div', { class: 'dw-tq-name' }, def?.name ?? questId, ready ? ' ✔' : ''));
       if (ready && def) {
         const turnInNpc = NPCS[def.turnIn ?? def.giver]?.name ?? def.turnIn ?? def.giver;
-        card.appendChild(el('div', { class: 'dw-tq-obj dw-done' }, `Return to ${turnInNpc}`));
+        card.appendChild(el('div', { class: 'dw-tq-obj dw-tq-return' }, `Return to ${turnInNpc}`));
       }
       const objectives = questObjectiveProgress(session.state, questId);
       for (const o of objectives) {

@@ -77,4 +77,8 @@
   --dw-fluke: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath fill='%23f1e6cf' d='M16 19.5 14.9 12.3C11.6 11.7 5.6 10.4 1 3.6c4.6 2.3 9.6 2.6 13.2 4.9L16 6.4l1.8 2.1c3.6-2.3 8.6-2.6 13.2-4.9-4.6 6.8-10.6 8.1-13.9 8.7z'/%3E%3C/svg%3E");
   /* scrimshaw corner ornament (compass star + curl), drawn for the top-left corner */
   --dw-corner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='none' stroke='%23f1e6cf' stroke-linecap='round'%3E%3Cpath d='M1 12 V5 a4 4 0 0 1 4 -4 H12' stroke-width='1.2'/%3E%3Cpath d='M4 16 V7 a3 3 0 0 1 3 -3 H16' stroke-opacity='.45'/%3E%3Cpath fill='%23f1e6cf' stroke='none' d='M9 6.2 9.7 8.3 11.8 9 9.7 9.7 9 11.8 8.3 9.7 6.2 9 8.3 8.3Z'/%3E%3C/svg%3E");
+
+  /* ---- Custom cursor: a small bone-and-brass pointer, lantern-tinted on hover ----------------- */
+  --dw-cursor-default: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 1.5 3 19.5 7.6 15.6 10.9 21.6 14.1 20 10.9 13.9 17.2 13.4Z' fill='%23f1e6cf' stroke='%235d4122' stroke-width='1.3' stroke-linejoin='round'/%3E%3Ccircle cx='4.6' cy='5' r='1.3' fill='%23ffb347'/%3E%3C/svg%3E") 3 2, auto;
+  --dw-cursor-point: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 1.5 3 19.5 7.6 15.6 10.9 21.6 14.1 20 10.9 13.9 17.2 13.4Z' fill='%23ffb347' stroke='%235d4122' stroke-width='1.3' stroke-linejoin='round'/%3E%3Ccircle cx='4.6' cy='5' r='1.3' fill='%235fe3c6'/%3E%3C/svg%3E") 3 2, pointer;
 }

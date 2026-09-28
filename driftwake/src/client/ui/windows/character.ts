@@ -46,7 +46,7 @@ export function createCharacterWindow(wm: WindowManager, session: GameSession) {
   }
 
   const statRows: Record<StatKey, HTMLElement> = {} as any;
-  const apLabel = el('span', { class: 'dw-caps', style: { color: '#e8c477' } }, 'AP: 0');
+  const apLabel = el('span', { class: 'dw-caps', style: { color: 'var(--dw-lantern)' } }, 'AP: 0');
   const autoBtn = el('button', {
     class: 'dw-btn dw-btn-sm', title: 'Spend all AP: mostly your main stat, some into your secondary',
     onclick: () => {
@@ -75,7 +75,7 @@ export function createCharacterWindow(wm: WindowManager, session: GameSession) {
   const repBlock = el('div', { style: { marginTop: '10px' } }, el('b', null, 'Reputation'));
   const titlesBlock = el('div', { style: { marginTop: '10px' } }, el('b', null, 'Titles'));
   const petBlock = el('div', { style: { marginTop: '10px' } }, el('b', null, 'Companion'));
-  const countersBlock = el('div', { style: { marginTop: '10px', fontSize: '11.5px', color: '#a7b0c4' } });
+  const countersBlock = el('div', { style: { marginTop: '10px', fontSize: '11.5px', color: 'var(--dw-bone-dim)' } });
 
   const right = el('div', { style: { flex: '1', minWidth: '210px' } }, statBlock, derivedBlock, repBlock, titlesBlock, petBlock, countersBlock);
   const body = el('div', { class: 'dw-body', style: { display: 'flex', gap: '16px', flexWrap: 'wrap' } }, paperdoll, right);
@@ -154,9 +154,9 @@ export function createCharacterWindow(wm: WindowManager, session: GameSession) {
       }, el('img', { src: safeItemIcon(petDef) }));
       attachTooltip(row, () => buildItemTooltip(st, { uid: 'pet-preview', itemId: petItemId!, qty: 1 }));
       petBlock.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' } },
-        row, el('div', {}, el('div', null, petDef.name), el('div', { style: { fontSize: '10.5px', color: '#a7b0c4' } }, 'Click to dismiss'))));
+        row, el('div', {}, el('div', null, petDef.name), el('div', { style: { fontSize: '10.5px', color: 'var(--dw-bone-dim)' } }, 'Click to dismiss'))));
     } else {
-      petBlock.appendChild(el('div', { style: { color: '#a7b0c4', fontSize: '11.5px', marginTop: '4px' } }, 'No active pet — double-click one in your Inventory to summon it.'));
+      petBlock.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)', fontSize: '11.5px', marginTop: '4px' } }, 'No active pet — double-click one in your Inventory to summon it.'));
     }
 
     countersBlock.innerHTML = '';

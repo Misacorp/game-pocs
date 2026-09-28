@@ -57,7 +57,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
       content.appendChild(profRow(def?.name ?? gid, prog.level, prog.xp, need, def?.benefit));
     }
     content.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: '14px' } },
-      el('b', null, 'Crafting'), el('span', { style: { fontSize: '11px', color: '#a7b0c4' } }, `${CRAFTING_IDS.filter((c) => st.professions[c]).length} / ${MAX_CRAFTING_PROFESSIONS} learned`)));
+      el('b', null, 'Crafting'), el('span', { style: { fontSize: '11px', color: 'var(--dw-bone-dim)' } }, `${CRAFTING_IDS.filter((c) => st.professions[c]).length} / ${MAX_CRAFTING_PROFESSIONS} learned`)));
     for (const cid of CRAFTING_IDS) {
       const def = PROFESSIONS[cid];
       const prog = st.professions[cid];
@@ -91,7 +91,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
   function profRow(name: string, level: number, xp: number, need: number, benefit?: string): HTMLElement {
     const pct = level >= PROFESSION_MAX_LEVEL ? 1 : xp / Math.max(1, need);
     return el('div', { style: { padding: '4px 0' } },
-      el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px' } }, el('span', null, `${name} — Lv ${level}`), el('span', { style: { color: '#a7b0c4' } }, level >= PROFESSION_MAX_LEVEL ? 'MAX' : `${fmtNum(xp)}/${fmtNum(need)}`)),
+      el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px' } }, el('span', null, `${name} — Lv ${level}`), el('span', { style: { color: 'var(--dw-bone-dim)' } }, level >= PROFESSION_MAX_LEVEL ? 'MAX' : `${fmtNum(xp)}/${fmtNum(need)}`)),
       progressBar(pct),
       benefit ? el('div', { class: 'dw-tt-desc', style: { fontSize: '11px' } }, benefit) : null);
   }
@@ -102,7 +102,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
       ...CRAFTING_IDS.filter((c) => session.state.professions[c]).map((c) => el('option', { value: c, selected: selectedProfession === c }, PROFESSIONS[c]?.name ?? c)));
     profSelect.addEventListener('change', () => { selectedProfession = (profSelect as HTMLSelectElement).value as CraftingProfessionId || null; render(); });
     content.appendChild(profSelect);
-    if (!selectedProfession) { content.appendChild(el('div', { style: { color: '#a7b0c4', marginTop: '10px' } }, 'Learn a crafting profession and pick it above to see recipes.')); return; }
+    if (!selectedProfession) { content.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)', marginTop: '10px' } }, 'Learn a crafting profession and pick it above to see recipes.')); return; }
     const recipes = Object.values(RECIPES).filter((r) => r.profession === selectedProfession);
     const list = el('div', { style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' } });
     for (const r of recipes) {
@@ -119,7 +119,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
         const check = recipeAvailability(session.state, r.id);
         for (const inp of check.inputs.length ? check.inputs : r.inputs.map((i) => ({ itemId: i.itemId, have: 0, need: i.qty }))) {
           const ok = inp.have >= inp.need;
-          inputsRow.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: ok ? '#6fdc6f' : '#ff6b6b' } },
+          inputsRow.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: ok ? 'var(--dw-tide)' : 'var(--dw-coral)' } },
             el('img', { src: safeItemIcon(ITEMS[inp.itemId]), style: { width: '18px', height: '18px', imageRendering: 'pixelated' } }), `${inp.have}/${inp.need}`));
         }
         card.appendChild(inputsRow);
@@ -129,7 +129,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
         card.appendChild(btnRow);
         if (!check.canCraft && check.reason) card.appendChild(el('div', { class: 'dw-tt-unmet', style: { fontSize: '11px' } }, check.reason));
       } else {
-        for (const inp of r.inputs) inputsRow.appendChild(el('div', { style: { fontSize: '11px', color: '#a7b0c4' } }, `${ITEMS[inp.itemId]?.name ?? inp.itemId} x${inp.qty}`));
+        for (const inp of r.inputs) inputsRow.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--dw-bone-dim)' } }, `${ITEMS[inp.itemId]?.name ?? inp.itemId} x${inp.qty}`));
         card.appendChild(inputsRow);
         if (r.learn === 'trainer') {
           card.appendChild(atTrainerFor(selectedProfession!)
@@ -186,7 +186,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
         if (inst) {
           const chance = enhanceChance(inst, stoneItemId);
           const color = RARITY_COLORS[rarityOf(inst)];
-          resultLine.appendChild(el('div', null, `Current: ${'★'.repeat(inst.stars ?? 0)} (${inst.stars ?? 0} stars) — Success chance: `, el('b', { style: { color: chance >= 0.6 ? '#6fdc6f' : chance >= 0.3 ? '#ff9a52' : '#ff6b6b' } }, `${Math.round(chance * 100)}%`)));
+          resultLine.appendChild(el('div', null, `Current: ${'★'.repeat(inst.stars ?? 0)} (${inst.stars ?? 0} stars) — Success chance: `, el('b', { style: { color: chance >= 0.6 ? 'var(--dw-tide)' : chance >= 0.3 ? 'var(--dw-lantern-deep)' : 'var(--dw-coral)' } }, `${Math.round(chance * 100)}%`)));
         }
       }
     }
@@ -211,7 +211,7 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
         stoneGrid.appendChild(slot);
       }
     }
-    function highlight(grid: HTMLElement, sel: HTMLElement) { Array.from(grid.children).forEach((c) => (c as HTMLElement).style.borderColor = c === sel ? '#e8c477' : ''); }
+    function highlight(grid: HTMLElement, sel: HTMLElement) { Array.from(grid.children).forEach((c) => (c as HTMLElement).style.borderColor = c === sel ? 'var(--dw-lantern)' : ''); }
 
     goBtn.addEventListener('click', () => { if (equipUid && stoneItemId) session.dispatch({ type: 'enhance', uid: equipUid, stoneItemId }); });
 

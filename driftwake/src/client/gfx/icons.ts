@@ -3,11 +3,11 @@
  * plus character portrait/preview data URLs built from the character renderer.
  */
 import type { IconSpec, ItemDef, SkillDef, SkillIconSpec } from '@shared/types';
-import { makeCanvas, ctx2d, outlined, scaleNearest, hashStr, line, rect } from './canvasKit';
+import { makeCanvas, ctx2d, scaleNearest, hashStr, line, rect } from './canvasKit';
 import { drawItemIcon, drawSkillIcon } from './iconShapes';
 import { characterIdleCanvas } from './characters';
 import type { CharacterLook } from './spec';
-import { OUTLINE } from './palette';
+import { outlineHued } from './shading';
 
 const urlCache = new Map<string, string>();
 
@@ -24,7 +24,7 @@ export function iconUrl(spec: IconSpec, size = 32): string {
   const ctx = ctx2d(art);
   drawItemIcon(ctx, spec.shape, spec.colors);
   if (spec.glyph) drawGlyph(ctx, spec.glyph);
-  const outlinedArt = outlined(art, OUTLINE, false);
+  const outlinedArt = outlineHued(art, false);
   const url = scaleNearest(outlinedArt, size, size).toDataURL();
   urlCache.set(key, url);
   return url;
@@ -40,7 +40,7 @@ export function skillIconUrl(def: SkillDef | { icon: SkillIconSpec; id: string }
   const art = makeCanvas(16, 16);
   const ctx = ctx2d(art);
   drawSkillIcon(ctx, def.icon.shape, def.icon.colors);
-  const outlinedArt = outlined(art, OUTLINE, false);
+  const outlinedArt = outlineHued(art, false);
   const url = scaleNearest(outlinedArt, size, size).toDataURL();
   urlCache.set(key, url);
   return url;

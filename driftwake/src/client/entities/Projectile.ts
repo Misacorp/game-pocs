@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import type { VfxStyle } from '@shared/types';
 import { getProjectileTexture, spawnVfx } from '../gfx';
+import type { WorldLighting } from '../render/lighting';
 
 export interface ProjectileHit { x: number; y: number; obj: unknown }
 
@@ -46,25 +47,35 @@ interface Live {
   onExplode?: ProjectileSpawnOpts['onExplode'];
   bounds?: { width: number; height: number };
   dead: boolean;
+  lightId: string;
 }
+
+let projLightSeq = 0;
 
 export class ProjectileManager {
   private live: Live[] = [];
 
-  constructor(private scene: Phaser.Scene) {}
+  constructor(private scene: Phaser.Scene, private lighting?: WorldLighting | null) {}
 
   spawn(opts: ProjectileSpawnOpts): void {
     const key = getProjectileTexture(this.scene, opts.style, opts.color);
     const sprite = this.scene.add.image(opts.x, opts.y, key).setDepth(45);
     const angle = Math.atan2(opts.vy, opts.vx);
     sprite.setRotation(angle);
+    const lightId = `proj${projLightSeq++}`;
+    // Every projectile emits a small, brief light that tracks it — most visible for the
+    // additive-blended bolt/orb/fire styles, harmless (just dim) for solid ones like arrows.
+    this.lighting?.addLight({
+      id: lightId, x: () => sprite.x, y: () => sprite.y,
+      color: Phaser.Display.Color.HexStringToColor(opts.color).color, radius: 55, intensity: 0.85,
+    });
     this.live.push({
       sprite, vx: opts.vx, vy: opts.vy, gravity: opts.gravity ?? 0,
       homingTarget: opts.homingTarget, turnRate: opts.homingTurnRate ?? 6,
       radius: opts.radius ?? 8, life: opts.life ?? 3000, pierce: opts.pierce ?? 0,
       hitSet: new Set(), queryHit: opts.queryHit, onHit: opts.onHit,
       explodeRadius: opts.explodeRadius, onExplode: opts.onExplode, bounds: opts.bounds,
-      dead: false,
+      dead: false, lightId,
     });
   }
 
@@ -74,6 +85,10 @@ export class ProjectileManager {
     if (p.explodeRadius) {
       spawnVfx(this.scene, 'explosion', p.sprite.x, p.sprite.y, { color: '#ffaa33', width: p.explodeRadius, height: p.explodeRadius });
       p.onExplode?.(p.sprite.x, p.sprite.y, p.explodeRadius);
+      const ex = p.sprite.x, ey = p.sprite.y;
+      this.lighting?.addLight({ id: p.lightId, x: () => ex, y: () => ey, color: 0xffaa33, radius: p.explodeRadius * 2.2, intensity: 1.2, ttl: 180 });
+    } else {
+      this.lighting?.removeLight(p.lightId);
     }
     p.sprite.destroy();
   }
@@ -117,7 +132,7 @@ export class ProjectileManager {
   }
 
   destroy(): void {
-    for (const p of this.live) p.sprite.destroy();
+    for (const p of this.live) { p.sprite.destroy(); this.lighting?.removeLight(p.lightId); }
     this.live = [];
   }
 }

@@ -6,6 +6,21 @@ import { BIND_LABELS, DEFAULT_BINDS, getBinds, setBind, resetBinds, keyLabel } f
 import { tipsEnabled, setTipsEnabled } from '../tips';
 
 const UI_SCALE_KEY = 'driftwake:uiscale';
+const GFX_KEY = 'driftwake:gfx';
+const SHAKE_KEY = 'driftwake:shake';
+
+export type GfxQuality = 'low' | 'medium' | 'high';
+
+/** Contract with the render engineer: quality tier + screen-shake toggle, persisted so the engine
+ *  can read them at boot, and broadcast live via 'settings:changed' whenever changed here. */
+export function getGfxQuality(): GfxQuality {
+  const v = store.get<string>(GFX_KEY, 'high');
+  return v === 'low' || v === 'medium' || v === 'high' ? v : 'high';
+}
+export function setGfxQuality(q: GfxQuality): void { store.set(GFX_KEY, q); bus.emit('settings:changed'); }
+
+export function getScreenShakeEnabled(): boolean { return store.get<string>(SHAKE_KEY, 'on') !== 'off'; }
+export function setScreenShakeEnabled(on: boolean): void { store.set(SHAKE_KEY, on ? 'on' : 'off'); bus.emit('settings:changed'); }
 
 export function applyStoredUiScale(root: HTMLElement) {
   const scale = store.get(UI_SCALE_KEY, 1);
@@ -35,6 +50,29 @@ export function createSettingsWindow(wm: WindowManager, uiRoot: HTMLElement) {
     const cb = el('input', { type: 'checkbox', checked: tipsEnabled() }) as HTMLInputElement;
     cb.addEventListener('change', () => setTipsEnabled(cb.checked));
     return el('div', { class: 'dw-settings-row' }, el('label', null, 'Tutorial Tips'), cb);
+  }
+
+  function qualityRow(): HTMLElement {
+    const levels: { id: GfxQuality; label: string }[] = [{ id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }];
+    const seg = el('div', { class: 'dw-seg' });
+    function build() {
+      seg.innerHTML = '';
+      const cur = getGfxQuality();
+      for (const lvl of levels) {
+        seg.appendChild(el('button', {
+          class: `dw-btn dw-btn-sm ${cur === lvl.id ? 'dw-btn-primary' : 'dw-btn-ghost'}`,
+          onclick: () => { setGfxQuality(lvl.id); build(); },
+        }, lvl.label));
+      }
+    }
+    build();
+    return el('div', { class: 'dw-settings-row' }, el('label', null, 'Quality'), seg);
+  }
+
+  function shakeRow(): HTMLElement {
+    const cb = el('input', { type: 'checkbox', checked: getScreenShakeEnabled() }) as HTMLInputElement;
+    cb.addEventListener('change', () => setScreenShakeEnabled(cb.checked));
+    return el('div', { class: 'dw-settings-row' }, el('label', null, 'Screen Shake'), cb);
   }
 
   function scaleRow(): HTMLElement {
@@ -89,6 +127,9 @@ export function createSettingsWindow(wm: WindowManager, uiRoot: HTMLElement) {
     body.appendChild(tipsRow());
     body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Display'));
     body.appendChild(scaleRow());
+    body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Graphics'));
+    body.appendChild(qualityRow());
+    body.appendChild(shakeRow());
     body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Keybinds'));
     body.appendChild(bindsSection());
   }

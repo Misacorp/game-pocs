@@ -5,7 +5,7 @@ import { el, fmtNum, clamp } from './dom';
 import { bus } from '../events';
 import type { GameSession } from '../session';
 import { HOTBAR_SIZE, xpToNext } from '@shared/constants';
-import { ITEMS, SKILLS, JOBS } from '@shared/data';
+import { ITEMS, SKILLS, JOBS, MAPS } from '@shared/data';
 import { countItem } from '@shared/logic';
 import { keyLabel, keysFor } from '../input/keybinds';
 import { safeItemIcon, safeSkillIcon } from './icons';
@@ -23,7 +23,12 @@ export function createHud(session: GameSession): { root: HTMLElement; cleanup: (
   const xpFill = el('div', { class: 'dw-bar-fill dw-xp' });
   const idRow = el('div', { class: 'dw-id-row' });
 
-  const bars = el('div', { class: 'dw-panel dw-bars', style: { padding: '6px 10px' } },
+  // Level medallion — porthole rim, job label on a small plate beneath (BRAND.md HUD spec).
+  const medallionLevel = el('b', null, '1');
+  const medallionJob = el('small', { class: 'dw-caps' }, '');
+  const medallion = el('div', { class: 'dw-medallion' }, medallionLevel, medallionJob);
+
+  const bars = el('div', { class: 'dw-panel dw-bars', style: { padding: '7px 10px' } },
     idRow,
     el('div', { class: 'dw-bar-row' }, el('div', { class: 'dw-bar-label' }, 'HP'), el('div', { class: 'dw-bar-track' }, hpFill, hpText)),
     el('div', { class: 'dw-bar-row' }, el('div', { class: 'dw-bar-label' }, 'MP'), el('div', { class: 'dw-bar-track' }, mpFill, mpText)),
@@ -43,9 +48,12 @@ export function createHud(session: GameSession): { root: HTMLElement; cleanup: (
     const pct = isFinite(need) ? clamp(st.xp / need, 0, 1) : 1;
     xpFill.style.width = `${pct * 100}%`;
     const jobName = JOBS[st.jobId]?.name ?? st.jobId;
+    const mapName = MAPS[st.mapId]?.name ?? st.mapId;
+    medallionLevel.textContent = String(st.level);
+    medallionJob.textContent = jobName;
     idRow.innerHTML = '';
-    idRow.appendChild(el('span', null, el('b', null, `Lv.${st.level}`), ` ${st.name}`));
-    idRow.appendChild(el('span', null, `${jobName} · ${isFinite(need) ? `${fmtNum(st.xp)}/${fmtNum(need)} (${Math.round(pct * 100)}%)` : 'MAX'}`));
+    idRow.appendChild(el('span', null, el('b', null, st.name)));
+    idRow.appendChild(el('span', null, `${jobName} · ${mapName}`.toUpperCase()));
   }
   offs.push(bus.on('vitals', renderVitals));
   offs.push(bus.on('state', renderIdentity));
@@ -172,7 +180,7 @@ export function createHud(session: GameSession): { root: HTMLElement; cleanup: (
   raf2 = requestAnimationFrame(tickBuffs);
 
   const hotbarWrap = el('div', { style: { pointerEvents: 'auto' } }, hotbarRoot);
-  const bottom = el('div', { class: 'dw-hud-bottom' }, bars, hotbarWrap);
+  const bottom = el('div', { class: 'dw-hud-bottom' }, medallion, bars, hotbarWrap);
 
   renderVitals();
   renderIdentity();

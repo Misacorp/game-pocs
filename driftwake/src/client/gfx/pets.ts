@@ -6,9 +6,9 @@
 import Phaser from 'phaser';
 import type { PetSpecies } from '@shared/types';
 import {
-  makeCanvas, ctx2d, outlined, circle, ellipse, line, poly, registerSpriteSheet, ensureAnim, hashStr,
+  makeCanvas, ctx2d, circle, ellipse, line, poly, registerSpriteSheet, ensureAnim, hashStr,
 } from './canvasKit';
-import { OUTLINE } from './palette';
+import { outlineHued, emissiveDab } from './shading';
 import type { SpriteInfo } from './spec';
 
 const BOX: Record<PetSpecies, [number, number]> = {
@@ -66,11 +66,10 @@ function drawPet(species: PetSpecies, ctx: CanvasRenderingContext2D, cx: number,
       break;
     }
     case 'lanternfish': {
-      ctx.save(); ctx.globalAlpha = 0.4; circle(ctx, w * 0.36, -h * 0.3, w * 0.16, c3 ?? c2 ?? c1); ctx.restore();
       ellipse(ctx, 0, 0, w * 0.42, h * 0.3, c1);
       poly(ctx, [[-w * 0.36, 0], [-w * 0.54, -h * 0.2], [-w * 0.54, h * 0.2]], c2 ?? c1);
       line(ctx, w * 0.2, -h * 0.24, w * 0.36, -h * 0.34, s * 0.8, c2 ?? c1);
-      circle(ctx, w * 0.36, -h * 0.34, s * 1.4, c3 ?? '#ffe066');
+      emissiveDab(ctx, w * 0.36, -h * 0.34, s * 2.6, c3 ?? '#ffe066', { coreStop: 0.32 }); // the little lure, genuinely glowing
       eye(ctx, w * 0.14, -h * 0.02, s * 1.1);
       break;
     }
@@ -118,7 +117,7 @@ export function getPetSprite(scene: Phaser.Scene, species: PetSpecies, colors: s
       const art = makeCanvas(fw, fh);
       const ctx = ctx2d(art);
       drawPet(species, ctx, fw / 2, fh / 2 + 4, 1, colors, poseFor(t.name, i, t.frames));
-      frames.push(outlined(art, OUTLINE));
+      frames.push(outlineHued(art));
     }
     ranges.push({ name: t.name, start, end: frames.length - 1, frameRate: t.frameRate, repeat: t.repeat });
   }

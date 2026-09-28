@@ -9,6 +9,8 @@ import type { ThemeId } from '@shared/types';
 import { makeCanvas, ctx2d, rect, circle, ellipse, poly, line, shade, mix, withAlpha, seedRandom, registerCanvasTexture } from './canvasKit';
 import { THEMES } from './palette';
 import type { Parallax } from './spec';
+import { getQuality, isWebGLAvailable } from '../render/quality';
+import { createSkyShader, type SkyShader } from '../render/sky';
 
 const VIEW_W = 640, VIEW_H = 360; // world-unit viewport at zoom 2
 
@@ -173,14 +175,70 @@ function nearLayer(theme: ThemeId): HTMLCanvasElement {
   return c;
 }
 
+type FgKind = 'grassFence' | 'grass' | 'rockSpikes' | 'kelpFronds' | 'coralSilhouette' | 'wreckDebris' | 'tendrils';
+
+const FG_KIND: Record<ThemeId, FgKind> = {
+  driftmoor: 'grassFence', meadow: 'grass', grotto: 'rockSpikes', kelpwood: 'kelpFronds',
+  galeoutpost: 'grass', stormspire: 'rockSpikes', lanternreef: 'coralSilhouette', galleon: 'wreckDebris',
+  hollow: 'tendrils', heart: 'tendrils',
+};
+
+/** Closer-than-camera foreground silhouette dressing (grass/kelp/coral/rocks passing in front of
+ *  the camera at the bottom edge), soft-blurred and darkened. Scrolls faster than the world via a
+ *  >1 tilePosition multiplier on cam.scrollX (cheaper and more robust across zoom than a real
+ *  scrollFactor > 1 object, consistent with how every other layer here recomputes from the camera). */
+function foregroundLayer(theme: ThemeId): HTMLCanvasElement {
+  const pal = THEMES[theme];
+  const w = 420, h = 90;
+  const c = makeCanvas(w, h);
+  const ctx = ctx2d(c);
+  const rnd = seedRandom(theme.length * 211 + 41);
+  const dark = shade(pal.groundFill, -0.35);
+  const col = withAlpha(dark, 0.85);
+  try { ctx.filter = 'blur(1.4px)'; } catch { /* Canvas2D filter unsupported — falls back to crisp */ }
+  switch (FG_KIND[theme]) {
+    case 'grassFence':
+      for (let i = 0; i < 14; i++) { const x = i * (w / 14) + rnd() * 8; line(ctx, x, h, x - 2 + rnd() * 4, h - 22 - rnd() * 14, 3, col); }
+      for (let i = 0; i < 5; i++) { const x = i * (w / 5) + 10; rect(ctx, x, h - 30, 3, 30, col); rect(ctx, x - 12, h - 22, 27, 3, col); }
+      break;
+    case 'grass':
+      for (let i = 0; i < 22; i++) { const x = i * (w / 22) + rnd() * 10; const hh = 18 + rnd() * 20; poly(ctx, [[x - 3, h], [x + rnd() * 4 - 2, h - hh], [x + 3, h]], col); }
+      break;
+    case 'rockSpikes':
+      for (let i = 0; i < 8; i++) { const x = i * (w / 8) + rnd() * 20; const hh = 24 + rnd() * 34; poly(ctx, [[x - 16, h], [x, h - hh], [x + 16, h]], col); }
+      break;
+    case 'kelpFronds':
+      for (let i = 0; i < 10; i++) { const x = i * (w / 10) + rnd() * 14; for (let s = -1; s <= 1; s += 2) line(ctx, x, h, x + s * (20 + rnd() * 16), h - 60 - rnd() * 20, 6, col); }
+      break;
+    case 'coralSilhouette':
+      for (let i = 0; i < 9; i++) { const x = i * (w / 9) + rnd() * 16; for (let s = 0; s < 3; s++) ellipse(ctx, x + s * 8 - 8, h - s * 16, 14, 22, col); }
+      break;
+    case 'wreckDebris':
+      for (let i = 0; i < 5; i++) { const x = i * (w / 5) + rnd() * 20; poly(ctx, [[x - 20, h], [x + 24, h - 10], [x + 10, h - 36], [x - 14, h - 20]], col); }
+      break;
+    case 'tendrils':
+      for (let i = 0; i < 12; i++) { let x = i * (w / 12) + rnd() * 10, y = h; ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y); for (let s = 0; s < 5; s++) { x += (rnd() - 0.5) * 18; y -= 12 + rnd() * 6; ctx.lineTo(x, y); } ctx.stroke(); }
+      break;
+  }
+  ctx.filter = 'none';
+  return c;
+}
+
 export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, _h: number): Parallax {
   const pal = THEMES[theme];
+  const quality = getQuality();
+  const useShaderSky = quality !== 'low' && isWebGLAvailable(scene);
+
+  let skyShader: SkyShader | null = useShaderSky
+    ? createSkyShader(scene, theme, quality, { skyTop: pal.skyTop, skyMid: pal.skyMid, skyBottom: pal.skyBottom, glow: pal.glow }, theme.length * 97)
+    : null;
 
   const skyKey = `bg_${theme}_sky`; registerCanvasTexture(scene, skyKey, skyCanvas(theme));
   const hazeKey = `bg_${theme}_haze`; registerCanvasTexture(scene, hazeKey, hazeLayer(theme));
   const whaleKey = `bg_${theme}_whale`; registerCanvasTexture(scene, whaleKey, whaleLayer(theme));
   const midKey = `bg_${theme}_mid`; registerCanvasTexture(scene, midKey, midLayer(theme));
   const nearKey = `bg_${theme}_near`; registerCanvasTexture(scene, nearKey, nearLayer(theme));
+  const fgKey = `bg_${theme}_fg`; registerCanvasTexture(scene, fgKey, foregroundLayer(theme));
 
   // NOTE: these layers are positioned every update() from the camera's actual visible world
   // rect (via cam.getWorldPoint), not from scrollFactor(0) + fixed screen coords. Phaser's
@@ -188,11 +246,17 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
   // object at a fixed x/y is NOT guaranteed to sit at that screen position once zoom != 1 —
   // recomputing from the camera each frame keeps this correct for whatever origin/zoom/scroll
   // the engine's camera ends up using, and keeps full coverage at any camera position.
-  const sky = scene.add.image(0, 0, skyKey).setOrigin(0).setDepth(-100);
+  // Flat gradient sky image — kept as the Low-quality/no-WebGL fallback, and hidden (not skipped)
+  // when the shader sky is active so there's zero flicker if the shader ever fails mid-session.
+  const sky = scene.add.image(0, 0, skyKey).setOrigin(0).setDepth(-100).setVisible(!skyShader);
   const haze = scene.add.tileSprite(0, 0, 10, 10, hazeKey).setOrigin(0).setDepth(-95);
   const whale = scene.add.tileSprite(0, 0, 10, 10, whaleKey).setOrigin(0).setDepth(-90);
   const mid = scene.add.tileSprite(0, 0, 10, 10, midKey).setOrigin(0).setDepth(-80).setAlpha(0.9);
   const near = scene.add.tileSprite(0, 0, 10, 10, nearKey).setOrigin(0).setDepth(-70).setAlpha(0.95);
+  // Foreground dressing passes in front of gameplay (depth above player/monsters/decor) at the
+  // bottom edge only, darker + softly blurred + semi-transparent so it reads as depth-of-field
+  // rather than obscuring the action.
+  const fg = scene.add.tileSprite(0, 0, 10, 10, fgKey).setOrigin(0).setDepth(500).setAlpha(0.55);
 
   let lightning: Phaser.GameObjects.Rectangle | undefined;
   let lightningTimer = 2000 + Math.random() * 3000;
@@ -205,6 +269,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
     const br = cam.getWorldPoint(cam.width, cam.height);
     const w = br.x - tl.x, h = br.y - tl.y;
     sky.setPosition(tl.x, tl.y).setDisplaySize(w, h);
+    skyShader?.update(cam);
     // TileSprite tiling is computed from its own width/height (setSize), not displaySize —
     // using setDisplaySize alone would leave the tiling viewport at its tiny placeholder size
     // and stretch a sliver of the texture across the whole screen instead of tiling it.
@@ -212,6 +277,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
     whale.setPosition(tl.x, tl.y + h * 0.05).setSize(w, h * 0.55);
     mid.setPosition(tl.x, tl.y + h * 0.1).setSize(w, h * 0.6);
     near.setPosition(tl.x, tl.y + h * 0.72).setSize(w, h * 0.3);
+    fg.setPosition(tl.x, tl.y + h * 0.82).setSize(w, h * 0.22);
     lightning?.setPosition(tl.x, tl.y).setDisplaySize(w, h);
   }
   layout(scene.cameras.main);
@@ -228,6 +294,7 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
       whale.tilePositionY = Math.sin(t * 0.15) * 3;
       mid.tilePositionX = cam.scrollX * 0.16 + t * 0.6;
       near.tilePositionX = cam.scrollX * 0.42;
+      fg.tilePositionX = cam.scrollX * 1.35; // > 1 => scrolls faster than the world, reads as closer than the camera
       if (lightning) {
         lightningTimer -= 16;
         if (lightningTimer <= 0) {
@@ -238,7 +305,8 @@ export function createParallax(scene: Phaser.Scene, theme: ThemeId, _w: number, 
       }
     },
     destroy() {
-      sky.destroy(); haze.destroy(); whale.destroy(); mid.destroy(); near.destroy(); lightning?.destroy();
+      sky.destroy(); haze.destroy(); whale.destroy(); mid.destroy(); near.destroy(); fg.destroy(); lightning?.destroy();
+      skyShader?.destroy(); skyShader = null;
     },
   };
 }

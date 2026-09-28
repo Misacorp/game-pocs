@@ -45,8 +45,8 @@ export function createTipLayer(session: GameSession): { root: HTMLElement; clean
     bubble.innerHTML = '';
     bubble.style.display = 'flex';
     bubble.appendChild(el('div', {},
-      el('div', { style: { fontWeight: '700', color: 'var(--dw-gold-bright)', marginBottom: '2px' } }, current.title),
-      el('div', { style: { fontSize: '12px', color: 'var(--dw-text)' } }, current.text)));
+      el('div', { style: { font: '400 15px "IM Fell English SC", Georgia, serif', color: 'var(--dw-lantern-hot)', marginBottom: '2px' } }, current.title),
+      el('div', { style: { fontSize: '12px', color: 'var(--dw-bone)' } }, current.text)));
     bubble.appendChild(el('button', { class: 'dw-btn dw-btn-sm dw-btn-ghost', style: { marginLeft: '10px', flexShrink: '0' }, onclick: dismiss }, 'Got it'));
     if (dismissTimer !== null) window.clearTimeout(dismissTimer);
     dismissTimer = window.setTimeout(dismiss, AUTO_DISMISS_MS);

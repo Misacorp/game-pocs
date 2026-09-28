@@ -4,6 +4,7 @@
  */
 import type { IconShape, SkillIconShape } from '@shared/types';
 import { rect, rrect, circle, ellipse, line, poly, shade } from './canvasKit';
+import { emissiveDab } from './shading';
 
 const S = 16;
 
@@ -63,14 +64,14 @@ export function drawItemIcon(ctx: CanvasRenderingContext2D, shape: IconShape, co
     case 'leather': rrect(ctx, 4, 4, 8, 8, 2, c1); line(ctx, 5, 7, 11, 7, 0.6, c2); line(ctx, 5, 9, 11, 9, 0.6, c2); break;
     case 'slime': ellipse(ctx, 8, 10, 5, 3.4, c1); ellipse(ctx, 8, 8, 4, 2.6, c3); circle(ctx, 6.5, 9, 0.7, '#111'); circle(ctx, 9.5, 9, 0.7, '#111'); break;
     case 'crystal': poly(ctx, [[8, 2], [12, 8], [9, 14], [7, 14], [4, 8]], c1); poly(ctx, [[8, 2], [12, 8], [8, 14]], c3); break;
-    case 'essence': circle(ctx, 8, 8, 5, c1); circle(ctx, 8, 8, 5, 'rgba(255,255,255,0.25)'); circle(ctx, 6.5, 6.5, 1.4, '#fff'); break;
+    case 'essence': emissiveDab(ctx, 8, 8, 6, c1, { coreStop: 0.3 }); break;
     case 'stone': poly(ctx, [[4, 11], [5, 6], [10, 4], [13, 8], [11, 12], [5, 13]], c1); break;
-    case 'orb': circle(ctx, 8, 8, 5, c1); circle(ctx, 6.5, 6.5, 1.6, '#fff'); break;
+    case 'orb': emissiveDab(ctx, 8, 8, 5.6, c1, { coreStop: 0.32 }); break;
     case 'leaf': poly(ctx, [[8, 2], [13, 9], [8, 14], [3, 9]], c1); line(ctx, 8, 2, 8, 14, 0.6, c2); break;
     case 'coral': for (let i = 0; i < 3; i++) ellipse(ctx, 5 + i * 3, 10 - (i % 2) * 3, 2, 4, i % 2 ? c1 : c3); break;
     case 'pearl': circle(ctx, 8, 9, 4.4, c1); circle(ctx, 6.5, 7.5, 1.4, '#fff'); break;
     case 'wood': rect(ctx, 4, 6, 8, 4, c1); circle(ctx, 5, 8, 1, c2); circle(ctx, 10, 8, 1, c2); break;
-    case 'core': circle(ctx, 8, 8, 5, c2); circle(ctx, 8, 8, 2.6, c1); break;
+    case 'core': circle(ctx, 8, 8, 5, c2); emissiveDab(ctx, 8, 8, 3.2, c1, { coreStop: 0.35 }); break;
     case 'claw': for (const dx of [-2, 0, 2]) poly(ctx, [[8 + dx, 4], [9 + dx, 4], [8 + dx * 0.6, 13]], c1); break;
     case 'fang': poly(ctx, [[6, 3], [10, 3], [8, 14]], c1); break;
     case 'dust': for (let i = 0; i < 8; i++) circle(ctx, 3 + (i * 5) % 12, 4 + ((i * 7) % 10), 0.7, c1); break;
@@ -79,7 +80,7 @@ export function drawItemIcon(ctx: CanvasRenderingContext2D, shape: IconShape, co
     case 'map': rrect(ctx, 3, 3, 10, 10, 1, '#e2d4a8'); line(ctx, 5, 7, 8, 5, 0.6, c1); line(ctx, 8, 5, 11, 9, 0.6, c1); circle(ctx, 11, 9, 1, c1); break;
     case 'coin': circle(ctx, 8, 9, 5, '#ffd24a'); circle(ctx, 8, 9, 3.2, '#f0b32a'); break;
     case 'bag': sack(ctx, c1); break;
-    case 'lantern': rect(ctx, 7.4, 2, 1.2, 2, '#3a3226'); rrect(ctx, 5, 4, 6, 8, 1, '#5a4636'); ellipse(ctx, 8, 8, 2.2, 2.8, '#ffdd88'); rect(ctx, 5, 12, 6, 1.4, '#3a3226'); break;
+    case 'lantern': rect(ctx, 7.4, 2, 1.2, 2, '#3a3226'); rrect(ctx, 5, 4, 6, 8, 1, '#5a4636'); emissiveDab(ctx, 8, 8, 2.6, '#ffdd88', { coreStop: 0.35 }); rect(ctx, 5, 12, 6, 1.4, '#3a3226'); break;
     case 'horn': poly(ctx, [[5, 13], [6, 5], [11, 4], [9, 12]], c1); line(ctx, 6, 9, 9, 8, 0.6, c2); break;
     case 'relic': poly(ctx, [[8, 2], [12, 8], [8, 14], [4, 8]], c2); circle(ctx, 8, 8, 2, c1); break;
     case 'book': rect(ctx, 4, 3, 8, 10, c1); rect(ctx, 4, 3, 1.4, 10, c2); line(ctx, 7, 6, 10, 6, 0.5, c3); line(ctx, 7, 8, 10, 8, 0.5, c3); break;
@@ -96,8 +97,8 @@ export function drawSkillIcon(ctx: CanvasRenderingContext2D, shape: SkillIconSha
     case 'fist': rrect(ctx, 5, 5, 7, 6, 2, c1); for (let i = 0; i < 3; i++) rect(ctx, 6 + i * 2, 3, 1.4, 3, c1); rect(ctx, 5, 11, 4, 3, c3); break;
     case 'burst': for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; line(ctx, 8, 8, 8 + Math.cos(a) * 6, 8 + Math.sin(a) * 6, 1.6, c1); } circle(ctx, 8, 8, 2.2, c3); break;
     case 'bolt': poly(ctx, [[9, 1], [4, 9], [7, 9], [6, 15], [12, 6], [9, 6]], c1); break;
-    case 'orb': circle(ctx, 8, 8, 5, c1); circle(ctx, 6.5, 6.5, 1.6, '#fff'); break;
-    case 'flame': poly(ctx, [[8, 1], [11, 8], [8, 15], [5, 8]], c1); poly(ctx, [[8, 6], [9.5, 9.5], [8, 13], [6.5, 9.5]], c3); break;
+    case 'orb': emissiveDab(ctx, 8, 8, 5.6, c1, { coreStop: 0.32 }); break;
+    case 'flame': poly(ctx, [[8, 1], [11, 8], [8, 15], [5, 8]], c1); emissiveDab(ctx, 8, 9, 3, c3, { coreStop: 0.4 }); break;
     case 'snow': for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI; line(ctx, 8 - Math.cos(a) * 6, 8 - Math.sin(a) * 6, 8 + Math.cos(a) * 6, 8 + Math.sin(a) * 6, 1.2, c1); } circle(ctx, 8, 8, 1.6, c3); break;
     case 'wave': for (let y = 4; y <= 12; y += 4) { ctx.strokeStyle = c1; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(2, y); ctx.quadraticCurveTo(6, y - 3, 8, y); ctx.quadraticCurveTo(10, y + 3, 14, y); ctx.stroke(); } break;
     case 'wind': for (let i = 0; i < 3; i++) { ctx.strokeStyle = c1; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(2, 5 + i * 3); ctx.quadraticCurveTo(10, 3 + i * 3, 14, 6 + i * 3); ctx.stroke(); } break;

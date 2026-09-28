@@ -1,6 +1,8 @@
 /**
  * DOM UI layer (HUD, windows, title screen) — public API used by main.ts. Keep these signatures stable.
  */
+import '../brand/tokens.css';
+import '../brand/components.css';
 import type { Backend } from '../net';
 import type { GameSession } from '../session';
 import { injectStyles } from './styles';
@@ -48,7 +50,20 @@ export function initUI(rootEl: HTMLElement): void {
 export function showTitleScreen(backend: Backend, onEnter: (characterId: string) => void): void {
   root.innerHTML = '';
   hideTooltip();
+  removeBootSplash();
   buildTitleScreen(root, backend, onEnter);
+}
+
+/** Removes the branded pre-boot splash (index.html #dw-splash) the first time the title screen
+ *  is ready to show. Fades out rather than snapping so it never looks like a flash of blank page. */
+let splashRemoved = false;
+function removeBootSplash(): void {
+  if (splashRemoved) return;
+  splashRemoved = true;
+  const splash = document.getElementById('dw-splash');
+  if (!splash) return;
+  splash.classList.add('dw-splash-out');
+  window.setTimeout(() => splash.remove(), 450);
 }
 
 /** Mount in-game HUD + panels bound to the session. */

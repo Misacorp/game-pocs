@@ -16,7 +16,7 @@ export function createBestiaryWindow(wm: WindowManager, session: GameSession) {
     grid.innerHTML = '';
     const st = session.state;
     const monsters = Object.values(MONSTERS);
-    if (!monsters.length) { grid.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'No monsters recorded yet.')); return; }
+    if (!monsters.length) { grid.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'No monsters recorded yet.')); return; }
     for (const m of monsters) {
       const kills = st.bestiary[m.id] ?? 0;
       const seen = kills > 0;

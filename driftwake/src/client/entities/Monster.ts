@@ -12,6 +12,8 @@ import { StatusEffects } from '../combat/StatusEffects';
 import type { DamageTextPool } from '../combat/DamageText';
 import type { ProjectileManager } from './Projectile';
 import { applyBodyBottomAligned, playAnim } from './spriteUtil';
+import type { WorldLighting } from '../render/lighting';
+import { ContactShadow } from '../render/ContactShadow';
 
 export interface MonsterWorldCtx {
   bounds: { width: number; height: number };
@@ -28,6 +30,8 @@ export interface MonsterWorldCtx {
   spawnMonsterNear: (monsterId: string, x: number, y: number, aggro: boolean) => void;
   rng: () => number;
   queryPlayerHit: (x: number, y: number) => { x: number; y: number; obj: unknown } | null;
+  lighting?: WorldLighting | null;
+  pulseChromatic?: (amount: number) => void;
 }
 
 let seq = 0;
@@ -59,6 +63,7 @@ export class MonsterEntity {
   private homeX: number;
   private homeY: number;
   private flashUntil = 0;
+  private shadow: ContactShadow;
 
   constructor(
     private scene: Phaser.Scene,
@@ -80,6 +85,8 @@ export class MonsterEntity {
     this.sprite.setData('info', info);
     this.sprite.setData('monster', this);
     playAnim(this.sprite, info, 'idle');
+    ctx.lighting?.lit(this.sprite, info.key);
+    this.shadow = new ContactShadow(scene, info.bodyWidth * (this.isBoss ? 2.2 : 1.4), 8);
 
     if (this.isBoss) {
       // NOTE: gfx already renders bosses at def.sprite.scale resolution — don't scale again.
@@ -109,7 +116,9 @@ export class MonsterEntity {
     this.sprite.setTintFill(0xffffff);
     this.scene.time.delayedCall(70, () => { if (!this.dead) this.sprite.clearTint(); });
     this.ctx.damageText.spawn(this.sprite.x, this.sprite.y - this.sprite.displayHeight, Math.round(amount), opts.crit ? 'crit' : 'normal', this.uid);
-    if (opts.crit) { this.ctx.hitstop(45); this.ctx.cameraShake(90, 0.003); audio.playSfx('crit'); }
+    const hfx = this.sprite.x, hfy = this.sprite.y - this.sprite.displayHeight * 0.6;
+    this.ctx.lighting?.addLight({ id: `hit${this.uid}`, x: () => hfx, y: () => hfy, color: opts.crit ? 0xffcc33 : 0xffffff, radius: opts.crit ? 90 : 60, intensity: opts.crit ? 1.2 : 0.7, ttl: opts.crit ? 180 : 100 });
+    if (opts.crit) { this.ctx.hitstop(45); this.ctx.cameraShake(90, 0.003); this.ctx.pulseChromatic?.(0.007); audio.playSfx('crit'); }
     else audio.playSfx('hit');
     if (opts.knockback && (this.def.knockbackResist ?? 0) < 1) {
       const kb = opts.knockback * (1 - (this.def.knockbackResist ?? 0));
@@ -129,6 +138,7 @@ export class MonsterEntity {
     audio.playSfx('monsterDie');
     (this.sprite.body as Phaser.Physics.Arcade.Body).enable = false;
     this.hpBar?.bg.destroy(); this.hpBar?.fill.destroy(); this.hpBar?.label?.destroy();
+    this.shadow.destroy();
     if (this.isBoss) { bus.emit('ui:bossBar', null); audio.playSfx('bossRoar'); }
     // Fire onDeath (loot/XP dispatch, respawn scheduling) right away rather than waiting for the
     // fade-out tween to complete: a map transition (portal dash right after a killing blow, or a
@@ -195,6 +205,7 @@ export class MonsterEntity {
 
     this.updateVisualTint(now);
     this.updateHpBar();
+    this.shadow.update(this.sprite.x, this.ctx.groundYAt(this.sprite.x, this.sprite.y), this.sprite.y);
 
     // contact damage
     if (now > this.contactCooldownUntil && dist < (this.isBoss ? 40 : 18) && Math.abs(dy) < (this.isBoss ? 50 : 26)) {
@@ -369,6 +380,16 @@ export class MonsterEntity {
     this.state = 'telegraph';
     playAnim(this.sprite, this.info(), 'attack');
     const color = atk.color ?? '#ff3344';
+    if (this.isBoss) {
+      // Boss telegraphs cast red (or the attack's own color) light onto the scene while charging,
+      // a beat before the hit lands — reinforcing the visual telegraph as a real light cue.
+      const lx = atk.kind === 'shockwave' || atk.kind === 'beam' ? this.ctx.bounds.width / 2 : targetX;
+      const ly = atk.kind === 'shockwave' || atk.kind === 'beam' ? this.sprite.y : targetY;
+      this.ctx.lighting?.addLight({
+        id: `telegraph${this.uid}`, x: () => lx, y: () => ly,
+        color: Phaser.Display.Color.HexStringToColor(color).color, radius: 140, intensity: 1.0, flicker: 0.3, ttl: atk.telegraphMs,
+      });
+    }
     switch (atk.kind) {
       case 'projectile':
         spawnTelegraph(this.scene, 'circle', this.sprite.x, this.sprite.y - 20, 20, 20, atk.telegraphMs, color);
@@ -502,6 +523,7 @@ export class MonsterEntity {
   destroy(): void {
     this.status.clear();
     this.hpBar?.bg.destroy(); this.hpBar?.fill.destroy(); this.hpBar?.label?.destroy();
+    this.shadow.destroy(); // Image.destroy() no-ops safely if die() already destroyed it
     this.sprite.destroy();
   }
 }

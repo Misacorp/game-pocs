@@ -36,7 +36,7 @@ export function createQuestLogWindow(wm: WindowManager, session: GameSession) {
       if (!grouped.has(type)) grouped.set(type, []);
       grouped.get(type)!.push(id);
     }
-    if (!ids.length) listEl.appendChild(el('div', { style: { color: '#a7b0c4', fontSize: '12px' } }, mode === 'active' ? 'No active quests.' : 'No completed quests yet.'));
+    if (!ids.length) listEl.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)', fontSize: '12px' } }, mode === 'active' ? 'No active quests.' : 'No completed quests yet.'));
     for (const type of TYPE_ORDER) {
       const group = grouped.get(type);
       if (!group?.length) continue;
@@ -47,7 +47,7 @@ export function createQuestLogWindow(wm: WindowManager, session: GameSession) {
         const row = el('div', {
           style: {
             padding: '5px 7px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px',
-            background: selected === id ? 'rgba(232,196,119,0.15)' : 'transparent', color: ready ? '#4fd8c4' : undefined,
+            background: selected === id ? 'rgba(232,196,119,0.15)' : 'transparent', color: ready ? 'var(--dw-tide)' : undefined,
           },
           onclick: () => { selected = id; renderList(); renderDetail(); },
         }, def?.name ?? id, ready ? ' ✔' : '');
@@ -58,11 +58,11 @@ export function createQuestLogWindow(wm: WindowManager, session: GameSession) {
 
   function renderDetail() {
     detailEl.innerHTML = '';
-    if (!selected) { detailEl.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Select a quest.')); return; }
+    if (!selected) { detailEl.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'Select a quest.')); return; }
     const def = QUESTS[selected];
     const prog = session.state.quests[selected];
-    if (!def || !prog) { detailEl.appendChild(el('div', { style: { color: '#a7b0c4' } }, '??? Unknown quest')); return; }
-    detailEl.appendChild(el('div', { style: { fontWeight: '800', color: '#ffe6a8', fontSize: '14px' } }, def.name));
+    if (!def || !prog) { detailEl.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, '??? Unknown quest')); return; }
+    detailEl.appendChild(el('div', { style: { fontWeight: '800', color: 'var(--dw-lantern-hot)', fontSize: '14px' } }, def.name));
     const turnInDiffers = !!def.turnIn && def.turnIn !== def.giver;
     detailEl.appendChild(el('div', { class: 'dw-tt-sub' }, `${TYPE_LABEL[def.type]}  ·  Lv ${def.level}  ·  Giver: ${NPCS[def.giver]?.name ?? def.giver}`
       + (turnInDiffers ? `  ·  Turn in: ${NPCS[def.turnIn!]?.name ?? def.turnIn}` : '')));

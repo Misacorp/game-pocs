@@ -3,10 +3,25 @@
  * from a MapDef, and exposes small spatial queries used by movement, monster AI and boss attacks.
  */
 import Phaser from 'phaser';
-import type { MapDef, PlatformType, RopeDef } from '@shared/types';
+import type { DecorKind, MapDef, PlatformType, RopeDef } from '@shared/types';
 import { getPlatformTextures, getDecorTexture, type PlatformTextures } from '../../gfx';
+import { THEMES } from '../../gfx/palette';
+import type { WorldLighting } from '../../render/lighting';
 
 interface Rect { x: number; y: number; w: number; h: number; type: PlatformType }
+
+/** Decor kinds whose art (see gfx/decor.ts) actually draws a lit window/flame/glow — everything
+ *  else stays unlit rather than implying a light source that isn't visually there. Colors are
+ *  fixed warm tones for the fire/window kinds; 'crystal' instead uses the theme's own glow accent
+ *  so it reads as matching whatever color that theme's crystals are drawn in. */
+const LIGHT_DECOR: Partial<Record<DecorKind, { color?: number; radius: number; intensity: number; flicker: number; heightFrac: number }>> = {
+  lamp: { color: 0xffdd88, radius: 85, intensity: 1.0, flicker: 0.18, heightFrac: 0.82 },
+  lantern: { color: 0xffdd88, radius: 65, intensity: 0.9, flicker: 0.22, heightFrac: 0.55 },
+  campfire: { color: 0xff8a3a, radius: 95, intensity: 1.35, flicker: 0.4, heightFrac: 0.5 },
+  crystal: { radius: 70, intensity: 0.85, flicker: 0.12, heightFrac: 0.55 },
+  house: { color: 0xffcf7a, radius: 60, intensity: 0.55, flicker: 0.05, heightFrac: 0.55 },
+  shop: { color: 0xffcf7a, radius: 55, intensity: 0.5, flicker: 0.05, heightFrac: 0.55 },
+};
 
 /** World-px of extra room below the map's nominal height that ground platforms extend into (and
  *  the camera/physics bounds allow scrolling into) so the DOM HUD never covers bare void — the
@@ -33,40 +48,65 @@ function addBody(scene: Phaser.Scene, group: Phaser.Physics.Arcade.StaticGroup, 
   group.add(rect);
 }
 
-export function buildTerrain(scene: Phaser.Scene, map: MapDef): Terrain {
+export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldLighting | null): Terrain {
   const textures: PlatformTextures = getPlatformTextures(scene, map.theme);
   const solidGroup = scene.physics.add.staticGroup();
   const onewayGroup = scene.physics.add.staticGroup();
   const rects: Rect[] = [];
   const visuals: Phaser.GameObjects.GameObject[] = [];
+  let lightSeq = 0;
 
   for (const p of map.platforms) {
     const h = p.h ?? (p.type === 'ground' ? Math.max(48, map.height + CAMERA_BOTTOM_SLACK - p.y) : p.type === 'oneway' ? 12 : 16);
     rects.push({ x: p.x, y: p.y, w: p.w, h, type: p.type });
     if (p.type === 'ground') {
       const topH = Math.min(16, h);
-      visuals.push(scene.add.tileSprite(p.x, p.y, p.w, topH, textures.groundTop).setOrigin(0, 0).setDepth(1));
-      if (h > topH) visuals.push(scene.add.tileSprite(p.x, p.y + topH, p.w, h - topH, textures.groundFill).setOrigin(0, 0).setDepth(0.9));
+      const top = scene.add.tileSprite(p.x, p.y, p.w, topH, textures.groundTop).setOrigin(0, 0).setDepth(1);
+      lighting?.lit(top, textures.groundTop);
+      visuals.push(top);
+      if (h > topH) {
+        const fill = scene.add.tileSprite(p.x, p.y + topH, p.w, h - topH, textures.groundFill).setOrigin(0, 0).setDepth(0.9);
+        lighting?.lit(fill, textures.groundFill);
+        visuals.push(fill);
+      }
       addBody(scene, solidGroup, p.x, p.y, p.w, h);
     } else if (p.type === 'oneway') {
-      visuals.push(scene.add.tileSprite(p.x, p.y, p.w, h, textures.oneway).setOrigin(0, 0).setDepth(1));
+      const v = scene.add.tileSprite(p.x, p.y, p.w, h, textures.oneway).setOrigin(0, 0).setDepth(1);
+      lighting?.lit(v, textures.oneway);
+      visuals.push(v);
       addBody(scene, onewayGroup, p.x, p.y, p.w, h);
     } else {
-      visuals.push(scene.add.tileSprite(p.x, p.y, p.w, h, textures.solid).setOrigin(0, 0).setDepth(1));
+      const v = scene.add.tileSprite(p.x, p.y, p.w, h, textures.solid).setOrigin(0, 0).setDepth(1);
+      lighting?.lit(v, textures.solid);
+      visuals.push(v);
       addBody(scene, solidGroup, p.x, p.y, p.w, h);
     }
   }
 
   for (const r of map.ropes) {
     const key = r.kind === 'ladder' ? textures.ladder : textures.rope;
-    visuals.push(scene.add.tileSprite(r.x - 4, r.top, 8, r.bottom - r.top, key).setOrigin(0, 0).setDepth(2));
+    const v = scene.add.tileSprite(r.x - 4, r.top, 8, r.bottom - r.top, key).setOrigin(0, 0).setDepth(2);
+    lighting?.lit(v, key);
+    visuals.push(v);
   }
 
+  const glowAccent = Phaser.Display.Color.HexStringToColor(THEMES[map.theme].glow).color;
   for (const d of map.decor) {
     const tex = getDecorTexture(scene, d.kind, map.theme);
     const img = scene.add.image(d.x, d.y, tex.key).setOrigin(0.5, 1).setScale(d.scale ?? 1).setFlipX(!!d.flip);
     img.setDepth(d.front ? 60 : -10);
+    lighting?.lit(img, tex.key);
     visuals.push(img);
+
+    const lightCfg = LIGHT_DECOR[d.kind];
+    if (lighting && lightCfg) {
+      const id = `decor${lightSeq++}`;
+      const lx = d.x, ly = d.y - img.displayHeight * lightCfg.heightFrac;
+      lighting.addLight({
+        id, x: () => lx, y: () => ly,
+        color: lightCfg.color ?? glowAccent, radius: lightCfg.radius, intensity: lightCfg.intensity, flicker: lightCfg.flicker,
+      });
+    }
   }
 
   function platformsAtX(x: number): Rect[] {

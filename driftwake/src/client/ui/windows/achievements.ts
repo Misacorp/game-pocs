@@ -32,7 +32,7 @@ function achievementIconUrl(def: AchievementDef, size = 32): string {
 export function createAchievementsWindow(wm: WindowManager, session: GameSession) {
   let tab: AchievementCategory | 'all' = 'all';
   const list = el('div', { class: 'dw-ach-list' });
-  const summary = el('div', { style: { fontSize: '11.5px', color: '#a7b0c4', marginBottom: '6px' } });
+  const summary = el('div', { style: { fontSize: '11.5px', color: 'var(--dw-bone-dim)', marginBottom: '6px' } });
   const tabsHost = el('div');
   const body = el('div', { class: 'dw-body', style: { width: '440px' } }, summary, tabsHost, list);
   const ctrl = createWindow(wm, { panel: 'achievements', title: 'Achievements', width: 460 }, body);
@@ -66,14 +66,14 @@ export function createAchievementsWindow(wm: WindowManager, session: GameSession
         if (prog && prog.target > 1) {
           info.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' } },
             progressBar(prog.current / prog.target, 'dw-ach-progress'),
-            el('span', { style: { fontSize: '10px', color: '#a7b0c4', whiteSpace: 'nowrap' } }, `${Math.floor(prog.current)}/${prog.target}`)));
+            el('span', { style: { fontSize: '10px', color: 'var(--dw-bone-dim)', whiteSpace: 'nowrap' } }, `${Math.floor(prog.current)}/${prog.target}`)));
         }
       }
-      if (isUnlocked) info.appendChild(el('div', { class: 'dw-ach-date' }, `Unlocked ${new Date(at).toLocaleDateString()}`));
+      if (isUnlocked) info.appendChild(el('div', { class: 'dw-ach-date' }, el('span', { class: 'dw-ach-seal' }), `Unlocked ${new Date(at).toLocaleDateString()}`));
       row.appendChild(info);
       list.appendChild(row);
     }
-    if (!defs.length) list.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Nothing here yet.'));
+    if (!defs.length) list.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'Nothing here yet.'));
   }
 
   wm.track(bus.on('state', render));

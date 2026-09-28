@@ -4,11 +4,11 @@
 import Phaser from 'phaser';
 import type { GatherNodeDef, ItemDef, Rarity } from '@shared/types';
 import {
-  makeCanvas, ctx2d, outlined, rect, circle, ellipse, line, poly,
+  makeCanvas, ctx2d, rect, circle, ellipse, line, poly,
   registerSpriteSheet, registerCanvasTexture, ensureAnim, shade, hexNum,
 } from './canvasKit';
 import { drawItemIcon } from './iconShapes';
-import { OUTLINE } from './palette';
+import { outlineHued, emissiveDab, glowHalo, warmHighlight } from './shading';
 import type { SpriteInfo } from './spec';
 
 const N = 24;
@@ -25,9 +25,10 @@ function drawNode(base: GatherNodeDef['sprite']['base'], color: string, color2: 
       poly(ctx, [[9, 12], [12, 8], [16, 10], [13, 15]], c2);
       break;
     case 'crystal':
+      if (!depleted) glowHalo(ctx, cx, cy, 12, c1, 0.35);
       poly(ctx, [[cx, 3], [cx + 6, cy], [cx + 2, 20], [cx - 2, 20], [cx - 6, cy]], c1);
-      poly(ctx, [[cx, 3], [cx + 6, cy], [cx, 15]], shade(c1, 0.2));
-      if (!depleted) circle(ctx, cx, cy, 2 + sparkle, c2);
+      poly(ctx, [[cx, 3], [cx + 6, cy], [cx, 15]], warmHighlight(c1, 0.3)); // lit facet
+      if (!depleted) emissiveDab(ctx, cx, cy, 2.6 + sparkle, c2, { coreStop: 0.3 }); // emissive core facet
       break;
     case 'herb':
       line(ctx, cx, 20, cx, 12, 1.4, '#4a7a3a');
@@ -52,10 +53,10 @@ function drawNode(base: GatherNodeDef['sprite']['base'], color: string, color2: 
   if (!depleted && sparkle > 0) {
     for (let i = 0; i < sparkle; i++) {
       const a = i * 2.4;
-      poly(ctx, [[cx + Math.cos(a) * 9, cy - 9 + Math.sin(a) * 3], [cx + Math.cos(a) * 9 + 1, cy - 11 + Math.sin(a) * 3], [cx + Math.cos(a) * 9 + 2, cy - 9 + Math.sin(a) * 3]], '#ffffff');
+      emissiveDab(ctx, cx + Math.cos(a) * 9, cy - 10 + Math.sin(a) * 3, 1.6, '#ffffff', { coreStop: 0.5, alpha: 0.9 });
     }
   }
-  return outlined(art, OUTLINE);
+  return outlineHued(art);
 }
 
 const nodeCache = new Map<string, SpriteInfo>();
@@ -100,6 +101,7 @@ export function getPortalSprite(scene: Phaser.Scene): SpriteInfo {
     const cx = w / 2, cy = h / 2;
     const rot = (f / N_FRAMES) * Math.PI * 2;
     ellipse(ctx, cx, cy, 10, 20, '#0a1830');
+    glowHalo(ctx, cx, cy, 16, '#4fd2ff', 0.4 + 0.12 * Math.sin(rot * 2)); // ambient shimmer, pulses with the swirl
     for (let ring = 0; ring < 3; ring++) {
       const rr = 6 + ring * 4;
       ctx.strokeStyle = ring % 2 === 0 ? '#66ccff' : '#a0e6ff';
@@ -114,8 +116,9 @@ export function getPortalSprite(scene: Phaser.Scene): SpriteInfo {
       ctx.closePath();
       ctx.stroke();
     }
-    ellipse(ctx, cx, cy, 3, 8, '#e0f8ff');
-    frames.push(outlined(art, '#0a1420', false));
+    // swirling emissive core — a genuine hot-white center that drifts slightly with rotation
+    emissiveDab(ctx, cx + Math.cos(rot) * 1.2, cy + Math.sin(rot * 1.6) * 2, 6.5, '#8fe6ff', { coreStop: 0.22, alpha: 0.95 });
+    frames.push(outlineHued(art, false));
   }
   registerSpriteSheet(scene, key, frames, w, h);
   const anims = { idle: ensureAnim(scene, key, `${key}:idle`, 0, N_FRAMES - 1, 10, -1) };
@@ -143,14 +146,24 @@ export function getDropTexture(scene: Phaser.Scene, item: ItemDef | 'gold', rari
   ctx.save();
   ctx.translate(1, 1);
   if (item === 'gold') {
+    emissiveDab(ctx, 8, 8, 6, '#ffd24a', { coreStop: 0.4, alpha: 0.7 });
     drawItemIcon(ctx, 'coin', ['#ffd24a', '#c98a1a']);
   } else {
-    const ring = RARITY_RING[rarity ?? item.rarity];
-    if ((rarity ?? item.rarity) !== 'common') { ctx.globalAlpha = 0.5; circle(ctx, 8, 8, 7.5, ring); ctx.globalAlpha = 1; }
+    const rar = rarity ?? item.rarity;
+    const ring = RARITY_RING[rar];
+    if (rar !== 'common') {
+      glowHalo(ctx, 8, 8, 9, ring, 0.5);
+      // a few rarity-colored sparkle points ringing the item — bloom picks these out at a glance
+      const n = rar === 'legendary' ? 5 : rar === 'epic' ? 4 : 3;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + (rar === 'legendary' ? 0.3 : 0);
+        emissiveDab(ctx, 8 + Math.cos(a) * 7.5, 8 + Math.sin(a) * 7.5, 1.3, ring, { coreStop: 0.5, alpha: 0.9 });
+      }
+    }
     drawItemIcon(ctx, item.icon.shape, item.icon.colors);
   }
   ctx.restore();
-  registerCanvasTexture(scene, key, outlined(art, OUTLINE, false));
+  registerCanvasTexture(scene, key, outlineHued(art, false));
   dropCache.set(key, key);
   return key;
 }

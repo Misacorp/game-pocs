@@ -11,7 +11,7 @@ export function createHelpWindow(wm: WindowManager) {
   const binds = getBinds();
   for (const action of Object.keys(DEFAULT_BINDS)) {
     if (action.startsWith('hotbar')) continue;
-    controls.appendChild(el('div', { class: 'dw-bind-row' }, el('span', null, BIND_LABELS[action] ?? action), el('span', { style: { color: '#e8c477' } }, (binds[action] ?? []).map((k) => keyLabel(k)).join(' / '))));
+    controls.appendChild(el('div', { class: 'dw-bind-row' }, el('span', null, BIND_LABELS[action] ?? action), el('span', { style: { color: 'var(--dw-lantern)' } }, (binds[action] ?? []).map((k) => keyLabel(k)).join(' / '))));
   }
 
   const tips = el('div', { class: 'dw-help-section' },

@@ -29,7 +29,7 @@ export interface ClientEventMap {
   'ui:crafting': { professionId?: string; npcId?: string };
   'ui:toast': { text: string; kind: NotifyKind };
   /** Big centered banner, e.g. map name, "LEVEL UP!", boss name */
-  'ui:banner': { title: string; subtitle?: string; kind?: 'map' | 'level' | 'boss' | 'quest' | 'job' };
+  'ui:banner': { title: string; subtitle?: string; kind?: 'map' | 'level' | 'boss' | 'quest' | 'job' | 'achievement' };
   'ui:bossBar': { name: string; title?: string; hp: number; maxHp: number } | null;
   /** Show interaction hint near bottom ("↑ Talk to Pell") or null */
   'ui:hint': { text: string } | null;

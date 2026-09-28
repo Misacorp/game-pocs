@@ -4,10 +4,10 @@
 import Phaser from 'phaser';
 import type { NpcDef, NpcBase } from '@shared/types';
 import {
-  makeCanvas, ctx2d, outlined, rect, rrect, circle, ellipse, line, poly,
+  makeCanvas, ctx2d, rect, rrect, circle, ellipse, line, poly,
   registerSpriteSheet, ensureAnim, shade, hashStr, scaleNearest,
 } from './canvasKit';
-import { OUTLINE } from './palette';
+import { outlineHued, emissiveDab, warmHighlight, coolShadow } from './shading';
 import type { SpriteInfo } from './spec';
 
 const FW = 32, FH = 40, CX = 16;
@@ -74,6 +74,9 @@ function drawNpcBody(ctx: CanvasRenderingContext2D, def: NpcDef, blink: boolean,
       rrect(ctx, cx - w / 2, torsoTop, w, torsoBot - torsoTop, 2, p.outfit);
   }
   if (base === 'merchant') rect(ctx, cx - w / 2, torsoTop + (torsoBot - torsoTop) * 0.4, w, (torsoBot - torsoTop) * 0.55, p.accent ?? '#caa66a');
+  // form-describing edge tone: warm key-light rim (left) + cool shadow (right), same ramp as players
+  rect(ctx, cx - w / 2, torsoTop, 1, torsoBot - torsoTop, warmHighlight(p.outfit, 0.35));
+  rect(ctx, cx + w / 2 - 1, torsoTop, 1, torsoBot - torsoTop, coolShadow(p.outfit, 0.35));
 
   // head
   circle(ctx, cx, headCy, r, p.skin);
@@ -96,8 +99,8 @@ function drawNpcBody(ctx: CanvasRenderingContext2D, def: NpcDef, blink: boolean,
     case 'apron': rect(ctx, cx - w / 2 + 1, torsoTop + 2, w - 2, torsoBot - torsoTop - 2, p.accent ?? '#caa66a'); break;
     case 'cape': poly(ctx, [[cx - w * 0.6, torsoTop], [cx - w * 0.9, torsoBot + 4], [cx, torsoBot + 2], [cx + w * 0.2, torsoTop]], shade(p.outfit, -0.3)); break;
     case 'horns': poly(ctx, [[cx - r * 0.7, headCy - r * 0.6], [cx - r * 1.15, headCy - r * 1.7], [cx - r * 0.35, headCy - r * 0.9]], p.accent ?? '#e8e0c8'); poly(ctx, [[cx + r * 0.7, headCy - r * 0.6], [cx + r * 1.15, headCy - r * 1.7], [cx + r * 0.35, headCy - r * 0.9]], p.accent ?? '#e8e0c8'); break;
-    case 'lantern': circle(ctx, cx - w * 0.75, torsoTop + 6, 2.6, p.accent ?? '#ffdd88'); rect(ctx, cx - w * 0.78, torsoTop + 3, 0.8, 3, '#3a3226'); break;
-    case 'staff': line(ctx, cx - w * 0.7, torsoBot, cx - w * 0.7, torsoTop - 8, 1.6, '#7a5636'); circle(ctx, cx - w * 0.7, torsoTop - 9, 2.4, p.accent ?? '#8a6ad6'); break;
+    case 'lantern': emissiveDab(ctx, cx - w * 0.75, torsoTop + 6, 3.4, p.accent ?? '#ffdd88', { coreStop: 0.35 }); rect(ctx, cx - w * 0.78, torsoTop + 3, 0.8, 3, '#3a3226'); break;
+    case 'staff': line(ctx, cx - w * 0.7, torsoBot, cx - w * 0.7, torsoTop - 8, 1.6, '#7a5636'); emissiveDab(ctx, cx - w * 0.7, torsoTop - 9, 3, p.accent ?? '#8a6ad6', { coreStop: 0.35 }); break;
     case 'hammer': line(ctx, cx + w * 0.75, torsoBot - 2, cx + w * 0.75, torsoTop - 2, 1.8, '#6b4a30'); rect(ctx, cx + w * 0.6, torsoTop - 5, w * 0.32, 3.4, '#8a97a6'); break;
   }
   ctx.restore();
@@ -114,7 +117,7 @@ export function getNpcSprite(scene: Phaser.Scene, def: NpcDef): SpriteInfo {
     const art = makeCanvas(FW, FH);
     const ctx = ctx2d(art);
     drawNpcBody(ctx, def, f === 1, f === 2 ? -1 : 0);
-    return outlined(art, OUTLINE);
+    return outlineHued(art);
   });
   registerSpriteSheet(scene, key, frames, FW, FH);
   const anims = { idle: ensureAnim(scene, key, `${key}:idle`, 0, 3, 3, -1) };
@@ -139,7 +142,7 @@ export function npcPortraitUrl(def: NpcDef, size = 96): string {
   if (def.sprite.accessory === 'beard') poly(ctx, [[18, 24], [30, 24], [24, 34]], p.hair);
   if (def.sprite.accessory === 'hat') { poly(ctx, [[12, 13], [36, 13], [30, 1], [18, 1]], p.accent ?? '#5a4636'); rect(ctx, 10, 12, 28, 3, p.accent ?? '#5a4636'); }
   if (def.sprite.accessory === 'glasses') { ctx.strokeStyle = '#2a241f'; ctx.lineWidth = 1; ctx.strokeRect(15, 18, 7, 5); ctx.strokeRect(26, 18, 7, 5); }
-  const withLine = outlined(native, OUTLINE);
+  const withLine = outlineHued(native);
   const scaled = scaleNearest(withLine, size, size);
   const url = scaled.toDataURL();
   urlCache.set(k, url);

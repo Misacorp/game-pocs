@@ -30,6 +30,10 @@ import { PortalManager } from './world/PortalManager';
 import { GatherManager } from './world/GatherManager';
 import { Presence } from './world/Presence';
 import { DarkOverlay } from './world/DarkOverlay';
+import { getQuality, isShakeEnabled, onSettingsChanged, type Quality } from '../render/quality';
+import { setupWorldLighting, type WorldLighting } from '../render/lighting';
+import { setupPostFX, type PostFXHandle } from '../render/PostFX';
+import { createMist, type MistLayer } from '../render/mist';
 
 export interface WorldSceneData { mapId: string; portalId?: string; x?: number; y?: number }
 
@@ -46,6 +50,10 @@ export class WorldScene extends Phaser.Scene {
   private parallax!: Parallax;
   private weatherFx!: Weather;
   private darkOverlay?: DarkOverlay;
+  private quality!: Quality;
+  private lighting: WorldLighting | null = null;
+  private postfx!: PostFXHandle;
+  private mist: MistLayer | null = null;
   private input2!: InputController;
   private player!: Player;
   private spawner!: Spawner;
@@ -81,14 +89,19 @@ export class WorldScene extends Phaser.Scene {
     // repeated quit-to-title cycles).
     this.torndown = false;
     this.map = getMapDefOrFallback(data.mapId);
+    this.quality = getQuality();
 
     this.physics.world.setBounds(0, 0, this.map.width, this.map.height + CAMERA_BOTTOM_SLACK);
-    this.terrain = buildTerrain(this, this.map);
+    this.lighting = setupWorldLighting(this, this.map.theme, this.quality);
+    this.terrain = buildTerrain(this, this.map, this.lighting);
 
     this.parallax = createParallax(this, this.map.theme, this.map.width, this.map.height);
     this.weatherFx = createWeather(this, this.map.weather ?? 'none');
+    this.mist = this.quality !== 'low' ? createMist(this, this.map.theme) : null;
+    // Light2D (High/Medium) replaces the old darkness overlay entirely; Low keeps it since it has
+    // no dynamic lighting to make dark maps readable otherwise.
     this.darkOverlay = undefined;
-    if (this.map.dark) this.darkOverlay = new DarkOverlay(this);
+    if (this.map.dark && !this.lighting) this.darkOverlay = new DarkOverlay(this);
 
     this.damageText = new DamageTextPool(this);
     const spawnPos = this.resolveSpawnPos(data);
@@ -97,11 +110,14 @@ export class WorldScene extends Phaser.Scene {
       inTown: () => !!this.map.town,
       cameraShake: (ms, i) => this.cameraShake(ms, i),
       damageText: this.damageText,
+      lighting: this.lighting,
+      groundYAt: (x, y) => this.terrain.groundYAt(x, y),
+      pulseChromatic: (amt) => this.postfx?.pulseChromatic(amt),
     });
 
-    this.projectiles = new ProjectileManager(this);
+    this.projectiles = new ProjectileManager(this, this.lighting);
     this.buffs = new BuffManager();
-    this.drops = new DropManager(this, (x, fromY) => this.terrain.groundYAt(x, fromY));
+    this.drops = new DropManager(this, (x, fromY) => this.terrain.groundYAt(x, fromY), this.lighting);
 
     const runnerCtx: SkillRunnerCtx = {
       getMonsters: () => this.spawner.monsters,
@@ -128,6 +144,8 @@ export class WorldScene extends Phaser.Scene {
       groundYAt: (x, fromY) => this.terrain.groundYAt(x, fromY),
       spawnMonsterNear: (id, x, y) => this.spawner.spawnNear(id, x, y),
       rng: Math.random,
+      lighting: this.lighting,
+      pulseChromatic: (amt) => this.postfx?.pulseChromatic(amt),
       queryPlayerHit: (x, y) => {
         const px = this.player.x, py = this.player.y - 20;
         return Math.hypot(x - px, y - py) < 18 ? { x: px, y: py, obj: 'player' } : null;
@@ -138,12 +156,12 @@ export class WorldScene extends Phaser.Scene {
     this.npcs = this.map.npcs.map((p) => {
       const def = getNpcDef(p.npcId);
       if (!def) { console.warn(`[WorldScene] unknown npc id "${p.npcId}"`); return null; }
-      return new NpcEntity(this, def, p.x, p.y, p.flip);
+      return new NpcEntity(this, def, p.x, p.y, p.flip, this.lighting);
     }).filter((n): n is NpcEntity => !!n);
     this.refreshNpcMarkers();
 
-    this.gatherMgr = new GatherManager(this, this.map);
-    this.portalMgr = new PortalManager(this, this.map);
+    this.gatherMgr = new GatherManager(this, this.map, this.lighting);
+    this.portalMgr = new PortalManager(this, this.map, this.lighting);
     this.presence = new Presence(this, this.map.id);
 
     this.physics.add.collider(this.player.sprite, this.terrain.solidGroup);
@@ -161,6 +179,7 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12, 0, CAMERA_FOLLOW_OFFSET_Y);
     this.cameras.main.setDeadzone(60, 36);
     this.cameras.main.setBackgroundColor(0x0b1020);
+    this.postfx = setupPostFX(this, this.map.theme, this.quality);
 
     this.input2 = new InputController();
     this.recomputePassives();
@@ -171,6 +190,7 @@ export class WorldScene extends Phaser.Scene {
       bus.on('state', () => { this.player.syncLook(); this.recomputePassives(); this.refreshNpcMarkers(); this.syncPet(); }),
       bus.on('player:respawn', () => session.dispatch({ type: 'respawn' })),
       bus.on('hotbar:activate', ({ index }) => this.tryActivateHotbar(index, false)),
+      onSettingsChanged(() => this.onSettingsChanged()),
     );
 
     audio.playMusic(this.map.music);
@@ -237,6 +257,9 @@ export class WorldScene extends Phaser.Scene {
     this.parallax.update(this.cameras.main);
     this.weatherFx.update(this.cameras.main, dt);
     try { this.darkOverlay?.update(this.cameras.main, this.player.x, this.player.y); } catch (e) { console.error('[WorldScene] dark overlay update threw', e); this.darkOverlay = undefined; }
+    try { this.lighting?.update(dt, this.cameras.main); } catch (e) { console.error('[WorldScene] lighting update threw', e); }
+    try { this.mist?.update(this.cameras.main, dt); } catch (e) { console.error('[WorldScene] mist update threw', e); }
+    this.postfx?.step(dt);
 
     this.presence.update(dt, this.player.x, this.player.y, this.player.vx, this.player.vy, this.player.facing, this.currentAnimName());
 
@@ -367,7 +390,7 @@ export class WorldScene extends Phaser.Scene {
     if (!itemId) return;
     const def = ITEMS[itemId];
     if (!def?.pet) return;
-    this.pet = new Pet(this, def, this.player.x, this.player.y);
+    this.pet = new Pet(this, def, this.player.x, this.player.y, this.lighting);
   }
 
   private updatePet(dt: number): void {
@@ -389,8 +412,19 @@ export class WorldScene extends Phaser.Scene {
 
   // ---- fx helpers --------------------------------------------------------------
 
-  cameraShake(ms: number, intensity: number): void { this.cameras.main.shake(ms, intensity); }
+  cameraShake(ms: number, intensity: number): void { if (isShakeEnabled()) this.cameras.main.shake(ms, intensity); }
   hitstop(ms: number): void { this.hitstopUntil = Math.max(this.hitstopUntil, performance.now() + ms); }
+
+  /** 'settings:changed' fired while playing: only a quality-tier change needs the full rebuild
+   *  every render subsystem here requires (shaders/lights/postFX pipelines/RenderTextures) —
+   *  a scene.restart() is the simplest way to guarantee that rebuild is clean and leak-free. */
+  private onSettingsChanged(): void {
+    if (getQuality() === this.quality) return;
+    if (this.transitioning) return;
+    this.transitioning = true;
+    const next: WorldSceneData = { mapId: this.map.id, x: this.player.x, y: this.player.y };
+    this.scene.restart(next);
+  }
 
   // ---- game events / map transitions ------------------------------------------
 
@@ -416,16 +450,22 @@ export class WorldScene extends Phaser.Scene {
       case 'xp':
         this.damageText.spawn(this.player.x, this.player.y - this.player.sprite.displayHeight - 10, `+${ev.amount} EXP`, 'xp');
         break;
-      case 'levelUp':
+      case 'levelUp': {
         spawnVfx(this, 'holy', this.player.x, this.player.y - 20, { color: '#ffe066', width: 40, height: 90, durationMs: 700 });
         audio.playSfx('levelUp');
         bus.emit('ui:banner', { title: 'LEVEL UP!', subtitle: `Level ${ev.level}`, kind: 'level' });
+        const px = this.player.x, py = this.player.y - 20;
+        this.lighting?.addLight({ id: 'levelup', x: () => px, y: () => py, color: 0xffe066, radius: 160, intensity: 1.6, priority: 2, ttl: 900 });
         break;
-      case 'jobAdvanced':
+      }
+      case 'jobAdvanced': {
         spawnVfx(this, 'holy', this.player.x, this.player.y - 20, { color: '#c77dff', width: 50, height: 100, durationMs: 900 });
         audio.playSfx('jobAdvance');
         bus.emit('ui:banner', { title: 'Job Advancement!', subtitle: ev.jobId, kind: 'job' });
+        const px = this.player.x, py = this.player.y - 20;
+        this.lighting?.addLight({ id: 'jobadv', x: () => px, y: () => py, color: 0xc77dff, radius: 170, intensity: 1.6, priority: 2, ttl: 1100 });
         break;
+      }
       case 'died':
         bus.emit('ui:death', { xpLost: ev.xpLost });
         break;
@@ -509,6 +549,9 @@ export class WorldScene extends Phaser.Scene {
     safely('parallax', () => this.parallax?.destroy());
     safely('weatherFx', () => this.weatherFx?.destroy());
     safely('darkOverlay', () => { this.darkOverlay?.destroy(); this.darkOverlay = undefined; });
+    safely('lighting', () => { this.lighting?.destroy(); this.lighting = null; });
+    safely('postfx', () => { this.postfx?.clear(); });
+    safely('mist', () => { this.mist?.destroy(); this.mist = null; });
     safely('spawner', () => this.spawner?.destroy());
     safely('npcs', () => { for (const n of this.npcs) n.destroy(); this.npcs = []; });
     safely('gatherMgr', () => this.gatherMgr?.destroy());

@@ -41,13 +41,19 @@ export function createWeather(scene: Phaser.Scene, w: WeatherId): Weather {
   switch (w) {
     case 'rain': case 'storm':
       add('wx_drop', { x: { min: -20, max: vw + 20 }, y: -20, lifespan: 900, speedY: { min: 500, max: 700 }, speedX: -60, scaleY: { min: 0.8, max: 1.3 }, alpha: 0.5, quantity: 3, frequency: 20, tint: 0xaad4ff });
+      // A second, additive-blended pass of the same drops gives rain a faint catch-light glint
+      // that the threshold bloom pass can pick up, without brightening (and thus blurring) the
+      // whole rain layer — most drops stay a normal crisp alpha-blended streak.
+      add('wx_drop', { x: { min: -20, max: vw + 20 }, y: -20, lifespan: 900, speedY: { min: 500, max: 700 }, speedX: -60, scaleY: { min: 0.8, max: 1.3 }, scaleX: 0.4, alpha: 0.16, quantity: 1, frequency: 55, tint: 0xdff2ff, blendMode: Phaser.BlendModes.ADD });
       if (w === 'storm') lightning = scene.add.rectangle(0, 0, 10, 10, 0xffffff, 0).setOrigin(0).setDepth(210);
       break;
     case 'snow':
       add('wx_dot', { x: { min: 0, max: vw }, y: -10, lifespan: 6000, speedY: { min: 30, max: 70 }, speedX: { min: -20, max: 20 }, scale: { min: 0.4, max: 1 }, alpha: { min: 0.5, max: 0.9 }, quantity: 1, frequency: 90, tint: 0xffffff });
       break;
     case 'embers':
-      add('wx_dot', { x: { min: 0, max: vw }, y: vh + 10, lifespan: 4000, speedY: { min: -60, max: -20 }, speedX: { min: -15, max: 15 }, scale: { start: 0.7, end: 0 }, alpha: { start: 0.9, end: 0 }, quantity: 1, frequency: 120, tint: [0xff8a3a, 0xffe07a] });
+      // ADD blend so embers read as small glowing points of light and catch the threshold bloom
+      // pass (their tint is already bright enough to cross the bloom luminance threshold).
+      add('wx_dot', { x: { min: 0, max: vw }, y: vh + 10, lifespan: 4000, speedY: { min: -60, max: -20 }, speedX: { min: -15, max: 15 }, scale: { start: 0.7, end: 0 }, alpha: { start: 0.9, end: 0 }, quantity: 1, frequency: 120, tint: [0xff8a3a, 0xffe07a], blendMode: Phaser.BlendModes.ADD });
       break;
     case 'bubbles':
       add('wx_dot', { x: { min: 0, max: vw }, y: vh + 10, lifespan: 5000, speedY: { min: -50, max: -15 }, speedX: { min: -10, max: 10 }, scale: { min: 0.4, max: 1.1 }, alpha: { min: 0.3, max: 0.7 }, quantity: 1, frequency: 140, tint: 0x8fd8ff });

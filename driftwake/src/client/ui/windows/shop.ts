@@ -16,8 +16,8 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   let mode: 'buy' | 'sell' = 'buy';
   const qtyState = new Map<string, number>();
 
-  const shopNameEl = el('div', { class: 'dw-caps', style: { color: '#e8c477', fontWeight: '700', fontSize: '12px', marginBottom: '4px' } }, 'Shop');
-  const goldEl = el('div', { style: { fontWeight: '700', color: '#ffd24a', display: 'flex', alignItems: 'center', gap: '5px' } }, el('img', { src: goldIconUrl(16) }), '0');
+  const shopNameEl = el('div', { class: 'dw-caps', style: { color: 'var(--dw-lantern)', fontWeight: '700', fontSize: '12px', marginBottom: '4px' } }, 'Shop');
+  const goldEl = el('div', { style: { fontWeight: '700', color: 'var(--dw-lantern-hot)', display: 'flex', alignItems: 'center', gap: '5px' } }, el('img', { src: goldIconUrl(16) }), '0');
   const tabsHost = el('div');
   const grid = el('div', { style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '420px', overflowY: 'auto' } });
   const body = el('div', { class: 'dw-body' }, shopNameEl, goldEl, tabsHost, grid);
@@ -44,7 +44,7 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
 
   function renderBuy() {
     const shop = shopId ? SHOPS[shopId] : undefined;
-    if (!shop) { grid.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Shop unavailable.')); return; }
+    if (!shop) { grid.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'Shop unavailable.')); return; }
     for (const entry of shop.items) {
       if (!checkConditions(session.state, entry.reqs)) continue;
       const def = ITEMS[entry.itemId];
@@ -53,7 +53,7 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
       const iconSlot = el('div', { class: 'dw-slot' }, el('img', { src: safeItemIcon(def) }));
       attachTooltip(iconSlot, () => def ? [`${def.name}`] : ['??? Item']);
       card.appendChild(iconSlot);
-      card.appendChild(el('div', { style: { flex: '1' } }, el('div', null, def?.name ?? entry.itemId), el('div', { style: { fontSize: '11px', color: '#ffd24a' } }, `${fmtNum(price)}g`)));
+      card.appendChild(el('div', { style: { flex: '1' } }, el('div', null, def?.name ?? entry.itemId), el('div', { style: { fontSize: '11px', color: 'var(--dw-lantern-hot)' } }, `${fmtNum(price)}g`)));
       const stackable = (def?.stack ?? 1) > 1;
       const qtyKey = entry.itemId;
       if (!qtyState.has(qtyKey)) qtyState.set(qtyKey, 1);
@@ -73,14 +73,14 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   function renderSell() {
     const all: ItemInstance[] = [];
     for (const tab of Object.values(session.state.inventory)) for (const inst of tab) if (inst && !ITEMS[inst.itemId]?.quest) all.push(inst);
-    if (!all.length) { grid.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'Nothing to sell.')); return; }
+    if (!all.length) { grid.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'Nothing to sell.')); return; }
     for (const inst of all) {
       const def = ITEMS[inst.itemId];
       const card = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' } });
       const iconSlot = el('div', { class: 'dw-slot' }, el('img', { src: safeItemIcon(def) }), inst.qty > 1 ? el('div', { class: 'dw-count' }, String(inst.qty)) : null);
       attachTooltip(iconSlot, () => buildItemTooltip(session.state, inst));
       card.appendChild(iconSlot);
-      card.appendChild(el('div', { style: { flex: '1' } }, el('div', null, def?.name ?? inst.itemId), el('div', { style: { fontSize: '11px', color: '#ffd24a' } }, `${fmtNum(def?.sellPrice ?? 0)}g ea`)));
+      card.appendChild(el('div', { style: { flex: '1' } }, el('div', null, def?.name ?? inst.itemId), el('div', { style: { fontSize: '11px', color: 'var(--dw-lantern-hot)' } }, `${fmtNum(def?.sellPrice ?? 0)}g ea`)));
       card.appendChild(el('button', { class: 'dw-btn dw-btn-sm', onclick: () => session.dispatch({ type: 'sell', uid: inst.uid, qty: inst.qty }) }, 'Sell'));
       grid.appendChild(card);
     }

@@ -12,7 +12,7 @@ import { JOB_ADVANCE_LEVEL } from '@shared/constants';
 import { audio } from '../../audio';
 
 export function createSkillsWindow(wm: WindowManager, session: GameSession) {
-  const spLabel = el('div', { class: 'dw-caps', style: { color: '#e8c477', fontWeight: '700' } }, 'SP: 0');
+  const spLabel = el('div', { class: 'dw-caps', style: { color: 'var(--dw-lantern)', fontWeight: '700' } }, 'SP: 0');
   const tabsHost = el('div');
   const list = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' } });
   const body = el('div', { class: 'dw-body' }, spLabel, tabsHost, list);
@@ -47,9 +47,9 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
     const tabDefs = jobTabs();
     const tabInfo = tabDefs.find((t) => t.id === activeJob);
     const job = activeJob ? JOBS[activeJob] : undefined;
-    if (!job) { list.appendChild(el('div', { style: { color: '#a7b0c4' } }, 'No skills yet.')); return; }
+    if (!job) { list.appendChild(el('div', { style: { color: 'var(--dw-bone-dim)' } }, 'No skills yet.')); return; }
     if (tabInfo?.locked) {
-      list.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: '#a7b0c4' } },
+      list.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--dw-bone-dim)' } },
         el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '🔒'),
         el('div', null, `Unlocks at level ${JOB_ADVANCE_LEVEL} via job advancement.`),
         el('div', { class: 'dw-tt-desc', style: { marginTop: '6px' } }, job.description)));
@@ -65,7 +65,7 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
 
       const info = el('div', { style: { flex: '1' } });
       info.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } },
-        el('b', null, def?.name ?? skillId), el('span', { style: { color: '#a7b0c4', fontSize: '11.5px' } }, `Lv ${level} / ${def?.maxLevel ?? '?'}`)));
+        el('b', null, def?.name ?? skillId), el('span', { style: { color: 'var(--dw-bone-dim)', fontSize: '11.5px' } }, `Lv ${level} / ${def?.maxLevel ?? '?'}`)));
       if (def?.description) info.appendChild(el('div', { class: 'dw-tt-desc', style: { margin: '2px 0' } }, def.description));
       if (def) info.appendChild(valuesLine(def, level));
       row.appendChild(info);
@@ -73,7 +73,7 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
       const check = def ? skillLearnCheck(st, skillId) : { ok: false, reason: 'Unknown skill' };
       const canLevel = level < (def?.maxLevel ?? 0);
       const btn = el('button', {
-        class: 'dw-btn dw-btn-sm', disabled: !check.ok || !canLevel,
+        class: `dw-btn dw-btn-sm ${check.ok && canLevel ? 'dw-btn-primary' : ''}`, disabled: !check.ok || !canLevel,
         onclick: () => { session.dispatch({ type: 'learnSkill', skillId }); audio.playSfx('uiClick'); },
       }, canLevel ? '+' : 'MAX');
       if (!check.ok && check.reason) attachTooltip(btn, () => [check.reason!]);
@@ -103,7 +103,7 @@ export function createSkillsWindow(wm: WindowManager, session: GameSession) {
       if (def.mpCost !== undefined) nextBits.push(`MP ${round1(scalar(def.mpCost, next))}`);
       if (nextBits.length) text += `  →  next: ${nextBits.join(', ')}`;
     }
-    return el('div', { style: { fontSize: '11px', color: '#e8c477' } }, text);
+    return el('div', { style: { fontSize: '11px', color: 'var(--dw-lantern)' } }, text);
   }
 
   wm.track(bus.on('state', () => { renderTabs(); renderList(); }));

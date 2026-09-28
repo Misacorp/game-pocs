@@ -57,7 +57,7 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
 
   offs.push(bus.on('ui:toast', ({ text, kind }) => {
     const t = el('div', { class: `dw-panel dw-toast` }, text);
-    const kindColor: Record<string, string> = { error: '#ff6b6b', good: '#6fdc6f', warn: '#ff9a52', quest: '#c77dff' };
+    const kindColor: Record<string, string> = { error: 'var(--dw-coral)', good: 'var(--dw-tide)', warn: 'var(--dw-lantern-hot)', quest: 'var(--dw-r-epic)' };
     if (kindColor[kind]) t.style.color = kindColor[kind];
     toasts.appendChild(t);
     window.setTimeout(() => { t.classList.add('dw-fade-out'); window.setTimeout(() => t.remove(), 260); }, 2600);
@@ -67,7 +67,8 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
     bannerSlot.innerHTML = '';
     const b = el('div', { class: `dw-panel dw-banner dw-${kind ?? 'map'}` },
       el('div', { class: 'dw-banner-title' }, title),
-      subtitle ? el('div', { class: 'dw-banner-sub' }, subtitle) : null);
+      subtitle ? el('div', { class: 'dw-banner-sub' }, subtitle) : null,
+      el('div', { class: 'dw-banner-wake' }));
     // banners are chrome-less (no panel bg) — override
     b.style.background = 'transparent'; b.style.border = 'none'; b.style.boxShadow = 'none';
     bannerSlot.appendChild(b);
@@ -94,8 +95,8 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
     deathSlot.innerHTML = '';
     const overlay = el('div', { class: 'dw-death-overlay' },
       el('div', { class: 'dw-panel dw-death-box' },
-        el('h2', { class: 'dw-caps' }, 'You Died'),
-        el('div', { style: { color: '#a7b0c4', marginBottom: '16px' } }, `Lost ${fmtNum(xpLost)} XP`),
+        el('h2', null, 'Lost to the Clouds'),
+        el('div', { style: { color: 'var(--dw-bone-dim)', fontStyle: 'italic', marginBottom: '18px' } }, `Lost ${fmtNum(xpLost)} XP`),
         el('button', {
           class: 'dw-btn dw-btn-primary', onclick: () => { overlay.remove(); bus.emit('player:respawn'); },
         }, 'Respawn')));
@@ -135,7 +136,7 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
       case 'achievementUnlocked': {
         const def = ACHIEVEMENTS[ev.id];
         audio.playSfx('questComplete');
-        bus.emit('ui:banner', { title: 'Achievement Unlocked!', subtitle: def?.name ?? ev.id, kind: 'quest' });
+        bus.emit('ui:banner', { title: 'Achievement Unlocked!', subtitle: def?.name ?? ev.id, kind: 'achievement' });
         pushFeed(`Achievement: ${def?.name ?? ev.id}`, 'good');
         break;
       }

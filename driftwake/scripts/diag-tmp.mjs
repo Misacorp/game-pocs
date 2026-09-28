@@ -18,13 +18,14 @@ await page.click('button:text-is("Create")');
 await page.waitForTimeout(4000);
 await page.evaluate(() => window.__ui.bus.emit('ui:banner', { title: 'LEVEL UP!', subtitle: '+5 AP, +3 SP', kind: 'level' }));
 await page.waitForTimeout(800);
-await page.evaluate(() => {
+const dump = await page.evaluate(() => {
   const b = document.querySelector('.dw-banner');
-  document.body.appendChild(b); // reparent, keep all its classes/computed CSS from stylesheet
-  b.style.position = 'fixed';
-  b.style.left = '400px'; b.style.top = '90px'; b.style.transform = 'none';
-  b.style.zIndex = '999999';
+  const t = b.querySelector('.dw-banner-title');
+  const cs = getComputedStyle(b);
+  const ct = getComputedStyle(t);
+  const keys = ['filter','mixBlendMode','clipPath','mask','maskImage','webkitMaskImage','color','fontSize','width','height','overflow','isolation','backdropFilter','opacity','visibility','display','contain','clip','WebkitTextFillColor','textFillColor'];
+  const pick = (o) => Object.fromEntries(keys.map(k => [k, o[k]]));
+  return { banner: pick(cs), title: pick(ct), titleText: t.textContent, titleRect: t.getBoundingClientRect() };
 });
-await page.waitForTimeout(100);
-await page.screenshot({ path: '/tmp/claude-0/brand/shots/diag_reparent.png' });
+console.log(JSON.stringify(dump, null, 2));
 await browser.close();

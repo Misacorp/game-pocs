@@ -20,10 +20,11 @@ await page.evaluate(() => window.__ui.bus.emit('ui:banner', { title: 'LEVEL UP!'
 await page.waitForTimeout(800);
 await page.evaluate(() => {
   const b = document.querySelector('.dw-banner');
-  b.style.animation = 'none';
-  b.style.opacity = '1';
-  b.style.transform = 'translate(-50%,-50%)';
+  document.body.appendChild(b); // reparent, keep all its classes/computed CSS from stylesheet
+  b.style.position = 'fixed';
+  b.style.left = '400px'; b.style.top = '90px'; b.style.transform = 'none';
+  b.style.zIndex = '999999';
 });
 await page.waitForTimeout(100);
-await page.screenshot({ path: '/tmp/claude-0/brand/shots/diag_noanim.png' });
+await page.screenshot({ path: '/tmp/claude-0/brand/shots/diag_reparent.png' });
 await browser.close();

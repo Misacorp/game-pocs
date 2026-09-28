@@ -23,7 +23,8 @@ Other scripts:
 | `npm run typecheck` | TypeScript only |
 | `npm test` | Vitest: reducer, balance and server smoke tests |
 | `npm run validate` | Content cross-reference validator (ids, portals, drops, quests, dialogue links, balance warnings) |
-| `npx tsx scripts/simulate-playthrough.ts [class]` | Headless bot plays the whole story through the authoritative reducer and reports pacing |
+| `npm run simulate -- [class]` | Headless bot plays the whole story through the authoritative reducer and reports pacing/blockers |
+| `npm run e2e` | Browser smoke test (Playwright): every class creates a character, travels, fights, quits — fails on page errors |
 | `npm run server` | Node WebSocket authoritative server on :7777 (see `server/README.md`) |
 
 Play online against the server: `npm run server`, then open `http://localhost:5173/?server=ws://localhost:7777`.

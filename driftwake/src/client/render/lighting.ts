@@ -81,8 +81,15 @@ export function ensureNormalMap(scene: Phaser.Scene, key: string): void {
 
 export interface WorldLighting {
   readonly manager: LightManager;
-  /** Attach the Light2D pipeline to a game object and ensure its texture has a normal map. */
-  lit<T extends Phaser.GameObjects.GameObject & { setPipeline: (key: string) => unknown }>(obj: T, textureKey: string): T;
+  /** Attach the Light2D pipeline to a game object, and (unless `normalMap: false`) queue a
+   *  generated normal map so it picks up bevel shading once ready. Bevel relief is most worth its
+   *  (deferred, but non-zero) cost on characters/monsters/NPCs — the things the eye actually
+   *  studies — so terrain tiles, decor and small icons are lit with a flat default normal
+   *  (`normalMap: false`): still correctly darkened/tinted by ambient + nearby lights, just
+   *  without per-pixel relief. This is the main lever for keeping the number of queued normal-map
+   *  jobs (and thus how long the background queue keeps competing with the main thread) bounded
+   *  on a busy map with many distinct tile/decor textures. */
+  lit<T extends Phaser.GameObjects.GameObject & { setPipeline: (key: string) => unknown }>(obj: T, textureKey: string, opts?: { normalMap?: boolean }): T;
   addLight(src: LightSource): void;
   removeLight(id: string): void;
   update(dtMs: number, cam: Phaser.Cameras.Scene2D.Camera): void;
@@ -98,12 +105,12 @@ export function setupWorldLighting(scene: Phaser.Scene, theme: ThemeId, quality:
     console.warn('[lighting] scene.lights.enable() failed — disabling dynamic lighting for this scene', e);
     return null;
   }
-  const budget = quality === 'high' ? 16 : 8;
+  const budget = quality === 'high' ? 10 : 6;
   const manager = new LightManager(scene, budget);
   return {
     manager,
-    lit(obj, textureKey) {
-      ensureNormalMap(scene, textureKey);
+    lit(obj, textureKey, opts) {
+      if (opts?.normalMap !== false) ensureNormalMap(scene, textureKey);
       try { obj.setPipeline('Light2D'); } catch { /* pipeline unavailable (canvas fallback) */ }
       return obj;
     },

@@ -108,7 +108,7 @@ export function createNotificationLayer(_session: GameSession): { root: HTMLElem
     switch (ev.type) {
       case 'itemAdded': {
         const def = ITEMS[ev.itemId];
-        const color = ev.rarity ? RARITY_COLORS[ev.rarity as keyof typeof RARITY_COLORS] : def ? RARITY_COLORS[def.rarity] : '#e8e8e8';
+        const color = ev.rarity ? RARITY_COLORS[ev.rarity as keyof typeof RARITY_COLORS] : def ? RARITY_COLORS[def.rarity] : '#e9e1cf';
         pushAggregated(`item:${ev.itemId}`, ev.qty, 'loot', safeItemIcon(def), color, (n) => `+${n} ${def?.name ?? '???'}`);
         break;
       }

@@ -39,7 +39,7 @@ export class GatherManager {
       const info = getGatherNodeSprite(scene, def);
       const sprite = scene.add.sprite(g.x, g.y, info.key, 0).setOrigin(0.5, 1).setDepth(4);
       playAnimSafe(sprite, info, 'idle');
-      lighting?.lit(sprite, info.key);
+      lighting?.lit(sprite, info.key, { normalMap: false });
       const entry: NodeEntry = { nodeId: g.nodeId, sprite, x: g.x, y: g.y, hitsDone: 0, depleted: false, respawnAt: 0 };
       if (lighting && GLOWING_BASES.has(def.sprite.base)) {
         entry.lightId = `node${nodeLightSeq++}`;

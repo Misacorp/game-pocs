@@ -33,10 +33,13 @@ async function main() {
     scene: [BootScene, TitleScene, WorldScene],
     input: { keyboard: true, mouse: true },
     audio: { noAudio: true },
-    // Compiled-in light count for the Light2D pipeline shader — fixed regardless of quality tier;
-    // LightManager (render/LightManager.ts) is what actually caps how many are active at once
-    // (16 on High, 8 on Medium, Light2D unused entirely on Low).
-    render: { maxLights: 16 },
+    // Compiled-in light count for the Light2D pipeline shader — fixed regardless of quality tier
+    // (Phaser recompiles the light shader's loop bound from this constant, and it can't change at
+    // runtime). LightManager (render/LightManager.ts) is what actually caps how many are active at
+    // once (10 on High, 6 on Medium, Light2D unused entirely on Low) — this is the compiled ceiling
+    // both tiers share, kept modest since every lit pixel on screen pays for this many loop
+    // iterations regardless of how many lights are actually doing anything that frame.
+    render: { maxLights: 10 },
   });
   (window as any).__game = game;
   (window as any).__session = session;

@@ -62,22 +62,22 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
     if (p.type === 'ground') {
       const topH = Math.min(16, h);
       const top = scene.add.tileSprite(p.x, p.y, p.w, topH, textures.groundTop).setOrigin(0, 0).setDepth(1);
-      lighting?.lit(top, textures.groundTop);
+      lighting?.lit(top, textures.groundTop, { normalMap: false });
       visuals.push(top);
       if (h > topH) {
         const fill = scene.add.tileSprite(p.x, p.y + topH, p.w, h - topH, textures.groundFill).setOrigin(0, 0).setDepth(0.9);
-        lighting?.lit(fill, textures.groundFill);
+        lighting?.lit(fill, textures.groundFill, { normalMap: false });
         visuals.push(fill);
       }
       addBody(scene, solidGroup, p.x, p.y, p.w, h);
     } else if (p.type === 'oneway') {
       const v = scene.add.tileSprite(p.x, p.y, p.w, h, textures.oneway).setOrigin(0, 0).setDepth(1);
-      lighting?.lit(v, textures.oneway);
+      lighting?.lit(v, textures.oneway, { normalMap: false });
       visuals.push(v);
       addBody(scene, onewayGroup, p.x, p.y, p.w, h);
     } else {
       const v = scene.add.tileSprite(p.x, p.y, p.w, h, textures.solid).setOrigin(0, 0).setDepth(1);
-      lighting?.lit(v, textures.solid);
+      lighting?.lit(v, textures.solid, { normalMap: false });
       visuals.push(v);
       addBody(scene, solidGroup, p.x, p.y, p.w, h);
     }
@@ -86,7 +86,7 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
   for (const r of map.ropes) {
     const key = r.kind === 'ladder' ? textures.ladder : textures.rope;
     const v = scene.add.tileSprite(r.x - 4, r.top, 8, r.bottom - r.top, key).setOrigin(0, 0).setDepth(2);
-    lighting?.lit(v, key);
+    lighting?.lit(v, key, { normalMap: false });
     visuals.push(v);
   }
 
@@ -95,7 +95,7 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
     const tex = getDecorTexture(scene, d.kind, map.theme);
     const img = scene.add.image(d.x, d.y, tex.key).setOrigin(0.5, 1).setScale(d.scale ?? 1).setFlipX(!!d.flip);
     img.setDepth(d.front ? 60 : -10);
-    lighting?.lit(img, tex.key);
+    lighting?.lit(img, tex.key, { normalMap: false });
     visuals.push(img);
 
     const lightCfg = LIGHT_DECOR[d.kind];

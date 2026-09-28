@@ -51,8 +51,11 @@ float noise(vec2 p) {
   return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 float fbm(vec2 p) {
-  float v = 0.0, amp = 0.5;
-  for (int i = 0; i < 3; i++) { v += amp * noise(p); p *= 2.05; amp *= 0.5; }
+  // 2 octaves: kept deliberately cheap — this runs on essentially every pixel of the sky, and
+  // SwiftShader (software WebGL, used in headless/CI) is dramatically more sensitive to per-pixel
+  // ALU cost than a real GPU is, so we err on the cheap side rather than the pretty side here.
+  float v = 0.0, amp = 0.6;
+  for (int i = 0; i < 2; i++) { v += amp * noise(p); p *= 2.1; amp *= 0.4; }
   return v;
 }
 
@@ -163,6 +166,18 @@ export interface SkyShader {
   gameObject: Phaser.GameObjects.Shader;
 }
 
+/** Internal render resolution for the sky, in pixels — independent of the display size it's
+ *  stretched to. A GPU (or SwiftShader) shades once per actually-rasterized framebuffer pixel, so
+ *  a Shader GameObject drawn "small then scaled up" is NOT cheaper — scaling only changes how many
+ *  pixels its quad covers in the final framebuffer, which is exactly what costs the same either
+ *  way. The lead's spike called this out explicitly: render the fbm/noise work into a small
+ *  RenderTexture once, then every frame just re-draw that already-computed texture (a plain,
+ *  cheap textured quad) stretched up to fill the screen — this is what actually saves the
+ *  per-pixel shader cost, and it's the difference between the sky being a rounding error and the
+ *  sky being the single most expensive thing on screen under software rendering. */
+const SKY_RT_W: Record<Quality, number> = { low: 0, medium: 160, high: 240 };
+const SKY_RT_H: Record<Quality, number> = { low: 0, medium: 90, high: 135 };
+
 export function createSkyShader(
   scene: Phaser.Scene,
   theme: ThemeId,
@@ -171,6 +186,7 @@ export function createSkyShader(
   seed: number,
 ): SkyShader | null {
   try {
+    const rtW = SKY_RT_W[quality] || 240, rtH = SKY_RT_H[quality] || 135;
     // A fresh BaseShader instance per scene/theme (each Shader GameObject compiles its own GL
     // program from it regardless — see Shader.js#setShader — so there's nothing to gain from a
     // shared cache entry here, and baking the theme's values straight into the instance avoids
@@ -184,18 +200,24 @@ export function createSkyShader(
       uSeed: { type: '1f', value: (seed % 1000) / 1000 },
       uQuality: { type: '1f', value: quality === 'high' ? 1 : 0 },
     });
-    const obj = scene.add.shader(base, 0, 0, 640, 360).setOrigin(0, 0).setDepth(-100);
+    // Rendered off the normal display list (setVisible(false)); only ever drawn into the RT below.
+    const shaderObj = scene.add.shader(base, 0, 0, rtW, rtH).setOrigin(0, 0).setVisible(false);
+    const rt = scene.add.renderTexture(0, 0, rtW, rtH).setOrigin(0, 0).setDepth(-100);
+    rt.draw(shaderObj, 0, 0);
 
+    let frame = 0;
     return {
-      gameObject: obj,
+      gameObject: shaderObj,
       update(cam) {
+        // The sky drifts slowly — redrawing the (already cheap, low-res) RT every other frame is
+        // imperceptible in motion but halves this pass's already-small cost again.
+        frame++;
+        if (frame % 2 === 0) { rt.clear(); rt.draw(shaderObj, 0, 0); }
         const tl = cam.getWorldPoint(0, 0);
         const br = cam.getWorldPoint(cam.width, cam.height);
-        obj.setPosition(tl.x, tl.y);
-        const w = br.x - tl.x, h = br.y - tl.y;
-        if (Math.abs(obj.width - w) > 0.5 || Math.abs(obj.height - h) > 0.5) obj.setSize(w, h);
+        rt.setPosition(tl.x, tl.y).setDisplaySize(br.x - tl.x, br.y - tl.y);
       },
-      destroy() { obj.destroy(); },
+      destroy() { rt.destroy(); shaderObj.destroy(); },
     };
   } catch (e) {
     console.warn('[sky] shader sky failed to initialize — falling back to gradient sky', e);

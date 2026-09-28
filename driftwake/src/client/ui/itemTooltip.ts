@@ -11,7 +11,7 @@ const CATEGORY_LABEL: Record<string, string> = { equip: 'Equipment', use: 'Consu
 export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts: { compareEquipped?: boolean } = {}): (Node | string)[] {
   const def = ITEMS[inst.itemId];
   const rarity = rarityOf(inst);
-  const color = RARITY_COLORS[rarity] ?? '#e8e8e8';
+  const color = RARITY_COLORS[rarity] ?? '#e9e1cf';
   const nodes: (Node | string)[] = [];
 
   const stars = inst.stars ?? 0;
@@ -72,7 +72,7 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
       for (const k in inst.bonus) {
         const v = (inst.bonus as any)[k];
         if (!v) continue;
-        nodes.push(el('div', { class: 'dw-stat-row', style: { color: '#6fdc6f' } }, el('span', null, statLabel(k as DerivedStatKey)), el('span', null, formatStatValue(k as DerivedStatKey, v, true))));
+        nodes.push(el('div', { class: 'dw-stat-row', style: { color: 'var(--dw-tide)' } }, el('span', null, statLabel(k as DerivedStatKey)), el('span', null, formatStatValue(k as DerivedStatKey, v, true))));
       }
     }
     if (def.equip.setId) {
@@ -84,7 +84,7 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
         for (const b of set.bonuses) {
           const active = owned >= b.count;
           const line = Object.entries(b.stats).map(([k, v]) => `${statLabel(k as DerivedStatKey)} ${formatStatValue(k as DerivedStatKey, v as number, true)}`).join(', ');
-          nodes.push(el('div', { style: { color: active ? '#6fdc6f' : '#8a90a0', fontSize: '11.5px' } }, `(${b.count}) ${line}`));
+          nodes.push(el('div', { style: { color: active ? 'var(--dw-tide)' : 'var(--dw-bone-dim)', fontSize: '11.5px' } }, `(${b.count}) ${line}`));
         }
       }
     }
@@ -98,7 +98,7 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
       for (const k in def.pet.stats) {
         const v = (def.pet.stats as any)[k];
         if (!v) continue;
-        nodes.push(el('div', { class: 'dw-stat-row', style: { color: '#6fdc6f' } }, el('span', null, statLabel(k as DerivedStatKey)), el('span', null, formatStatValue(k as DerivedStatKey, v, true))));
+        nodes.push(el('div', { class: 'dw-stat-row', style: { color: 'var(--dw-tide)' } }, el('span', null, statLabel(k as DerivedStatKey)), el('span', null, formatStatValue(k as DerivedStatKey, v, true))));
       }
     }
     nodes.push(el('div', { class: 'dw-tt-desc' }, def.pet.flavor));

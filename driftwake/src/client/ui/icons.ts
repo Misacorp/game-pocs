@@ -49,5 +49,5 @@ export function iconUrlForMonster(def: MonsterDef, size = 40): string {
   return url;
 }
 
-export function goldIconUrl(size = 20): string { return iconUrl({ shape: 'coin', colors: ['#ffd24a', '#c98a1c'] }, size); }
-export function xpIconUrl(size = 20): string { return iconUrl({ shape: 'orb', colors: ['#4fd8c4'] }, size); }
+export function goldIconUrl(size = 20): string { return iconUrl({ shape: 'coin', colors: ['#ffb347', '#c9731f'] }, size); }
+export function xpIconUrl(size = 20): string { return iconUrl({ shape: 'orb', colors: ['#5fe3c6'] }, size); }

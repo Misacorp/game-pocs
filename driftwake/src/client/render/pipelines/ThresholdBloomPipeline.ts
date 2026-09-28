@@ -26,20 +26,18 @@ vec3 brightPass(vec2 uv) {
 void main() {
   vec2 texel = 1.0 / max(resolution, vec2(1.0));
   vec3 base = texture2D(uMainSampler, outTexCoord).rgb;
+  // 9 taps (down from 13) — still reads as a soft glow at the small radii bloom actually needs,
+  // for noticeably less per-pixel cost (this runs full-screen, every frame).
   vec3 sum = brightPass(outTexCoord);
   vec2 offsets4[4];
   offsets4[0] = vec2(1.0, 0.0); offsets4[1] = vec2(-1.0, 0.0);
   offsets4[2] = vec2(0.0, 1.0); offsets4[3] = vec2(0.0, -1.0);
-  for (int i = 0; i < 4; i++) sum += brightPass(outTexCoord + offsets4[i] * texel * 2.0);
+  for (int i = 0; i < 4; i++) sum += brightPass(outTexCoord + offsets4[i] * texel * 2.2);
   vec2 offsets8[4];
   offsets8[0] = vec2(1.0, 1.0); offsets8[1] = vec2(-1.0, 1.0);
   offsets8[2] = vec2(1.0, -1.0); offsets8[3] = vec2(-1.0, -1.0);
-  for (int i = 0; i < 4; i++) sum += brightPass(outTexCoord + offsets8[i] * texel * 2.4);
-  vec2 offsetsFar[4];
-  offsetsFar[0] = vec2(3.2, 0.0); offsetsFar[1] = vec2(-3.2, 0.0);
-  offsetsFar[2] = vec2(0.0, 3.2); offsetsFar[3] = vec2(0.0, -3.2);
-  for (int i = 0; i < 4; i++) sum += brightPass(outTexCoord + offsetsFar[i] * texel * 2.4);
-  sum /= 13.0;
+  for (int i = 0; i < 4; i++) sum += brightPass(outTexCoord + offsets8[i] * texel * 2.6);
+  sum /= 9.0;
   gl_FragColor = vec4(base + sum * uIntensity, 1.0);
 }
 `;

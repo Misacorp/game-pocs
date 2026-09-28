@@ -45,7 +45,7 @@ export class DropManager {
   private spawnOne(drop: LootDrop, x: number, y: number, def: ItemDef | undefined, rarity: Rarity | undefined, seq: number): void {
     const key = def ? getDropTexture(this.scene, def) : getDropTexture(this.scene, 'gold');
     const sprite = this.scene.add.image(x, y - 6, key).setDepth(6);
-    this.lighting?.lit(sprite, key);
+    this.lighting?.lit(sprite, key, { normalMap: false });
     const now = performance.now();
     const entry: DropEntry = { dropId: drop.dropId, sprite, landed: false, landY: y, bornAt: now, pickedUp: false };
 

@@ -291,6 +291,9 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 }
 .dw-tracker-toggle:hover { color: var(--dw-lantern-hot); background: rgba(255,179,71,0.1); }
 .dw-tracker.dw-collapsed .dw-tracker-list { display:none; }
+/* Nothing tracked — collapse to nothing rather than an empty panel over the map (never overrides
+   dw-collapsed's own display since that's a modifier on the list, not the root). */
+.dw-tracker.dw-tracker-empty { display:none; }
 .dw-tracker-list { display:flex; flex-direction:column; gap:5px; max-height: 232px; overflow-y:auto; }
 .dw-tracker-quest {
   padding: 6px 9px 6px 22px; position: relative; background: rgba(11,21,25,0.55); backdrop-filter: blur(1px);
@@ -304,7 +307,7 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-tracker-quest.dw-ready::before { opacity:1; filter: sepia(1) saturate(6) hue-rotate(115deg) brightness(1.3); }
 .dw-tracker-quest .dw-tq-obj { font: 400 10.5px / 1.3 var(--dw-font-body); color: var(--dw-bone-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dw-tracker-quest .dw-tq-obj.dw-tq-return { color: var(--dw-lantern-hot); font-family: var(--dw-font-label); letter-spacing:0.03em; text-transform:uppercase; font-size: 9.5px; }
-.dw-tq-more, .dw-tq-none {
+.dw-tq-more {
   font: 500 11px/1 var(--dw-font-label); letter-spacing:0.02em; color: var(--dw-bone-dim); text-align:center; padding: 4px 0;
 }
 .dw-tq-more { cursor: var(--dw-cursor-point); }

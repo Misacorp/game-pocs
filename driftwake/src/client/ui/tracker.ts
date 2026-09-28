@@ -117,21 +117,32 @@ export function createQuestTracker(session: GameSession, wm: WindowManager, mini
     }
     const hiddenCount = active.length - shown.length;
     if (hiddenCount > 0) listEl.appendChild(el('div', { class: 'dw-tq-more', onclick: () => wm.open('quests') }, `+${hiddenCount} more`));
-    if (!active.length) listEl.appendChild(el('div', { class: 'dw-tq-none' }, 'No tracked quests.'));
+    // Nothing tracked: collapse to nothing rather than an empty panel sitting over the map. The
+    // whole tracker (including the collapse toggle) reappears the moment a quest becomes active
+    // and pinned again — nothing to re-expand in the meantime since there's nothing to show.
+    root.classList.toggle('dw-tracker-empty', !active.length);
+    reposition();
   }
 
   render();
   const offs: (() => void)[] = [bus.on('state', render), bus.on('ui:questPinsChanged', render)];
 
-  // ---- Position below the minimap, with a gap -----------------------------------------------
+  // ---- Position below the minimap, with a gap ------------------------------------------------
+  // Called on every render (cheap) too, not just mount/resize: the minimap's own height can
+  // change size after this first paints (web fonts finishing their swap reflows its name label),
+  // and a stale offset would otherwise leave the tracker overlapping the minimap until the next
+  // window resize.
   function reposition() {
-    if (minimap?.root) {
-      const r = minimap.root.getBoundingClientRect();
-      root.style.top = `${Math.round(r.bottom + GAP_BELOW_MINIMAP)}px`;
-      root.style.right = '14px';
-    }
+    if (!minimap?.root) return;
+    const r = minimap.root.getBoundingClientRect();
+    root.style.top = `${Math.round(r.bottom + GAP_BELOW_MINIMAP)}px`;
+    root.style.right = '14px';
   }
   reposition();
+  // Re-check once more after layout/fonts settle (fonts.ready resolves once web fonts used above
+  // the fold, like the minimap's IM Fell English SC name label, have finished swapping in).
+  if ('fonts' in document) (document as any).fonts.ready.then(reposition).catch(() => {});
+  requestAnimationFrame(() => requestAnimationFrame(reposition));
   window.addEventListener('resize', reposition);
   offs.push(() => window.removeEventListener('resize', reposition));
 

@@ -9,6 +9,7 @@ import { audio } from './audio';
 import { bus } from './events';
 import { installDevHandle } from './dev/debug';
 import { registerPipelines } from './render/pipelines/registerPipelines';
+import { ensurePixelFontLoading, waitForPixelFont } from './render/pixelFont';
 
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
@@ -52,6 +53,7 @@ async function main() {
   window.addEventListener('pointerdown', unlockAudio);
   window.addEventListener('keydown', unlockAudio);
 
+  ensurePixelFontLoading();
   const toTitle = () => {
     hideGameUI();
     audio.playMusic('title');
@@ -59,6 +61,8 @@ async function main() {
     if (!game.scene.isActive('Title')) game.scene.start('Title');
     showTitleScreen(backend, async (characterId) => {
       await session.enter(characterId);
+      // World labels/barks/damage numbers are created with the pixel font as soon as the scene starts.
+      await waitForPixelFont();
       showGameUI(session);
       game.scene.stop('Title');
       game.scene.start('World', { mapId: session.state.mapId });

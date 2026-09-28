@@ -32,6 +32,7 @@ import { createMenuWindow } from './windows/menu';
 import { createHelpWindow } from './windows/help';
 import { uiState } from './state';
 import { hideTooltip } from './tooltip';
+import { isConfirmDialogOpen } from './widgets';
 
 let root: HTMLElement;
 let gameLayer: HTMLElement | null = null;
@@ -130,6 +131,10 @@ export function showGameUI(session: GameSession): void {
   const onKeydown = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (settingsListening?.()) return; // key-remap capture handles its own Escape
+    // A confirmDialog open on top owns Escape (cancel) while it's up — without this, Escape would
+    // do double duty and also close whatever window sits behind the confirm (its own listener
+    // runs later than this one, since it's registered fresh on open — see isConfirmDialogOpen()).
+    if (isConfirmDialogOpen()) return;
     if (document.activeElement && root.contains(document.activeElement) && (document.activeElement as HTMLElement).tagName === 'INPUT') return; // let chat/input own-handler deal with it
     if (wm.anyOpen()) { wm.closeTopmost(); e.stopPropagation(); }
   };

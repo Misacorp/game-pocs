@@ -2,7 +2,7 @@ import { el, fmtNum } from '../dom';
 import { bus } from '../../events';
 import type { GameSession } from '../../session';
 import { WindowManager, createWindow } from '../manager';
-import { confirmDialog, createListNav, keyHintFooter } from '../widgets';
+import { confirmDialog, createListNav, keyHintFooter, isConfirmDialogOpen } from '../widgets';
 import { safeNpcPortrait, safeItemIcon, goldIconUrl } from '../icons';
 import { attachItemTooltip } from '../itemTooltip';
 import { NPCS, DIALOGUES, QUESTS, ITEMS } from '@shared/data';
@@ -54,7 +54,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
   let keyHandler: ((e: KeyboardEvent) => void) | null = null;
   function setKeyHandler(fn: ((e: KeyboardEvent) => void) | null) { keyHandler = fn; }
   const onWindowKeyDown = (e: KeyboardEvent) => {
-    if (!ctrl.isOpen()) return;
+    if (!ctrl.isOpen() || isConfirmDialogOpen()) return;
     keyHandler?.(e);
   };
   window.addEventListener('keydown', onWindowKeyDown, true);

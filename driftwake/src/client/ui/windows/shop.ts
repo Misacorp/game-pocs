@@ -2,7 +2,7 @@ import { el, fmtNum, clamp } from '../dom';
 import { bus } from '../../events';
 import type { GameSession } from '../../session';
 import { WindowManager, createWindow } from '../manager';
-import { makeTabs, createListNav, keyHintFooter } from '../widgets';
+import { makeTabs, createListNav, keyHintFooter, isConfirmDialogOpen } from '../widgets';
 import { attachItemTooltip } from '../itemTooltip';
 import { safeItemIcon, goldIconUrl } from '../icons';
 import { ITEMS, SHOPS } from '@shared/data';
@@ -51,7 +51,7 @@ export function createShopWindow(wm: WindowManager, session: GameSession) {
   // listener stays correct — see dialogue.ts's identical pattern for why capture-phase +
   // stopImmediatePropagation is needed here rather than just preventDefault.
   const onKeyDown = (e: KeyboardEvent) => {
-    if (!ctrl.isOpen()) return;
+    if (!ctrl.isOpen() || isConfirmDialogOpen()) return;
     // Let a focused quantity <input> keep normal typing/arrow-key/Enter behavior.
     if ((document.activeElement as HTMLElement | null)?.tagName === 'INPUT') return;
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {

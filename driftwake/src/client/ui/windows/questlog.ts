@@ -2,7 +2,7 @@ import { el, fmtNum } from '../dom';
 import { bus } from '../../events';
 import type { GameSession } from '../../session';
 import { WindowManager, createWindow } from '../manager';
-import { makeTabs, confirmDialog, createListNav, keyHintFooter } from '../widgets';
+import { makeTabs, confirmDialog, createListNav, keyHintFooter, isConfirmDialogOpen } from '../widgets';
 import { attachItemTooltip } from '../itemTooltip';
 import { safeItemIcon, goldIconUrl } from '../icons';
 import { QUESTS, ITEMS, NPCS } from '@shared/data';
@@ -133,7 +133,7 @@ export function createQuestLogWindow(wm: WindowManager, session: GameSession) {
   // quest, everything else (↑/↓ focus, Enter "expand" into the detail pane) goes to `nav`. Esc is
   // left unhandled here so it bubbles to the WindowManager's global Escape-closes-topmost.
   const onKeyDown = (e: KeyboardEvent) => {
-    if (!ctrl.isOpen()) return;
+    if (!ctrl.isOpen() || isConfirmDialogOpen()) return;
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Tab') {
       e.preventDefault(); e.stopImmediatePropagation();
       const next = mode === 'active' ? 'completed' : 'active';

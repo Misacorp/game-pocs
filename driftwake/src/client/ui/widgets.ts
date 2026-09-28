@@ -1,6 +1,5 @@
 import { el } from './dom';
 import { audio } from '../audio';
-import { bus } from '../events';
 
 /** Simple tab strip. onSelect fires with the tab id; returns {root, select}. */
 export function makeTabs(tabs: { id: string; label: string }[], onSelect: (id: string) => void, initial?: string) {
@@ -46,7 +45,13 @@ export function confirmDialog(text: string, opts?: { okLabel?: string; danger?: 
       keyHintFooter('←→ choose · Enter select · Esc cancel'));
     overlay.appendChild(box);
     document.body.appendChild(overlay);
-    bus.emit('input:capture', true);
+    // No 'input:capture' emit here on purpose: this listener is registered capture:true and
+    // unconditionally stops propagation for every key while open, which already keeps every key
+    // from ever reaching InputController's (bubble-phase) game-input listener. Emitting
+    // input:capture would also risk clobbering a parent window's own true→false transition when
+    // this confirm is nested inside one that's already capturing (dialogue's "weighty choice"
+    // confirm, the Quest Log's abandon prompt, etc.) — see isConfirmDialogOpen()'s doc comment.
+    openConfirmCount++;
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault(); e.stopImmediatePropagation();
       if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Tab') { focus = focus === 0 ? 1 : 0; applyFocus(); }
@@ -56,7 +61,7 @@ export function confirmDialog(text: string, opts?: { okLabel?: string; danger?: 
     window.addEventListener('keydown', onKey, true);
     function finish(v: boolean) {
       window.removeEventListener('keydown', onKey, true);
-      bus.emit('input:capture', false);
+      openConfirmCount--;
       overlay.remove();
       resolve(v);
     }
@@ -93,6 +98,16 @@ export function showContextMenu(x: number, y: number, items: { label: string; on
   if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 4}px`;
   if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 4}px`;
 }
+
+// A background window's own keydown listener (dialogue/quest log/shop) is registered once, long
+// before any confirmDialog it might later open above itself — so when both are capture-phase
+// listeners on `window`, the background window's (registered first) always runs BEFORE
+// confirmDialog's (registered fresh, on open). Without this, e.g. pressing ←/→ to move
+// confirmDialog's focus also flips the Quest Log's Active/Completed tab underneath it, since the
+// Quest Log's handler has no way to know a modal is now on top of it. Every such window checks
+// this flag first and bails out while a confirmDialog is open.
+let openConfirmCount = 0;
+export function isConfirmDialogOpen(): boolean { return openConfirmCount > 0; }
 
 export function progressBar(pct: number, className = ''): HTMLElement {
   return el('div', { class: `dw-prof-bar ${className}` }, el('div', { style: { width: `${Math.round(Math.max(0, Math.min(1, pct)) * 100)}%` } }));

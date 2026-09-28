@@ -5,3 +5,5 @@ dist
 server/data/
 dist-e2e
 scripts/_diag_*
+scripts/_rope_*
+scripts/_tmp_*

@@ -396,10 +396,11 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 }
 .dw-dlg-opt::before {
   content:''; position:absolute; left:10px; top:50%; width:14px; height:10px; transform: translateY(-50%);
-  background: var(--dw-fluke) center / contain no-repeat; opacity:0.5;
+  background: var(--dw-fluke) center / contain no-repeat; opacity:0.8;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.6));
 }
 .dw-dlg-opt:hover { border-color: rgba(255,179,71,0.35); background: rgba(255,179,71,0.08); }
-.dw-dlg-opt:hover::before { opacity:1; filter: sepia(1) saturate(4) hue-rotate(-5deg); }
+.dw-dlg-opt:hover::before { opacity:1; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)) sepia(1) saturate(6) hue-rotate(-8deg) brightness(1.1); }
 .dw-dlg-opt .dw-dlg-marker { font-family: var(--dw-font-label); font-weight:800; width:14px; text-align:center; }
 .dw-dlg-opt.dw-marker-ready .dw-dlg-marker { color: var(--dw-tide); }
 .dw-dlg-opt.dw-marker-offer .dw-dlg-marker { color: var(--dw-lantern-hot); }

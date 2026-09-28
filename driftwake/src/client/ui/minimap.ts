@@ -26,10 +26,18 @@ function questVisitTargetMaps(session: GameSession): Set<string> {
 }
 
 export function createMinimap(session: GameSession): MinimapHandle {
-  const nameEl = el('div', { class: 'dw-minimap-name' }, 'Unknown');
+  // Named from session state immediately so the chart never shows a bare "Unknown" placeholder
+  // while waiting for the engine's first 'world:minimap' payload (map load / first render frame).
+  const nameEl = el('div', { class: 'dw-minimap-name' }, MAPS[session.state.mapId]?.name ?? prettyMapName(session.state.mapId));
   const canvas = el('canvas', { width: W, height: H }) as HTMLCanvasElement;
   const root = el('div', { class: 'dw-panel dw-minimap' }, nameEl, canvas);
   const ctx = canvas.getContext('2d')!;
+
+  // Also keep the name in sync with map changes driven by state (portals, teleports) that land
+  // before the next minimap payload — 'world:minimap' below still owns the authoritative name.
+  const offState = bus.on('state', ({ state }) => {
+    nameEl.textContent = MAPS[state.mapId]?.name ?? prettyMapName(state.mapId);
+  });
 
   const off = bus.on('world:minimap', (m) => {
     nameEl.textContent = MAPS[m.mapId]?.name ?? prettyMapName(m.mapId);
@@ -89,7 +97,7 @@ export function createMinimap(session: GameSession): MinimapHandle {
     ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 1;
     ctx.strokeRect(tx(m.player.x) - 4, ty(m.player.y) - 4, 8, 8);
   });
-  return { root, cleanup: off };
+  return { root, cleanup: () => { off(); offState(); } };
 }
 
 function prettyMapName(id: string): string {

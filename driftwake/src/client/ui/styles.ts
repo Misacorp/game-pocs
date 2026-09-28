@@ -287,7 +287,12 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-tracker-quest .dw-tq-obj.dw-tq-return { color: var(--dw-lantern-hot); text-decoration:none; opacity:1; font-family: var(--dw-font-label); letter-spacing:0.03em; text-transform:uppercase; font-size: 10px; }
 
 /* ---------- Notifications / toasts / banner / boss bar / hint ---------- */
-.dw-feed { position:absolute; left: 14px; bottom: 200px; width: 270px; display:flex; flex-direction:column-reverse; gap:4px; pointer-events:none; }
+/* Left column stacks bottom-up: chat, then feed, then buffs — all clear of the centered
+   HUD cluster (helm + vials + hotbar), which is ~93px tall regardless of viewport size
+   (measured at both 1280x720 and 1920x1080). Kept as fixed px offsets, not tied to the
+   HUD's own width, since the HUD is centered and only its *height* is what the left
+   column has to clear. */
+.dw-feed { position:absolute; left: 14px; bottom: 250px; width: 270px; display:flex; flex-direction:column-reverse; gap:4px; pointer-events:none; }
 .dw-feed-item {
   font: 400 12px/1.3 var(--dw-font-body); padding: 5px 9px; border-radius: 4px; background: rgba(8,15,18,0.62);
   animation: dw-feed-in var(--dw-dur) var(--dw-ease) both; border-left: 2px solid var(--dw-bone-faint);
@@ -360,7 +365,9 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-death-box h2 { margin:0 0 10px; color: var(--dw-coral); font: 400 var(--dw-fs-2xl) / 1 var(--dw-font-display); letter-spacing:0.03em; }
 
 /* ---------- Chat — translucent hide strip ---------- */
-.dw-chat { position:absolute; left: 14px; bottom: 14px; width: 270px; display:flex; flex-direction:column; pointer-events:auto; background: rgba(11,21,25,0.55); backdrop-filter: blur(2px); }
+/* bottom:100 (not 14) so an active input row + a full 60-line-scrollback log never reaches
+   down into the centered HUD cluster (helm medallion + HP/MP/XP vials) behind it. */
+.dw-chat { position:absolute; left: 14px; bottom: 100px; width: 270px; display:flex; flex-direction:column; pointer-events:auto; background: rgba(11,21,25,0.55); backdrop-filter: blur(2px); }
 .dw-chat-log { max-height: 120px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding: 7px 9px; font-size:12px; }
 .dw-chat-log div { line-height:1.4; }
 .dw-chat-log .dw-chat-system { color: var(--dw-bone-dim); font-style:italic; }

@@ -37,7 +37,9 @@ for (const cls of CLASSES) {
   // pipeline (shader sky, Light2D lighting, color grading/vignette) minus the heaviest bits
   // (bloom, full cloud detail), which is enough to restore reliable headless throughput while
   // still exercising the pipeline end to end.
-  await page.addInitScript(() => localStorage.setItem('driftwake:gfx', JSON.stringify('medium')));
+  // E2E_GFX=low|medium|high overrides the tier (default medium).
+  const tier = process.env.E2E_GFX || 'medium';
+  await page.addInitScript((t) => localStorage.setItem('driftwake:gfx', JSON.stringify(t)), tier);
   try {
     await page.goto(url);
     await page.waitForTimeout(2500);
@@ -54,10 +56,24 @@ for (const cls of CLASSES) {
     await page.waitForFunction(() => window.__game.scene.getScene('World')?.map?.id === 'mossback_meadows', null, { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(4000);
     await page.evaluate(() => window.__dw?.godmode?.(true));
-    for (let i = 0; i < 6; i++) {
-      await hold(page, 'ArrowRight', 350);
-      await hold(page, 'KeyQ', 1500);
-      await hold(page, 'KeyX', 1500);
+    // Frame-rate independent combat check: stand next to a live monster (facing it) and attack
+    // until a kill registers or 90s pass. Verifies spawning, hit detection, death and the
+    // killMonster round-trip without depending on how many frames headless rendering manages.
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      const done = await page.evaluate(() => {
+        if (window.__session.state.counters.kills > 0) return true;
+        const w = window.__game.scene.getScene('World');
+        const m = w?.spawner?.monsters?.find((mm) => !mm.dead);
+        if (!m || !w.player) return false;
+        const p = w.player;
+        p.sprite.body.reset(m.sprite.x - 18, m.sprite.y - 4);
+        p.facing = 1; p.sprite.setFlipX(false);
+        return false;
+      });
+      if (done) break;
+      await hold(page, 'KeyQ', 700);
+      await hold(page, 'KeyX', 700);
     }
     const res = await page.evaluate(() => ({ kills: window.__session.state.counters.kills, map: window.__session.state.mapId }));
     if (res.kills < 1) failures.push(`${cls}: no kills in meadows (${JSON.stringify(res)})`);

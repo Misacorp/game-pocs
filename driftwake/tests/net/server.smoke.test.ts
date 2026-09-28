@@ -57,7 +57,8 @@ function sendMsg(ws: WebSocket, msg: WireClientMessage): void {
 
 afterAll(() => {
   if (child && child.pid) {
-    try { process.kill(child.pid, 'SIGKILL'); } catch { /* already dead */ }
+    // tsx forks the real node process, so kill the whole process group (spawned detached).
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { try { process.kill(child.pid, 'SIGKILL'); } catch { /* already dead */ } }
   }
 });
 
@@ -71,6 +72,7 @@ describe('driftwake server (smoke)', () => {
       cwd: ROOT,
       env: { ...process.env, PORT: String(PORT) },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
     await waitForListening(child);
 

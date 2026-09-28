@@ -76,6 +76,13 @@ function img(scene: Phaser.Scene, key: string, x: number, y: number, opts: VfxOp
   return im;
 }
 
+/** Same as img(), but additive-blended — for the "light" part of an effect (glows, energy,
+ *  sparks) as opposed to its solid/material part (a blade, an ice shard). This is most of what
+ *  makes a hit or skill "pop": additive light overdraws brighter instead of just alpha-covering. */
+function glowImg(scene: Phaser.Scene, key: string, x: number, y: number, opts: VfxOpts): Phaser.GameObjects.Image {
+  return img(scene, key, x, y, opts).setBlendMode(Phaser.BlendModes.ADD);
+}
+
 function fadeOut(scene: Phaser.Scene, target: Phaser.GameObjects.GameObject, duration: number, extra: Record<string, unknown> = {}): void {
   scene.tweens.add({ targets: target, alpha: 0, duration, ...extra, onComplete: () => target.destroy() });
 }
@@ -101,33 +108,57 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
   const color2 = opts.color2 ?? opts.color;
   switch (style) {
     case 'slash': case 'arc': {
+      const rot = opts.rotation ?? 0;
+      // additive under-glow trailing the blade — this is most of the "pop": the crescent alone
+      // reads as a shape, the glow behind it reads as light/energy
+      const glow = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.9 });
+      glow.setAlpha(0.55);
+      scene.tweens.add({ targets: glow, scale: scale * 1.3, alpha: 0, duration: dur * 0.8, onComplete: () => glow.destroy() });
       const s = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.1 });
-      s.setRotation((opts.rotation ?? 0));
+      s.setRotation(rot);
+      // a fainter, larger "smear" crescent lags one tick behind for a motion-blur trail
+      const smear = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.25 });
+      smear.setRotation(rot); smear.setAlpha(0.35);
       scene.tweens.add({ targets: s, angle: (opts.flipX ? -1 : 1) * 40, alpha: 0, scaleX: s.scaleX * 1.3, duration: dur, onComplete: () => s.destroy() });
+      scene.tweens.add({ targets: smear, angle: (opts.flipX ? -1 : 1) * 40, alpha: 0, scaleX: smear.scaleX * 1.5, duration: dur * 1.25, delay: 40, onComplete: () => smear.destroy() });
+      burst(scene, x, y, 'vfx_spark', hexNum(opts.color), 3, 60 * scale, 160);
       break;
     }
     case 'heavySlash': {
+      const glow = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.1, color: color2 });
+      glow.setAlpha(0.6);
+      scene.tweens.add({ targets: glow, scale: scale * 1.7, alpha: 0, duration: dur, onComplete: () => glow.destroy() });
       const s1 = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.5 });
       const s2 = img(scene, 'vfx_crescent', x, y, { ...opts, scale: scale * 1.1, color: color2 });
       s2.setAlpha(0.7);
       scene.tweens.add({ targets: [s1, s2], angle: (opts.flipX ? -1 : 1) * 55, alpha: 0, duration: dur + 80, onComplete: () => { s1.destroy(); s2.destroy(); } });
+      burst(scene, x, y, 'vfx_spark', hexNum(opts.color), 6, 120 * scale, 220);
       break;
     }
     case 'thrust': {
       const s = img(scene, 'vfx_line', x, y, { ...opts, width: (opts.width ?? 26) * 0.2, height: opts.height ?? 5 });
-      scene.tweens.add({ targets: s, x: x + (opts.flipX ? -1 : 1) * (opts.width ?? 26), alpha: 0, duration: dur * 0.7, onComplete: () => s.destroy() });
+      const tipX = x + (opts.flipX ? -1 : 1) * (opts.width ?? 26);
+      scene.tweens.add({
+        targets: s, x: tipX, alpha: 0, duration: dur * 0.7, onComplete: () => {
+          s.destroy();
+          const flash = glowImg(scene, 'vfx_soft', tipX, y, { ...opts, scale: scale * 0.6 });
+          scene.tweens.add({ targets: flash, scale: scale, alpha: 0, duration: 140, onComplete: () => flash.destroy() });
+        },
+      });
       break;
     }
     case 'spin': {
-      const r = img(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.4 });
+      const glow = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.5 });
+      scene.tweens.add({ targets: glow, scale: scale * 1.1, alpha: 0, duration: dur + 80, onComplete: () => glow.destroy() });
+      const r = glowImg(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.4 });
       scene.tweens.add({ targets: r, scale: scale * 1.4, alpha: 0, angle: 200, duration: dur + 100, onComplete: () => r.destroy() });
       break;
     }
     case 'bolt': {
-      const core = img(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.8 });
+      const core = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.8 });
       scene.tweens.add({ targets: core, scale: scale * 1.2, alpha: 0, duration: 180, onComplete: () => core.destroy() });
       for (let i = 0; i < 3; i++) {
-        const line2 = img(scene, 'vfx_line', x, y, { ...opts, width: 10 + i * 4, height: 2, rotation: (Math.random() - 0.5) * 1.2 });
+        const line2 = glowImg(scene, 'vfx_line', x, y, { ...opts, width: 10 + i * 4, height: 2, rotation: (Math.random() - 0.5) * 1.2 });
         scene.tweens.add({ targets: line2, alpha: 0, scaleX: 1.6, duration: 150, onComplete: () => line2.destroy() });
       }
       break;
@@ -138,23 +169,24 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       break;
     }
     case 'orb': {
-      const g = img(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.3 });
+      const g = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.3 });
       scene.tweens.add({ targets: g, scale: scale * 1.7, alpha: 0, duration: dur, onComplete: () => g.destroy() });
       break;
     }
     case 'explosion': {
-      const g = img(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.6, color: opts.color });
-      scene.tweens.add({ targets: g, scale: scale * 2.6, alpha: 0, duration: dur + 120, onComplete: () => g.destroy() });
-      const ring = img(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.3, color: color2 });
-      scene.tweens.add({ targets: ring, scale: scale * 2.2, alpha: 0, duration: dur + 200, onComplete: () => ring.destroy() });
-      burst(scene, x, y, 'vfx_spark', hexNum(opts.color), 14, 140 * scale, 380);
+      // snappy: the flash reads instantly, the ring/sparks finish just after — under 350ms total
+      const g = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 0.6, color: opts.color });
+      scene.tweens.add({ targets: g, scale: scale * 2.4, alpha: 0, duration: Math.min(dur + 70, 300), onComplete: () => g.destroy() });
+      const ring = glowImg(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.3, color: color2 });
+      scene.tweens.add({ targets: ring, scale: scale * 2.1, alpha: 0, duration: Math.min(dur + 90, 340), onComplete: () => ring.destroy() });
+      burst(scene, x, y, 'vfx_spark', hexNum(opts.color), 14, 150 * scale, 300);
       break;
     }
     case 'lightning': {
-      const b = img(scene, 'vfx_bolt', x, y - 16 * scale, { ...opts, scale });
+      const b = glowImg(scene, 'vfx_bolt', x, y - 16 * scale, { ...opts, scale });
       b.setOrigin(0.5, 0);
       scene.tweens.add({ targets: b, alpha: 0, duration: 220, onComplete: () => b.destroy() });
-      const flash = img(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.2 });
+      const flash = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.2 });
       fadeOut(scene, flash, 180);
       break;
     }
@@ -192,7 +224,7 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       break;
     }
     case 'holy': {
-      const ring = img(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.5 });
+      const ring = glowImg(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.5 });
       scene.tweens.add({ targets: ring, scale: scale * 1.6, alpha: 0, duration: dur + 150, onComplete: () => ring.destroy() });
       burst(scene, x, y - 6, 'vfx_dot', hexNum(opts.color), 6, 30, 400, 0.7, 0, -50);
       break;
@@ -206,12 +238,12 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       break;
     }
     case 'buff': {
-      const ring = img(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.4 });
+      const ring = glowImg(scene, 'vfx_ring', x, y, { ...opts, scale: scale * 0.4 });
       scene.tweens.add({ targets: ring, scale: scale * 1.2, y: y - 4, alpha: 0, duration: dur + 200, onComplete: () => ring.destroy() });
       break;
     }
     case 'shield': {
-      const g = img(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.3 });
+      const g = glowImg(scene, 'vfx_soft', x, y, { ...opts, scale: scale * 1.3 });
       g.setAlpha(0.5);
       scene.tweens.add({ targets: g, alpha: 0, scale: scale * 1.6, duration: dur + 150, onComplete: () => g.destroy() });
       break;
@@ -221,7 +253,7 @@ export function spawnVfx(scene: Phaser.Scene, style: VfxStyle, x: number, y: num
       break;
     }
     case 'spark': {
-      const s = img(scene, 'vfx_spark', x, y, { ...opts, scale: scale * 0.8 });
+      const s = glowImg(scene, 'vfx_spark', x, y, { ...opts, scale: scale * 0.8 });
       scene.tweens.add({ targets: s, scale: 0, angle: 90, duration: 160, onComplete: () => s.destroy() });
       break;
     }
@@ -296,7 +328,12 @@ export function spawnTelegraph(scene: Phaser.Scene, shape: 'circle' | 'rect', x:
 export function spawnHitSpark(scene: Phaser.Scene, x: number, y: number, crit: boolean): void {
   ensureBase(scene);
   const color = crit ? '#ffcc33' : '#ffffff';
-  const s = scene.add.image(x, y, 'vfx_spark').setTint(hexNum(color)).setDepth(70).setScale(crit ? 1.3 : 0.8);
+  const tint = hexNum(color);
+  const s = scene.add.image(x, y, 'vfx_spark').setTint(tint).setDepth(70).setScale(crit ? 1.3 : 0.8).setBlendMode(Phaser.BlendModes.ADD);
   scene.tweens.add({ targets: s, scale: 0, angle: crit ? 160 : 90, duration: crit ? 220 : 140, onComplete: () => s.destroy() });
-  if (crit) burst(scene, x, y, 'vfx_dot', hexNum(color), 6, 70, 200, 0.7, 0);
+  // a quick additive impact ring on every hit (bigger + brighter on a crit) — this, more than the
+  // spark alone, is what sells a hit as having landed with real weight
+  const ring = scene.add.image(x, y, 'vfx_ring').setTint(tint).setDepth(69).setScale(crit ? 0.35 : 0.2).setAlpha(crit ? 0.9 : 0.6).setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({ targets: ring, scale: crit ? 1.1 : 0.7, alpha: 0, duration: crit ? 240 : 160, onComplete: () => ring.destroy() });
+  if (crit) burst(scene, x, y, 'vfx_dot', tint, 6, 70, 200, 0.7, 0);
 }

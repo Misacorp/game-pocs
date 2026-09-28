@@ -118,6 +118,7 @@ function midLayer(theme: ThemeId): HTMLCanvasElement {
       for (let i = 0; i < 4; i++) {
         const cx = i * (w / 3.6) + rnd() * 30, cy = h * 0.62 + (i % 2) * 10, r = 90 + rnd() * 40;
         ellipse(ctx, cx, cy, r, r * 0.4, col);
+        rect(ctx, cx - r, cy, r * 2, h - cy, col); // fill below the crest so hills sit on the horizon instead of floating
         for (let k = 0; k < 5; k++) circle(ctx, cx - r * 0.6 + k * r * 0.3, cy - r * 0.34 + Math.sin(k) * 3, 4 + (k % 3), withAlpha(pal.midSilhouette, 0.55)); // barnacle ridge
       }
       break;
@@ -141,7 +142,16 @@ function midLayer(theme: ThemeId): HTMLCanvasElement {
       for (let i = 0; i < 12; i++) circle(ctx, rnd() * w, rnd() * h * 0.6, 1.6, withAlpha(pal.glow, 0.6)); // fish shoal dots
       break;
     case 'shipRibs':
-      for (let i = 0; i < 6; i++) { const x = i * (w / 6) + 30; poly(ctx, [[x - 24, h], [x, 20], [x + 24, h]], withAlpha(pal.midSilhouette, 0.55)); }
+      for (let i = 0; i < 6; i++) {
+        const x = i * (w / 6) + 30;
+        poly(ctx, [[x - 24, h], [x, 20], [x + 24, h]], withAlpha(pal.midSilhouette, 0.55));
+        if (i % 2 === 0) { // a lantern hanging from every other rib, glowing softly
+          const ly = 60 + (i % 3) * 10;
+          line(ctx, x, 20, x, ly, 1.4, withAlpha(pal.midSilhouette, 0.7));
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55; circle(ctx, x, ly + 6, 7, pal.glow); ctx.restore();
+          circle(ctx, x, ly + 6, 3, withAlpha(pal.glow, 0.85));
+        }
+      }
       break;
     case 'boneArch':
       for (let i = 0; i < 3; i++) { const cx = i * 260 + 120; ctx.strokeStyle = col; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(cx, h + 40, 90, Math.PI, 0); ctx.stroke(); }

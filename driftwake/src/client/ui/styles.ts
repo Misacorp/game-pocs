@@ -688,6 +688,8 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
   box-shadow: 0 0 0 3px #0b1417, 0 0 0 5px #b58a4a, 0 0 0 6px #5d4122, 0 0 0 7px rgba(241,230,207,.25);
 }
 .dw-charcard .dw-cc-porthole img { width:100%; height: 130%; object-fit: cover; object-position: top; image-rendering:pixelated; position:absolute; left:0; top:-6%; }
+/* illustrated art style (gfx/rig): portraits/previews are smooth vector renders, not pixel art */
+[data-art="illustrated"] .dw-doll-preview, [data-art="illustrated"] .dw-dlg-portrait, [data-art="illustrated"] .dw-charcard .dw-cc-porthole img { image-rendering: auto; }
 .dw-charcard .dw-cc-name { font: 400 var(--dw-fs-md) / 1 var(--dw-font-display); color: var(--dw-bone); margin-top:2px; }
 .dw-charcard .dw-cc-sub { font: 500 10.5px/1 var(--dw-font-label); letter-spacing:0.04em; text-transform:uppercase; color: var(--dw-bone-dim); margin-top:3px; }
 /* Sized (with the trimmed markup in title.ts) to fit whole at 1280x720 with no scrollbar:

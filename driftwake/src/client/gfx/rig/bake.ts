@@ -60,6 +60,11 @@ export function renderRigFrame(spec: RigSpec, clip: RigClip, i: number, res = 1)
   return spec.rim === false ? c : rimOutline(c, spec.rim ?? '#1a1119', res);
 }
 
+/** True when `key` is already baked into `scene`'s texture manager. */
+export function isRigBaked(scene: Phaser.Scene, key: string): boolean {
+  return infoCache.has(key) && scene.textures.exists(key);
+}
+
 /** Bakes (or returns the cached) spritesheet for a rig spec. */
 export function bakeRig(scene: Phaser.Scene, spec: RigSpec): SpriteInfo {
   const cached = infoCache.get(spec.key);

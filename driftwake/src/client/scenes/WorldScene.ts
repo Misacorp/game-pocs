@@ -9,7 +9,7 @@ import type { GameEvent } from '@shared/protocol';
 import { HOTBAR_SIZE } from '@shared/constants';
 import { npcQuestMarker, checkConditions } from '@shared/logic';
 import { ITEMS, MONSTERS } from '@shared/data';
-import { createParallax, createWeather, spawnVfx, type Parallax, type Weather } from '../gfx';
+import { createParallax, createWeather, spawnVfx, getArtStyle, type Parallax, type Weather, type ArtStyle } from '../gfx';
 import { audio } from '../audio';
 import { session } from '../session';
 import { bus } from '../events';
@@ -51,6 +51,7 @@ export class WorldScene extends Phaser.Scene {
   private weatherFx!: Weather;
   private darkOverlay?: DarkOverlay;
   private quality!: Quality;
+  private artStyle!: ArtStyle;
   private lighting: WorldLighting | null = null;
   private postfx!: PostFXHandle;
   private mist: MistLayer | null = null;
@@ -95,6 +96,7 @@ export class WorldScene extends Phaser.Scene {
     this.torndown = false;
     this.map = getMapDefOrFallback(data.mapId);
     this.quality = getQuality();
+    this.artStyle = getArtStyle();
 
     this.physics.world.setBounds(0, 0, this.map.width, this.map.height + CAMERA_BOTTOM_SLACK);
     this.lighting = setupWorldLighting(this, this.map.theme, this.quality);
@@ -428,7 +430,7 @@ export class WorldScene extends Phaser.Scene {
    *  every render subsystem here requires (shaders/lights/postFX pipelines/RenderTextures) —
    *  a scene.restart() is the simplest way to guarantee that rebuild is clean and leak-free. */
   private onSettingsChanged(): void {
-    if (getQuality() === this.quality) return;
+    if (getQuality() === this.quality && getArtStyle() === this.artStyle) return;
     if (this.transitioning) return;
     this.transitioning = true;
     const next: WorldSceneData = { mapId: this.map.id, x: this.player.x, y: this.player.y };

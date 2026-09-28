@@ -8,7 +8,7 @@
 export type { CharacterLook, SpriteInfo, PlatformTextures, Parallax, Weather, VfxOpts } from './spec';
 
 export { registerBaseTextures } from './base';
-export { getCharacterSprite, getMonsterSprite, getNpcSprite, npcPortraitUrl, characterPortraitUrl, characterPreviewUrl } from './artDispatch';
+export { getCharacterSprite, getCharacterSpriteDeferred, getMonsterSprite, getNpcSprite, npcPortraitUrl, characterPortraitUrl, characterPreviewUrl } from './artDispatch';
 export { getPetSprite } from './pets';
 export { getPlatformTextures } from './tiles';
 export { createParallax } from './parallax';

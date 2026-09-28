@@ -10,6 +10,9 @@ import { bus } from './events';
 import { installDevHandle } from './dev/debug';
 import { registerPipelines } from './render/pipelines/registerPipelines';
 import { ensurePixelFontLoading, waitForPixelFont } from './render/pixelFont';
+import { getArtStyle } from './gfx/rig/style';
+
+document.documentElement.dataset.art = getArtStyle();
 
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;

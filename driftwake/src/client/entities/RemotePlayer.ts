@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import type { JobId } from '@shared/types';
 import type { RemotePlayer, PresenceUpdate } from '@shared/protocol';
-import { getCharacterSprite, type SpriteInfo } from '../gfx';
+import { getCharacterSpriteDeferred, type SpriteInfo } from '../gfx';
 import { makeCrispLabel, playAnim, applySpriteScale, visualTop } from './spriteUtil';
 
 export class RemotePlayerEntity {
@@ -16,7 +16,14 @@ export class RemotePlayerEntity {
   private destroyed = false;
 
   constructor(scene: Phaser.Scene, data: RemotePlayer) {
-    this.info = getCharacterSprite(scene, { classId: data.classId, jobId: data.jobId as JobId, appearance: data.appearance });
+    this.info = getCharacterSpriteDeferred(scene, { classId: data.classId, jobId: data.jobId as JobId, appearance: data.appearance }, (info) => {
+      if (this.destroyed || !this.sprite.scene) return;
+      const anim = this.sprite.anims?.currentAnim?.key?.split(':').pop() ?? 'idle';
+      this.info = info;
+      this.sprite.setTexture(info.key, 0);
+      applySpriteScale(this.sprite, info);
+      playAnim(this.sprite, info, anim, { ignoreIfPlaying: false });
+    });
     this.sprite = scene.add.sprite(data.x, data.y, this.info.key, 0).setOrigin(0.5, 1).setDepth(14).setFlipX(data.facing === -1).setAlpha(0.92);
     applySpriteScale(this.sprite, this.info);
     this.nameTag = makeCrispLabel(scene, data.x, data.y - visualTop(this.info) - 5, data.title ? `${data.name} <${data.title}>` : data.name, {

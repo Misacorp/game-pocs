@@ -72,4 +72,12 @@ for (const s of subjects) {
     row.appendChild(wrap);
   }
 }
+if (q.get('perf')) {
+  for (const s of subjects) {
+    if (only && !only.some((o) => s.id === o || s.id.startsWith(o))) continue;
+    const t0 = performance.now();
+    for (const clip of s.spec.clips) for (let i = 0; i < clip.frames; i++) renderRigFrame(s.spec, clip, i);
+    console.warn(`[perf] ${s.id}: ${s.spec.clips.reduce((a, c) => a + c.frames, 0)} frames in ${(performance.now() - t0).toFixed(1)}ms`);
+  }
+}
 (window as unknown as { __labReady: boolean }).__labReady = true;

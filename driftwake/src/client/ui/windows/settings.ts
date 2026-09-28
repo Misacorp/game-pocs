@@ -4,6 +4,7 @@ import { WindowManager, createWindow } from '../manager';
 import { audio, type Volumes } from '../../audio';
 import { BIND_LABELS, DEFAULT_BINDS, getBinds, setBind, resetBinds, keyLabel } from '../../input/keybinds';
 import { tipsEnabled, setTipsEnabled } from '../tips';
+import { getArtStyle, setArtStyle, type ArtStyle } from '../../gfx/rig/style';
 
 const UI_SCALE_KEY = 'driftwake:uiscale';
 const GFX_KEY = 'driftwake:gfx';
@@ -69,6 +70,23 @@ export function createSettingsWindow(wm: WindowManager, uiRoot: HTMLElement) {
     return el('div', { class: 'dw-settings-row' }, el('label', null, 'Quality'), seg);
   }
 
+  function artRow(): HTMLElement {
+    const styles: { id: ArtStyle; label: string }[] = [{ id: 'illustrated', label: 'Illustrated' }, { id: 'pixel', label: 'Pixel' }];
+    const seg = el('div', { class: 'dw-seg' });
+    function build() {
+      seg.innerHTML = '';
+      const cur = getArtStyle();
+      for (const st of styles) {
+        seg.appendChild(el('button', {
+          class: `dw-btn dw-btn-sm ${cur === st.id ? 'dw-btn-primary' : 'dw-btn-ghost'}`,
+          onclick: () => { if (getArtStyle() === st.id) return; setArtStyle(st.id); bus.emit('settings:changed'); build(); },
+        }, st.label));
+      }
+    }
+    build();
+    return el('div', { class: 'dw-settings-row', title: 'Character & creature art style (trial: player classes, early monsters and Old Pell)' }, el('label', null, 'Character Art'), seg);
+  }
+
   function shakeRow(): HTMLElement {
     const cb = el('input', { type: 'checkbox', checked: getScreenShakeEnabled() }) as HTMLInputElement;
     cb.addEventListener('change', () => setScreenShakeEnabled(cb.checked));
@@ -129,6 +147,7 @@ export function createSettingsWindow(wm: WindowManager, uiRoot: HTMLElement) {
     body.appendChild(scaleRow());
     body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Graphics'));
     body.appendChild(qualityRow());
+    body.appendChild(artRow());
     body.appendChild(shakeRow());
     body.appendChild(el('b', { class: 'dw-caps', style: { display: 'block', marginTop: '12px' } }, 'Keybinds'));
     body.appendChild(bindsSection());

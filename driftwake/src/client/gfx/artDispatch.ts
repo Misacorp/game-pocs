@@ -11,16 +11,43 @@ import { getMonsterSprite as pixelMonster } from './monsters';
 import { getNpcSprite as pixelNpc, npcPortraitUrl as pixelNpcPortrait } from './npcs';
 import { characterPortraitUrl as pixelPortrait, characterPreviewUrl as pixelPreview } from './icons';
 import { isIllustrated } from './rig/style';
-import { getRigCharacterSprite, rigCharacterIdleCanvas } from './rig/characters';
+import { getRigCharacterSprite, rigCharacterIdleCanvas, characterRigSpec } from './rig/characters';
 import { getRigMonsterSprite, hasRigMonster } from './rig/monsters';
 import { getRigNpcSprite, hasRigNpc, rigNpcPortraitUrl, portraitCrop } from './rig/npcs';
-import { frameToDataUrl } from './rig/bake';
+import { frameToDataUrl, isRigBaked } from './rig/bake';
 import { RIG_SCALE } from './rig/pen';
 import { hashStr } from './canvasKit';
 import './rig/register';
 
 export function getCharacterSprite(scene: Phaser.Scene, look: CharacterLook): SpriteInfo {
   return isIllustrated() ? getRigCharacterSprite(scene, look) : pixelCharacter(scene, look);
+}
+
+const deferred: { scene: Phaser.Scene; look: CharacterLook; cbs: ((info: SpriteInfo) => void)[] }[] = [];
+let deferArmed = false;
+function pumpDeferred(): void {
+  const job = deferred.shift();
+  if (job && job.scene.sys?.isActive()) {
+    const info = getRigCharacterSprite(job.scene, job.look);
+    for (const cb of job.cbs) cb(info);
+  }
+  if (deferred.length) setTimeout(pumpDeferred, 60); else deferArmed = false;
+}
+
+/**
+ * For characters that don't need to be illustrated on their very first frame (other players,
+ * bots): returns the cheap pixel sheet immediately when the illustrated one isn't baked yet, and
+ * bakes it in the background (one sheet per tick, so a map full of players never stalls a frame
+ * for long), calling `onUpgrade` with the illustrated sheet once ready.
+ */
+export function getCharacterSpriteDeferred(scene: Phaser.Scene, look: CharacterLook, onUpgrade: (info: SpriteInfo) => void): SpriteInfo {
+  if (!isIllustrated()) return pixelCharacter(scene, look);
+  if (isRigBaked(scene, characterRigSpec(look).key)) return getRigCharacterSprite(scene, look);
+  const key = JSON.stringify(look);
+  const existing = deferred.find((d) => d.scene === scene && JSON.stringify(d.look) === key);
+  if (existing) existing.cbs.push(onUpgrade); else deferred.push({ scene, look, cbs: [onUpgrade] });
+  if (!deferArmed) { deferArmed = true; setTimeout(pumpDeferred, 120); }
+  return pixelCharacter(scene, look);
 }
 
 export function getMonsterSprite(scene: Phaser.Scene, def: MonsterDef): SpriteInfo {

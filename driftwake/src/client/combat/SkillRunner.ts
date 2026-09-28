@@ -107,6 +107,11 @@ function bodyOverlaps(m: MonsterEntity, x1: number, y1: number, x2: number, y2: 
   return bx <= rx && bx + bw >= lx && by <= byy && by + bh >= ty;
 }
 
+/** Projectile contact: generous center radius for small mobs (old behavior) OR near the body for big ones. */
+function projectileHits(m: MonsterEntity, x: number, y: number, radius: number): boolean {
+  return Phaser.Math.Distance.Between(x, y, m.sprite.x, m.sprite.y - m.sprite.displayHeight / 2) < radius || distToBody(m, x, y) < 6;
+}
+
 export class SkillRunner {
   constructor(
     private scene: Phaser.Scene,
@@ -222,7 +227,7 @@ export class SkillRunner {
             color: desc.vfx?.color ?? '#ffffff', style: desc.vfx?.style ?? 'bullet', bounds: this.ctx.bounds,
             homingTarget: effect.homing ? () => { const n = this.nearest(caster.x, caster.y, 500, hitSetLocal); return n ? { x: n.sprite.x, y: n.sprite.y - n.sprite.displayHeight / 2 } : null; } : undefined,
             queryHit: (x, y, already) => {
-              const m = this.aliveMonsters().find((mm) => !already.has(mm) && distToBody(mm, x, y) < 7);
+              const m = this.aliveMonsters().find((mm) => !already.has(mm) && projectileHits(mm, x, y, 18));
               return m ? { x: m.sprite.x, y: m.sprite.y, obj: m } : null;
             },
             onHit: (hit) => { const m = hit.obj as MonsterEntity; hitSetLocal.add(m); dealt += this.resolveHit(m, desc, caster.x);
@@ -306,7 +311,7 @@ export class SkillRunner {
               x: rx, y: caster.y - 260, vx: 0, vy: 340, gravity: 260, color: desc.vfx?.color ?? '#88ccff', style: desc.vfx?.style ?? 'ice',
               radius: 10, life: 1800, bounds: this.ctx.bounds,
               queryHit: (x, y, already) => {
-                const m = this.aliveMonsters().find((mm) => !already.has(mm) && distToBody(mm, x, y) < 7);
+                const m = this.aliveMonsters().find((mm) => !already.has(mm) && projectileHits(mm, x, y, 18));
                 return m ? { x: m.sprite.x, y: m.sprite.y, obj: m } : null;
               },
               onHit: (hit) => { dealt += this.resolveHit(hit.obj as MonsterEntity, desc, caster.x); },
@@ -361,7 +366,7 @@ export class SkillRunner {
           x: turret.x, y: turret.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, color: desc.vfx?.color ?? '#ffaa33',
           style: desc.vfx?.style ?? 'bullet', radius: 8, life: 1500, bounds: this.ctx.bounds,
           queryHit: (px, py, already) => {
-            const m = this.aliveMonsters().find((mm) => !already.has(mm) && distToBody(mm, px, py) < 7);
+            const m = this.aliveMonsters().find((mm) => !already.has(mm) && projectileHits(mm, px, py, 18));
             return m ? { x: m.sprite.x, y: m.sprite.y, obj: m } : null;
           },
           onHit: (hit) => { this.resolveHit(hit.obj as MonsterEntity, desc, turret.x); },

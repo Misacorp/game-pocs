@@ -26,23 +26,57 @@ const AMBIENT: Record<ThemeId, number> = {
 };
 
 const normalMapped = new Set<string>();
+const pendingQueue: { scene: Phaser.Scene; key: string }[] = [];
+let queueArmed = false;
 
-/** Idempotent, cached-by-key: attaches a generated normal map as texture.dataSource so the
- *  Light2D pipeline can bevel-shade the sprite. Safe to call repeatedly (across scene restarts —
- *  the TextureManager and this module-level cache both persist for the life of the game). */
+type IdleWindow = Window & { requestIdleCallback?: (cb: (deadline: { timeRemaining: () => number }) => void, opts?: { timeout: number }) => number };
+
+/** Actually generating a normal map (getImageData + putImageData over a whole texture/spritesheet)
+ *  is cheap in isolation, but a busy scene first-touches dozens of distinct textures (tiles, decor,
+ *  every monster/NPC sheet, the player...) in the same tick — doing all of that synchronously at
+ *  scene-create time was measured to stall the main thread for seconds under headless SwiftShader,
+ *  which is exactly the kind of stall that would also hurt on a weaker real GPU. So `ensureNormalMap`
+ *  only enqueues; this drains a couple of entries per idle callback (or a timer, if
+ *  requestIdleCallback isn't available) instead. Light2D lights/ambient already look correct in the
+ *  meantime — Phaser's LightPipeline falls back to a flat default normal for any texture that
+ *  doesn't have one yet (see LightPipeline#getNormalMap), so there's nothing to gate on this. */
+function drainQueue(): void {
+  const budgetPerTick = 2;
+  let n = 0;
+  while (pendingQueue.length && n < budgetPerTick) {
+    const { scene, key } = pendingQueue.shift()!;
+    n++;
+    try {
+      if (!scene.textures.exists(key)) continue;
+      const tex = scene.textures.get(key);
+      const src = tex.getSourceImage(0) as unknown;
+      if (!(src instanceof HTMLCanvasElement)) continue;
+      const normal = buildNormalMapFromAlpha(src, { bevel: 2 });
+      tex.setDataSource(normal as unknown as HTMLCanvasElement);
+    } catch (e) {
+      console.warn(`[lighting] normal map generation failed for "${key}" (falls back to flat shading)`, e);
+    }
+  }
+  if (pendingQueue.length) armQueue(); else queueArmed = false;
+}
+
+function armQueue(): void {
+  if (queueArmed) return;
+  queueArmed = true;
+  const w = window as IdleWindow;
+  if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(drainQueue, { timeout: 250 });
+  else setTimeout(drainQueue, 16);
+}
+
+/** Idempotent, cached-by-key: queues a normal map to be generated and attached as
+ *  texture.dataSource in the background, a couple of textures per idle tick, so the Light2D
+ *  pipeline can bevel-shade the sprite once it's ready. Safe to call repeatedly (across scene
+ *  restarts — the TextureManager and this module-level cache both persist for the game's life). */
 export function ensureNormalMap(scene: Phaser.Scene, key: string): void {
   if (normalMapped.has(key)) return;
   normalMapped.add(key);
-  try {
-    if (!scene.textures.exists(key)) return;
-    const tex = scene.textures.get(key);
-    const src = tex.getSourceImage(0) as unknown;
-    if (!(src instanceof HTMLCanvasElement)) return;
-    const normal = buildNormalMapFromAlpha(src);
-    tex.setDataSource(normal as unknown as HTMLCanvasElement);
-  } catch (e) {
-    console.warn(`[lighting] normal map generation failed for "${key}" (lighting will fall back to flat shading)`, e);
-  }
+  pendingQueue.push({ scene, key });
+  armQueue();
 }
 
 export interface WorldLighting {

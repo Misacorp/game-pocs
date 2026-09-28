@@ -8,13 +8,13 @@ export function makeCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(w));
   c.height = Math.max(1, Math.round(h));
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
   ctx.imageSmoothingEnabled = false;
   return c;
 }
 
 export function ctx2d(c: HTMLCanvasElement): CanvasRenderingContext2D {
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
   ctx.imageSmoothingEnabled = false;
   return ctx;
 }

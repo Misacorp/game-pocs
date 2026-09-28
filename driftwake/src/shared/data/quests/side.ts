@@ -17,7 +17,9 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
     type: 'side',
     giver: 'npc_pell',
     level: 2,
-    reqs: [{ type: 'level', min: 1 }],
+    // Staggered behind mq_01 (see DESIGN.md "Onboarding curve") so a brand-new character sees the
+    // main quest alone first, not a pile of offers all at once.
+    reqs: [{ type: 'quest', questId: 'mq_01_welcome', state: 'completed' }],
     summary: "Gather sproutling caps for Old Pell's knee tea.",
     offer:
       "\"Ah, hello there. Don't mind me, just creaking like an old ship's mast.\"\n\nOld Pell rubs his knee and nods at the meadow. \"There's a tea my grandmother swore by — sproutling cap, dried and steeped. If you're headed that way and don't mind an old man's aches, I'd be grateful for a handful.\"",
@@ -32,7 +34,8 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
     type: 'side',
     giver: 'npc_wren',
     level: 2,
-    reqs: [{ type: 'level', min: 1 }],
+    // Staggered behind mq_02 so it doesn't stack on top of Pell's tea quest at the very start.
+    reqs: [{ type: 'quest', questId: 'mq_02_tremors', state: 'completed' }],
     summary: "Fetch Wren's kite from the meadow willow — and decide what to tell her about it.",
     offer:
       "Wren is near tears, clutching a snapped kite string. \"My kite! The wind took it and now it's stuck in the big willow in the meadow and I'm too small to climb and Mom says I can't go alone and — will you get it? Please??\"\n\nShe sniffles. \"It's got my whole heart sewn into it. Also feathers. Mostly feathers.\"",
@@ -69,7 +72,8 @@ const DRIFTMOOR_QUESTS: QuestDef[] = [
     type: 'side',
     giver: 'npc_pim',
     level: 3,
-    reqs: [{ type: 'level', min: 2 }],
+    // Follows Wren's kite quest narratively (Pim now knows Wren) and keeps the wave staggered.
+    reqs: [{ type: 'quest', questId: 'sq_driftmoor_wren_kite', state: 'completed' }],
     summary: 'Deliver a bag of sour candies to Wren for Pim.',
     offer:
       "\"Say, you're heading out, yes? Do an old shopkeep a favor.\" Pim slides a paper bag across the counter. \"Sour candies for young Wren. Her mother says one a day, but between you and me, the girl negotiates.\"",
@@ -1232,7 +1236,7 @@ const DAILY_QUESTS: QuestDef[] = [
     type: 'daily',
     giver: 'npc_pim',
     level: 3,
-    reqs: [{ type: 'level', min: 2 }],
+    reqs: [{ type: 'level', min: 3 }],
     summary: 'Thin the meadow pest population for the bounty board.',
     offer: "A hand-scrawled notice pinned by Pim's counter: \"WANTED: fewer puffmoss, fewer shellsnails. Ask inside for details (and coin).\"",
     progress: '"Meadow pests, same as the board says."',
@@ -1377,7 +1381,8 @@ const DAILY_QUESTS: QuestDef[] = [
     type: 'daily',
     giver: 'npc_rook_prospector',
     level: 5,
-    reqs: [{ type: 'level', min: 3 }],
+    // Dusty himself only appears in Driftmoor from level 5 (see DESIGN.md "Onboarding curve").
+    reqs: [{ type: 'level', min: 5 }],
     summary: 'Standing task: bring Dusty Fen a fresh batch of ore.',
     offer:
       "\"Always short on ore, never short on customers,\" Dusty Fen grumbles cheerfully. \"Bring me a fresh haul, whatever vein you can reach, and I'll make it worth the swing of your pick.\"",
@@ -1393,7 +1398,7 @@ const DAILY_QUESTS: QuestDef[] = [
     type: 'daily',
     giver: 'npc_rook_prospector',
     level: 5,
-    reqs: [{ type: 'level', min: 3 }],
+    reqs: [{ type: 'level', min: 5 }],
     summary: 'Standing task: bring Dusty Fen a fresh batch of herbs.',
     offer: '"Herbs go stale in my pack faster than you\'d think," Fen says. "Standing order, if you\'re passing through anywhere green — or kelpy, or coral, doesn\'t much matter."',
     progress: '"Herbs, whatever\'s growing where you are."',

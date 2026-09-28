@@ -8,6 +8,7 @@ import { ITEMS, MONSTERS, MAPS, NPCS, QUESTS, DIALOGUES, RECIPES, PROFESSIONS, G
 import {
   XP_CURVE, xpToNext, levelDiffXpMult, SP_ON_ADVANCE, JOB_ADVANCE_LEVEL,
   STARTING_STATS, DEATH_XP_PENALTY, PROFESSION_MAX_LEVEL, professionXpToNext, MAX_CRAFTING_PROFESSIONS,
+  PROFESSION_UNLOCK_LEVEL,
   RARITY_ORDER, RARITY_BONUS_LINES, RARITY_UPGRADE_CHANCE, ENHANCE_DOWNGRADE_FROM, DROP_LIFETIME_MS, START_MAP,
 } from '../constants';
 import { chance, randInt, pick, type Rng } from '../rng';
@@ -99,8 +100,19 @@ function grantProfessionXp(s: CharacterState, events: GameEvent[], professionId:
   }
 }
 
+/** Flavor line for the friendly level-gate refusal, keyed by trainer NPC (see DESIGN.md §5/§7). */
+const CRAFTING_TRAINER_REFUSAL: Record<CraftingProfessionId, string> = {
+  smithing: "Come back at level " + PROFESSION_UNLOCK_LEVEL + " — Brina doesn't train greenhorns.",
+  alchemy: "Come back at level " + PROFESSION_UNLOCK_LEVEL + " — Juniper won't waste good herbs on a greenhorn.",
+  cooking: "Come back at level " + PROFESSION_UNLOCK_LEVEL + " — Tobbin won't teach a greenhorn to boil water.",
+  jewelcrafting: "Come back at level " + PROFESSION_UNLOCK_LEVEL + " — Sera won't hand a greenhorn her good crystals.",
+};
+
 function tryLearnProfession(s: CharacterState, professionId: CraftingProfessionId): { ok: boolean; error?: string } {
   if (PROFESSIONS[professionId]?.kind !== 'crafting') return { ok: false, error: 'Unknown profession' };
+  if (s.level < PROFESSION_UNLOCK_LEVEL) {
+    return { ok: false, error: CRAFTING_TRAINER_REFUSAL[professionId] ?? `Come back at level ${PROFESSION_UNLOCK_LEVEL}.` };
+  }
   if (s.professions[professionId]) return { ok: false, error: 'Already learned' };
   const craftingCount = Object.keys(s.professions).filter((p) => PROFESSIONS[p]?.kind === 'crafting').length;
   if (craftingCount >= MAX_CRAFTING_PROFESSIONS) return { ok: false, error: `You can only know ${MAX_CRAFTING_PROFESSIONS} crafting professions at once` };

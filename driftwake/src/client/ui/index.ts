@@ -13,6 +13,7 @@ import { WindowManager } from './manager';
 import { createHud } from './hud';
 import { createMinimap } from './minimap';
 import { createQuestTracker } from './tracker';
+import { createBuffBar } from './buffbar';
 import { createNotificationLayer } from './notifications';
 import { createTipLayer } from './tips';
 import { createChat } from './chat';
@@ -86,7 +87,8 @@ export function showGameUI(session: GameSession): void {
 
   const hud = createHud(session);
   const minimap = createMinimap(session);
-  const tracker = createQuestTracker(session, wm);
+  const tracker = createQuestTracker(session, wm, minimap);
+  const buffBar = createBuffBar(session);
   const notif = createNotificationLayer(session);
   const chat = createChat(session);
   const tips = createTipLayer(session);
@@ -94,10 +96,11 @@ export function showGameUI(session: GameSession): void {
   gameLayer.appendChild(hud.root);
   gameLayer.appendChild(minimap.root);
   gameLayer.appendChild(tracker.root);
+  gameLayer.appendChild(buffBar.root);
   gameLayer.appendChild(notif.root);
   gameLayer.appendChild(chat.root);
   gameLayer.appendChild(tips.root);
-  cleanupFns.push(hud.cleanup, minimap.cleanup, tracker.cleanup, notif.cleanup, chat.cleanup, tips.cleanup, () => wm.dispose());
+  cleanupFns.push(hud.cleanup, minimap.cleanup, tracker.cleanup, buffBar.cleanup, notif.cleanup, chat.cleanup, tips.cleanup, () => wm.dispose());
 
   createInventoryWindow(wm, session);
   createCharacterWindow(wm, session);

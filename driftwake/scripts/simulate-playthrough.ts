@@ -110,6 +110,27 @@ function dispatch(action: ClientAction, label = ''): ActionResult {
 const npcMapId: Record<string, string> = {};
 for (const m of Object.values(MAPS)) for (const np of m.npcs) if (!npcMapId[np.npcId]) npcMapId[np.npcId] = m.id;
 
+// NPCs can now be placed conditionally (`MapNpcPlacement.reqs`, e.g. crafters arriving at a
+// certain level/story beat — see DESIGN.md "Onboarding curve"). `npcMapId` above only answers
+// "where would I go looking for this NPC", not "are they actually there right now" — so anywhere
+// the sim is about to interact with an NPC as if it were spawned (accept/turn-in a quest, satisfy
+// a `talk` objective), it should also check this. `scripts/validate-data.ts` already proves
+// statically that no NPC's placement reqs can be stricter than the quests that need it, so this
+// should never actually fire for real content; it exists as a runtime safety net against a future
+// regression (e.g. a quest reqs loosened without loosening the matching NPC placement).
+const npcPlacementsByNpc = new Map<string, { mapId: string; reqs?: Condition[] }[]>();
+for (const m of Object.values(MAPS)) {
+  for (const np of m.npcs) {
+    if (!npcPlacementsByNpc.has(np.npcId)) npcPlacementsByNpc.set(np.npcId, []);
+    npcPlacementsByNpc.get(np.npcId)!.push({ mapId: m.id, reqs: np.reqs });
+  }
+}
+function npcActuallyPresent(npcId: string): boolean {
+  const placements = npcPlacementsByNpc.get(npcId);
+  if (!placements || placements.length === 0) return false;
+  return placements.some((p) => checkConditions(state, p.reqs));
+}
+
 const bossMapId: Record<string, string> = {};
 for (const m of Object.values(MAPS)) if (m.boss) bossMapId[m.boss.monsterId] = m.id;
 
@@ -866,6 +887,10 @@ function satisfyObjective(def: QuestDef, i: number) {
       const mapId = npcMapId[obj.npcId];
       if (!mapId) { blocker(`NPC '${obj.npcId}' (talk objective in '${def.id}') is not placed on any map.`); break; }
       navigateTo(mapId);
+      if (!npcActuallyPresent(obj.npcId)) {
+        blocker(`Talk objective in '${def.id}' needs '${obj.npcId}', but it isn't actually present per its map placement reqs — NPC reqs are stricter than the quest's own reqs.`);
+        break;
+      }
       if (obj.npcId === 'npc_poacher_defector' && state.flags.jory === undefined) {
         dispatch({ type: 'dialogueAction', npcId: obj.npcId, action: { type: 'setFlag', flag: 'jory', value: strategy.jorySpare ? 'spared' : 'turned_in' } }, 'jory-choice');
       }
@@ -928,6 +953,11 @@ function processQuest(questId: string): boolean {
     const giverMap = npcMapId[def.giver];
     if (!giverMap) { blocker(`Quest giver '${def.giver}' for '${def.id}' is not placed on any map.`); attemptedQuests.add(questId); return false; }
     if (!navigateTo(giverMap)) { attemptedQuests.add(questId); return false; }
+    if (!npcActuallyPresent(def.giver)) {
+      blocker(`Quest '${def.id}' is offerable, but its giver '${def.giver}' isn't actually present per its map placement reqs — NPC reqs are stricter than the quest's own reqs.`);
+      attemptedQuests.add(questId);
+      return false;
+    }
     let acc = dispatch({ type: 'acceptQuest', questId }, def.id);
     if (!acc.ok && /inventory space/i.test(acc.error ?? '')) {
       // Some quests hand over an item on accept; the reducer refuses rather than losing it.
@@ -950,8 +980,14 @@ function processQuest(questId: string): boolean {
     return false;
   }
 
-  const turnInMap = npcMapId[def.turnIn ?? def.giver];
+  const turnInNpc = def.turnIn ?? def.giver;
+  const turnInMap = npcMapId[turnInNpc];
   if (turnInMap) navigateTo(turnInMap);
+  if (!npcActuallyPresent(turnInNpc)) {
+    blocker(`Quest '${def.id}' is ready to turn in, but its turn-in npc '${turnInNpc}' isn't actually present per its map placement reqs — NPC reqs are stricter than the quest's own reqs.`);
+    attemptedQuests.add(questId);
+    return false;
+  }
   const choiceId = choiceIdFor(def);
   const chooseIndex = !choiceId && def.rewards.chooseOne ? pickChooseOne(def.rewards.chooseOne) : undefined;
   let res = dispatch({ type: 'completeQuest', questId, choiceId, chooseIndex }, def.id);

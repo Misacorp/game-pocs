@@ -20,9 +20,15 @@ varying vec2 outTexCoord;
 vec3 brightPass(vec2 uv) {
   vec3 c = texture2D(uMainSampler, uv).rgb;
   float l = dot(c, vec3(0.299, 0.587, 0.114));
-  // A tight knee: only texels genuinely near-white (true emissives — lanterns, crystals, VFX,
-  // eyes) contribute, not merely well-lit sprites/walls sitting in the upper-mid brightness range.
-  return c * smoothstep(uThreshold, uThreshold + 0.12, l);
+  // A tight, high knee: DriftwakeLightPipeline (render/pipelines/LightingPipeline.ts) now runs
+  // every lit sprite/tile's ambient+lights gain through a soft-knee rolloff before it multiplies
+  // the albedo, so a well-lit (but not emissive) pixel should essentially never approach 1.0 raw
+  // luminance any more — only genuinely emissive draws (VFX glows/sparks/eyes, which are additively
+  // blended on TOP of an already-lit background and so routinely push well past 1.0) should still
+  // cross this. The threshold sits high, with a fairly narrow knee just under it, precisely so a
+  // stray near-white texture pixel (pale hair, a shell highlight) sitting at the top of its capped
+  // lit range doesn't also trip the bloom and read as a glowing hotspot.
+  return c * smoothstep(uThreshold, uThreshold + 0.1, l);
 }
 
 void main() {
@@ -45,7 +51,7 @@ void main() {
 `;
 
 export class ThresholdBloomPipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
-  threshold = 0.88;
+  threshold = 0.95;
   intensity = 0.75;
 
   constructor(game: Phaser.Game) {

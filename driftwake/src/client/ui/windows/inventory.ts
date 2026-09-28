@@ -3,8 +3,7 @@ import { bus } from '../../events';
 import type { GameSession } from '../../session';
 import { WindowManager, createWindow } from '../manager';
 import { makeTabs, confirmDialog, showContextMenu } from '../widgets';
-import { attachTooltip } from '../tooltip';
-import { buildItemTooltip } from '../itemTooltip';
+import { attachItemTooltip } from '../itemTooltip';
 import { safeItemIcon, goldIconUrl } from '../icons';
 import { ITEMS } from '@shared/data';
 import { INVENTORY_SIZE } from '@shared/constants';
@@ -48,7 +47,7 @@ export function createInventoryWindow(wm: WindowManager, session: GameSession) {
           dragSrc = { tab: currentTab, index: i };
           e.dataTransfer?.setData('text/plain', `item:${inst.itemId}`);
         });
-        attachTooltip(slot, () => buildItemTooltip(session.state, inst));
+        attachItemTooltip(slot, session.state, inst);
         slot.addEventListener('dblclick', () => useOrEquip(inst, def));
         slot.addEventListener('contextmenu', (e) => {
           e.preventDefault();

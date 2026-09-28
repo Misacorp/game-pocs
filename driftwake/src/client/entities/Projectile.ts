@@ -48,6 +48,15 @@ interface Live {
   bounds?: { width: number; height: number };
   dead: boolean;
   lightId: string;
+  /** True for the projectile's whole life whenever it spawned with pierce > 0 — i.e. it is
+   *  ALLOWED to hit more than one target — independent of how much pierce it has left, so a
+   *  piercing shot keeps reading as one even after using up its last piercing hit. */
+  piercing: boolean;
+  /** Additive glow sibling image trailing the sprite, only for piercing projectiles (see spawn()) —
+   *  the visual cue that tells a piercing shot apart from a normal one. */
+  glow?: Phaser.GameObjects.Image;
+  trailAccumMs: number;
+  trailKey: string;
 }
 
 let projLightSeq = 0;
@@ -63,19 +72,29 @@ export class ProjectileManager {
     const angle = Math.atan2(opts.vy, opts.vx);
     sprite.setRotation(angle);
     const lightId = `proj${projLightSeq++}`;
+    const tint = Phaser.Display.Color.HexStringToColor(opts.color).color;
+    const piercing = (opts.pierce ?? 0) > 0;
     // Every projectile emits a small, brief light that tracks it — most visible for the
     // additive-blended bolt/orb/fire styles, harmless (just dim) for solid ones like arrows.
+    // A piercing shot gets a bigger, brighter light so it reads as "hotter" even before the
+    // glow sibling/trail below are visible.
     this.lighting?.addLight({
       id: lightId, x: () => sprite.x, y: () => sprite.y,
-      color: Phaser.Display.Color.HexStringToColor(opts.color).color, radius: 55, intensity: 0.85,
+      color: tint, radius: piercing ? 80 : 55, intensity: piercing ? 1.15 : 0.85,
     });
+    // Visual cue for pierce (c): a soft additive glow riding just behind the sprite, plus a short
+    // fading trail spawned as it flies — makes a piercing shot visibly different from a normal one
+    // (which gets neither), so players can tell them apart before they ever see it punch through.
+    const glow = piercing
+      ? this.scene.add.image(opts.x, opts.y, key).setDepth(44).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5).setScale(1.7)
+      : undefined;
     this.live.push({
       sprite, vx: opts.vx, vy: opts.vy, gravity: opts.gravity ?? 0,
       homingTarget: opts.homingTarget, turnRate: opts.homingTurnRate ?? 6,
       radius: opts.radius ?? 8, life: opts.life ?? 3000, pierce: opts.pierce ?? 0,
       hitSet: new Set(), queryHit: opts.queryHit, onHit: opts.onHit,
       explodeRadius: opts.explodeRadius, onExplode: opts.onExplode, bounds: opts.bounds,
-      dead: false, lightId,
+      dead: false, lightId, piercing, glow, trailAccumMs: 0, trailKey: key,
     });
   }
 
@@ -91,6 +110,16 @@ export class ProjectileManager {
       this.lighting?.removeLight(p.lightId);
     }
     p.sprite.destroy();
+    p.glow?.destroy();
+  }
+
+  /** Piercing-only afterimage: a fading, shrinking duplicate dropped at the current position,
+   *  a few times per second — reads as a short bright streak trailing the shot. */
+  private spawnTrailGhost(p: Live): void {
+    const ghost = this.scene.add.image(p.sprite.x, p.sprite.y, p.trailKey)
+      .setDepth(43).setRotation(p.sprite.rotation).setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.4);
+    this.scene.tweens.add({ targets: ghost, alpha: 0, scale: 0.4, duration: 220, onComplete: () => ghost.destroy() });
   }
 
   update(dtMs: number): void {
@@ -114,6 +143,11 @@ export class ProjectileManager {
       p.sprite.x += p.vx * dt;
       p.sprite.y += p.vy * dt;
       p.sprite.setRotation(Math.atan2(p.vy, p.vx));
+      if (p.glow) p.glow.setPosition(p.sprite.x, p.sprite.y).setRotation(p.sprite.rotation);
+      if (p.piercing) {
+        p.trailAccumMs += dtMs;
+        if (p.trailAccumMs >= 35) { p.trailAccumMs = 0; this.spawnTrailGhost(p); }
+      }
       p.life -= dtMs;
       const hit = p.queryHit(p.sprite.x, p.sprite.y, p.hitSet);
       if (hit) {
@@ -132,7 +166,7 @@ export class ProjectileManager {
   }
 
   destroy(): void {
-    for (const p of this.live) { p.sprite.destroy(); this.lighting?.removeLight(p.lightId); }
+    for (const p of this.live) { p.sprite.destroy(); p.glow?.destroy(); this.lighting?.removeLight(p.lightId); }
     this.live = [];
   }
 }

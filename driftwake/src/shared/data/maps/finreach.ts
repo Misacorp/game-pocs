@@ -36,6 +36,9 @@ function kelpwoodEdge(): MapDef {
     npcs: [
       placeNpc('npc_idris', 1880, groundY),
       placeNpc('npc_fenna', 2020, groundY),
+      // Cooking moved out here from Driftmoor (see DESIGN.md "Onboarding curve") — gives Kelpwood
+      // Edge its own reason to visit beyond the main quest, and thins Driftmoor's starting cast.
+      placeNpc('npc_tobbin', 1750, groundY),
     ],
     spawns: [
       mspawn('kelp_sprite', 9, { x1: 150, x2: 2000, y1: 240, y2: 520 }),

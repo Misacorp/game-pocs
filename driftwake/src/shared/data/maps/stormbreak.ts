@@ -46,6 +46,8 @@ function galeOutpost(): MapDef {
       placeNpc('npc_whisper', 850, groundY),
       placeNpc('npc_quill', 1000, groundY),
       placeNpc('npc_ferry_tamsin', 1150, groundY),
+      // Jewelcrafting moved out here from Driftmoor (see DESIGN.md "Onboarding curve").
+      placeNpc('npc_sera', 1300, groundY),
     ],
     spawns: [],
     gather: [],

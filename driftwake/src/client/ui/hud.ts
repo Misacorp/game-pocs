@@ -154,30 +154,9 @@ export function createHud(session: GameSession): { root: HTMLElement; cleanup: (
   }
   raf = requestAnimationFrame(tick);
 
-  // ---- Buffs ----
-  const buffsRoot = el('div', { class: 'dw-buffs' });
-  function renderBuffs(buffs: { id: string; name: string; expiresAt: number; icon?: { shape: string; colors: string[] } }[]) {
-    buffsRoot.innerHTML = '';
-    for (const b of buffs) {
-      const timeEl = el('div', { class: 'dw-buff-time' }, '');
-      const row = el('div', { class: 'dw-buff' },
-        el('img', { src: b.icon ? safeSkillIcon({ id: b.id, icon: b.icon as any }) : safeSkillIcon(undefined) }), timeEl);
-      attachTooltip(row, () => [b.name]);
-      (row as any)._expiresAt = b.expiresAt;
-      buffsRoot.appendChild(row);
-    }
-  }
-  offs.push(bus.on('buffs', renderBuffs));
-  let raf2 = 0;
-  function tickBuffs() {
-    for (const row of Array.from(buffsRoot.children) as HTMLElement[]) {
-      const remain = (row as any)._expiresAt - Date.now();
-      const timeEl = row.querySelector('.dw-buff-time');
-      if (timeEl) timeEl.textContent = remain > 0 ? `${Math.ceil(remain / 1000)}s` : '';
-    }
-    raf2 = requestAnimationFrame(tickBuffs);
-  }
-  raf2 = requestAnimationFrame(tickBuffs);
+  // Buffs used to have a small row here too — replaced by the top-center buff bar (ui/buffbar.ts),
+  // which also (unlike this old row) shows persisted food/elixir buffs and a proper countdown
+  // ring, so it isn't duplicated in the bottom HUD any more (PLAYTEST feedback #4).
 
   const hotbarWrap = el('div', { style: { pointerEvents: 'auto' } }, hotbarRoot);
   const bottom = el('div', { class: 'dw-hud-bottom' }, medallion, bars, hotbarWrap);
@@ -185,9 +164,9 @@ export function createHud(session: GameSession): { root: HTMLElement; cleanup: (
   renderVitals();
   renderIdentity();
 
-  const root = el('div', {}, bottom, buffsRoot);
+  const root = el('div', {}, bottom);
   return {
     root,
-    cleanup: () => { offs.forEach((o) => o()); cancelAnimationFrame(raf); cancelAnimationFrame(raf2); },
+    cleanup: () => { offs.forEach((o) => o()); cancelAnimationFrame(raf); },
   };
 }

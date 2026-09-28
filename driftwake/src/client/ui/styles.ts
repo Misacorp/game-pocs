@@ -272,19 +272,43 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
   opacity: 0.85;
 }
 
-/* ---------- Quest tracker — logbook margin ---------- */
-.dw-tracker { position:absolute; top: 100px; right: 14px; width: 216px; display:flex; flex-direction:column; gap:6px; pointer-events:auto; }
-.dw-tracker-quest { padding: 8px 10px 8px 24px; position: relative; }
+/* ---------- Quest tracker — logbook margin (compact, PLAYTEST feedback #2) --------------------
+   Positioned in JS (tracker.ts) below the minimap with a gap, so its CSS top/right here are just
+   an unpositioned fallback before the first reposition() call. Semi-transparent + capped height
+   so it blocks as little of the upper-right playfield as possible, and fades near the player. */
+.dw-tracker {
+  position:absolute; top: 170px; right: 14px; width: 200px; max-height: 260px; overflow:hidden;
+  pointer-events:auto; opacity: 0.92; transition: opacity var(--dw-dur) var(--dw-ease);
+}
+.dw-tracker.dw-tracker-faded { opacity: 0.28; }
+.dw-tracker-head {
+  display:flex; align-items:center; justify-content:space-between; padding: 2px 2px 5px;
+  font: 700 var(--dw-fs-xs) / 1 var(--dw-font-label); letter-spacing: var(--dw-track-label); color: var(--dw-bone-dim);
+}
+.dw-tracker-toggle {
+  background:none; border:none; color: var(--dw-bone-dim); cursor: var(--dw-cursor-point); font-size:12px;
+  padding: 2px 6px; border-radius:4px; line-height:1;
+}
+.dw-tracker-toggle:hover { color: var(--dw-lantern-hot); background: rgba(255,179,71,0.1); }
+.dw-tracker.dw-collapsed .dw-tracker-list { display:none; }
+.dw-tracker-list { display:flex; flex-direction:column; gap:5px; max-height: 232px; overflow-y:auto; }
+.dw-tracker-quest {
+  padding: 6px 9px 6px 22px; position: relative; background: rgba(11,21,25,0.55); backdrop-filter: blur(1px);
+}
 .dw-tracker-quest::before {
-  content:''; position:absolute; left:9px; top:11px; width:14px; height:10px;
+  content:''; position:absolute; left:8px; top:9px; width:13px; height:9px;
   background: var(--dw-fluke-mini) center / contain no-repeat; opacity:0.7;
 }
-.dw-tracker-quest .dw-tq-name { font: 400 var(--dw-fs-md) / 1.1 var(--dw-font-display); color: var(--dw-bone); }
+.dw-tracker-quest .dw-tq-name { font: 400 var(--dw-fs-sm) / 1.15 var(--dw-font-display); color: var(--dw-bone); }
 .dw-tracker-quest.dw-ready .dw-tq-name { color: var(--dw-tide); }
 .dw-tracker-quest.dw-ready::before { opacity:1; filter: sepia(1) saturate(6) hue-rotate(115deg) brightness(1.3); }
-.dw-tracker-quest .dw-tq-obj { font: 400 var(--dw-fs-xs) / 1.3 var(--dw-font-body); color: var(--dw-bone-dim); margin-top:3px; }
-.dw-tracker-quest .dw-tq-obj.dw-done { color: var(--dw-bone-dim); text-decoration: line-through; opacity: 0.7; }
-.dw-tracker-quest .dw-tq-obj.dw-tq-return { color: var(--dw-lantern-hot); text-decoration:none; opacity:1; font-family: var(--dw-font-label); letter-spacing:0.03em; text-transform:uppercase; font-size: 10px; }
+.dw-tracker-quest .dw-tq-obj { font: 400 10.5px / 1.3 var(--dw-font-body); color: var(--dw-bone-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dw-tracker-quest .dw-tq-obj.dw-tq-return { color: var(--dw-lantern-hot); font-family: var(--dw-font-label); letter-spacing:0.03em; text-transform:uppercase; font-size: 9.5px; }
+.dw-tq-more, .dw-tq-none {
+  font: 500 11px/1 var(--dw-font-label); letter-spacing:0.02em; color: var(--dw-bone-dim); text-align:center; padding: 4px 0;
+}
+.dw-tq-more { cursor: var(--dw-cursor-point); }
+.dw-tq-more:hover { color: var(--dw-lantern-hot); }
 
 /* ---------- Notifications / toasts / banner / boss bar / hint ---------- */
 /* Left column stacks bottom-up: chat, then feed, then buffs — all clear of the centered
@@ -536,6 +560,65 @@ input.dw-input::placeholder { color: var(--dw-bone-dim); }
 .dw-ach-date { display:flex; align-items:center; gap:5px; font: 600 10px/1 var(--dw-font-pixel); color: var(--dw-tide); margin-top:4px; }
 .dw-ach-seal { width:12px; height:9px; flex:none; background: var(--dw-fluke-mini) center / contain no-repeat; opacity:0.9; filter: sepia(1) saturate(4) hue-rotate(-5deg); }
 .dw-ach-progress { flex:1; }
+
+/* ---------- Keyboard navigation (PLAYTEST feedback #1) -----------------------------------------
+   Shared across the dialogue window, quest log, shop and confirmDialog. */
+.dw-kbd-focus {
+  outline: none; border-color: var(--dw-lantern) !important;
+  box-shadow: var(--dw-glow-lantern), inset 0 0 0 1px rgba(255,179,71,0.35) !important;
+}
+.dw-dlg-opt.dw-kbd-focus { background: rgba(255,179,71,0.1); }
+.dw-dlg-opt.dw-kbd-focus::before { opacity:1; filter: sepia(1) saturate(6) hue-rotate(-8deg) brightness(1.15); }
+/* number chip — small Pixelify badge showing which digit key (1-9) picks this option */
+.dw-kbd-num {
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:15px; height:15px; border-radius:3px; margin-right:2px;
+  background: rgba(241,230,207,0.1); border: 1px solid var(--dw-bone-faint);
+  font: 600 10px/1 var(--dw-font-pixel); color: var(--dw-bone-dim);
+}
+.dw-kbd-focus .dw-kbd-num { color: var(--dw-lantern-hot); border-color: var(--dw-lantern); }
+.dw-kbd-hint {
+  text-align:center; padding: 6px 10px 2px; font: 500 10.5px/1 var(--dw-font-label); letter-spacing:0.03em;
+  color: var(--dw-bone-dim); text-transform:uppercase; border-top: 1px solid var(--dw-bone-faint); margin-top:4px;
+}
+.dw-choice-card.dw-kbd-focus, .dw-btn.dw-kbd-focus { border-color: var(--dw-lantern) !important; box-shadow: var(--dw-glow-lantern) !important; }
+.dw-pin-toggle {
+  width:14px; height:11px; flex:none; cursor: var(--dw-cursor-point); opacity:0.3;
+  background: var(--dw-fluke-mini) center / contain no-repeat;
+}
+.dw-pin-toggle:hover { opacity:0.7; }
+.dw-pin-toggle.dw-pinned { opacity:1; filter: sepia(1) saturate(6) hue-rotate(-8deg) brightness(1.15); }
+
+/* ---------- Equipment compare tooltip (PLAYTEST feedback #3) -----------------------------------
+   Second small tooltip shown beside the hovered item's, positioned by tooltip.ts. */
+.dw-tooltip-compare { border-color: var(--dw-lantern-deep); }
+
+/* ---------- Buff bar — top-center glass beads (PLAYTEST feedback #4) --------------------------- */
+.dw-buffbar { position:absolute; top: 62px; left:50%; transform:translateX(-50%); display:flex; gap:8px; pointer-events:auto; }
+.dw-buffbead { position:relative; width:38px; height:38px; }
+.dw-buffbead img {
+  position:absolute; inset:3px; width:calc(100% - 6px); height:calc(100% - 6px); border-radius:50%;
+  image-rendering:pixelated; background: radial-gradient(circle at 40% 30%, #2c4750, #0d181c);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6);
+}
+.dw-buffbead-ring {
+  position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background: conic-gradient(var(--dw-tide) calc(var(--p, 100) * 1%), rgba(5,11,13,0.75) 0);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+}
+.dw-buffbead-time {
+  position:absolute; left:50%; bottom:-13px; transform:translateX(-50%); white-space:nowrap;
+  font: 600 9.5px/1 var(--dw-font-pixel); color: var(--dw-bone); text-shadow:0 1px 0 #000;
+}
+.dw-buffbead-blink { animation: dw-buff-blink 0.6s ease-in-out infinite; }
+.dw-buffbead-blink .dw-buffbead-ring { background: conic-gradient(var(--dw-coral) calc(var(--p, 100) * 1%), rgba(5,11,13,0.75) 0); }
+@keyframes dw-buff-blink { 50% { opacity:0.45; } }
+@media (prefers-reduced-motion: reduce) { .dw-buffbead-blink { animation:none; } }
+
+/* ---------- Professions — level-gated crafting (PLAYTEST feedback #5) -------------------------- */
+.dw-prof-locked { opacity:0.55; }
+.dw-prof-unlock-hint { color: var(--dw-coral); font: 600 10.5px/1 var(--dw-font-label); letter-spacing:0.02em; margin-top:3px; }
 
 /* ---------- Settings ---------- */
 .dw-settings-row { display:flex; align-items:center; gap:10px; padding:7px 2px; }

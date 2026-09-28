@@ -8,16 +8,20 @@ import type { ThemeId } from '@shared/types';
 import { buildNormalMapFromAlpha } from '../gfx/canvasKit';
 import { LightManager, type LightSource } from './LightManager';
 import { isWebGLAvailable, type Quality } from './quality';
+import { DRIFTWAKE_LIGHT_KEY } from './pipelines/LightingPipeline';
 
 /** Ambient color per theme — warm dusk in town, bright daylight in the fields, deep blue/near-black
  *  in caves and the reef, sickly violet/red in the Blight zones. Deliberately separate from
  *  gfx/palette.ts (owned by the sprite artist) since this is a lighting-only concern. */
 const AMBIENT: Record<ThemeId, number> = {
-  // Tuning pass 2: daylight ambient dialed back slightly to leave headroom for the (also now
-  // scaled down, see LIGHT_SCALE) player/decor lights — Light2D adds light on top of ambient with
-  // no HDR/tone-mapping before the framebuffer write, so ambient + light stacking past ~1.0 just
-  // clips to flat white with no way to recover it in post. Night/cave/reef themes raised
-  // substantially instead — glowtide_shallows in particular read as almost pure black.
+  // Tuning pass 3: sprites are now lit through DriftwakeLightPipeline (pipelines/LightingPipeline.ts)
+  // instead of stock Light2D — the combined ambient+lights gain is run through a soft-knee
+  // highlight rolloff (identity below ~0.85, eased/capped at 1.35 above it) before it multiplies the
+  // albedo, so stacking no longer clips straight to flat white. That headroom is what let pass 2's
+  // player/decor LIGHT_SCALE come back up a little in the bright daylight themes (a small, evenly-
+  // distributed fill reads fine now that it can't blow out) while dark themes needed no further
+  // change — they were only ever clipping because of the old hard clip, not because they were
+  // under-lit; the rolloff makes the same intensities read as a proper glow instead of a white blob.
   driftmoor: 0x584a60,
   meadow: 0x7f93aa,
   grotto: 0x1c2f2a,
@@ -35,7 +39,7 @@ const AMBIENT: Record<ThemeId, number> = {
  *  bright daylight (no hotspots on the player/NPCs/walls) and a real, pop-off-the-background glow
  *  in caves/night/blight zones (where ambient alone still can't carry full readability). */
 const LIGHT_SCALE: Record<ThemeId, number> = {
-  driftmoor: 0.48, meadow: 0.42, galeoutpost: 0.48,
+  driftmoor: 0.52, meadow: 0.46, galeoutpost: 0.52,
   grotto: 1.15, kelpwood: 0.9, stormspire: 0.85,
   lanternreef: 1.25, galleon: 1.2, hollow: 1.1, heart: 1.1,
 };
@@ -127,7 +131,10 @@ export function setupWorldLighting(scene: Phaser.Scene, theme: ThemeId, quality:
     manager,
     lit(obj, textureKey, opts) {
       if (opts?.normalMap !== false) ensureNormalMap(scene, textureKey);
-      try { obj.setPipeline('Light2D'); } catch { /* pipeline unavailable (canvas fallback) */ }
+      // DriftwakeLightPipeline (see pipelines/LightingPipeline.ts), not stock 'Light2D' — same
+      // diffuse/normal-map math, but with a soft highlight rolloff so lit sprites can't clip to
+      // flat white the way stock Light2D's uncapped additive sum did.
+      try { obj.setPipeline(DRIFTWAKE_LIGHT_KEY); } catch { /* pipeline unavailable (canvas fallback) */ }
       return obj;
     },
     addLight(src) { manager.add({ ...src, intensity: src.intensity * lightScale }); },

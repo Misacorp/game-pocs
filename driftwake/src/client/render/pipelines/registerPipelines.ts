@@ -7,6 +7,7 @@
 import Phaser from 'phaser';
 import { ThresholdBloomPipeline } from './ThresholdBloomPipeline';
 import { GradingPipeline } from './GradingPipeline';
+import { DriftwakeLightPipeline, DRIFTWAKE_LIGHT_KEY } from './LightingPipeline';
 
 let registered = false;
 
@@ -17,4 +18,7 @@ export function registerPipelines(game: Phaser.Game): void {
   registered = true;
   renderer.pipelines.addPostPipeline('ThresholdBloom', ThresholdBloomPipeline);
   renderer.pipelines.addPostPipeline('ColorGrade', GradingPipeline);
+  // Tone-mapped stand-in for the stock 'Light2D' pipeline (see LightingPipeline.ts) — a normal
+  // (non-PostFX) pipeline, so it needs an instance registered via `add`, not `addPostPipeline`.
+  renderer.pipelines.add(DRIFTWAKE_LIGHT_KEY, new DriftwakeLightPipeline(game));
 }

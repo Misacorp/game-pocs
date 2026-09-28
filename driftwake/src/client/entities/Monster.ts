@@ -92,9 +92,12 @@ export class MonsterEntity {
     // A small personal fill light so monsters never read as flat dark silhouettes against a dim
     // background (LightManager/theme scaling keeps this negligible in bright daylight themes and
     // a real, readable pop in caves/night/blight zones).
+    // LIGHTING FIX: raised further above the sprite (was 0.55*displayHeight — inside the monster's
+    // own body) and detuned so its peak lands past the monster, not on it; see Player.ts /
+    // pipelines/LightingPipeline.ts for the full root cause.
     ctx.lighting?.addLight({
-      id: `mon_${this.uid}`, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 0.55,
-      color: 0xcfe0ff, radius: this.isBoss ? 130 : 70, intensity: this.isBoss ? 0.7 : 0.45,
+      id: `mon_${this.uid}`, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 1.1,
+      color: 0xcfe0ff, radius: this.isBoss ? 170 : 100, intensity: this.isBoss ? 0.45 : 0.28,
     });
     this.cachedGroundY = ctx.groundYAt(x, y);
 

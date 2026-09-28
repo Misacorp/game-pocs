@@ -32,7 +32,9 @@ export class BuffManager {
     }
     if (this.dirty) {
       this.dirty = false;
-      bus.emit('buffs', [...this.buffs.values()].map((b) => ({ id: b.id, name: b.name, expiresAt: b.expiresAt, icon: b.icon })));
+      // `stats` is forwarded so the top buff bar (ui/buffbar.ts) can show what each buff actually
+      // does in its tooltip, not just its name.
+      bus.emit('buffs', [...this.buffs.values()].map((b) => ({ id: b.id, name: b.name, expiresAt: b.expiresAt, icon: b.icon, stats: b.stats })));
     }
   }
 

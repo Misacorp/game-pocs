@@ -9,7 +9,7 @@ export type BindAction =
   | `hotbar${number}`
   | 'inventory' | 'character' | 'skills' | 'quests' | 'professions' | 'map' | 'bestiary' | 'help'
   | 'achievements'
-  | 'menu' | 'chat';
+  | 'menu' | 'chat' | 'tracker';
 
 export const HOTBAR_DEFAULT_KEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
 
@@ -33,6 +33,7 @@ export const DEFAULT_BINDS: Record<string, string[]> = {
   achievements: ['KeyJ'],
   menu: ['Escape'],
   chat: ['Enter'],
+  tracker: ['KeyT'],
   ...Object.fromEntries(Array.from({ length: HOTBAR_SIZE }, (_, i) => [`hotbar${i}`, [HOTBAR_DEFAULT_KEYS[i]]])),
 };
 
@@ -41,6 +42,7 @@ export const BIND_LABELS: Record<string, string> = {
   jump: 'Jump', attack: 'Basic Attack', dash: 'Dash (i-frames)', interact: 'Interact / Gather / Talk',
   inventory: 'Inventory', character: 'Character & Stats', skills: 'Skills', quests: 'Quest Log', professions: 'Professions & Crafting',
   map: 'World Map', bestiary: 'Bestiary', help: 'Help', achievements: 'Achievements', menu: 'Menu / Close', chat: 'Chat',
+  tracker: 'Toggle Quest Tracker',
   ...Object.fromEntries(Array.from({ length: HOTBAR_SIZE }, (_, i) => [`hotbar${i}`, `Hotbar Slot ${i + 1}`])),
 };
 

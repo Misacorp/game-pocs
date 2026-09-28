@@ -38,19 +38,31 @@ function driftmoorTown(): MapDef {
       }),
       portal('to_meadows', 2350, groundY, 'mossback_meadows', 'to_town', { label: 'To Mossback Meadows' }),
     ],
+    // ONBOARDING CURVE (see DESIGN.md "Onboarding curve"): at level 1 only Pell, Maren, Pim and
+    // Wren are here — a calm, focused town. Everyone else arrives later, gated by `reqs` tied to
+    // level/story so the town visibly grows as the player returns. Tobbin (cooking) and Sera
+    // (jewelcrafting) moved out entirely — Tobbin to Kelpwood Edge, Sera to Gale Outpost — so those
+    // regions have a reason to be visited, and Driftmoor doesn't open with every trainer at once.
     npcs: [
       placeNpc('npc_pell', 220, groundY),
       placeNpc('npc_maren', 370, groundY),
       placeNpc('npc_pim', 520, groundY),
       placeNpc('npc_wren', 660, groundY),
-      placeNpc('npc_brina', 810, groundY),
-      placeNpc('npc_juniper', 960, groundY),
-      placeNpc('npc_sera', 1110, groundY),
-      placeNpc('npc_tobbin', 1260, groundY),
-      placeNpc('npc_rook_prospector', 1410, groundY),
-      placeNpc('npc_grell', 1560, groundY),
-      placeNpc('npc_aolani', 1710, groundY, true),
-      placeNpc('npc_ferry_tamsin', 1860, groundY),
+      // Dusty arrives once gathering becomes relevant (pq_mining_1 / pq_foraging_1 start here).
+      placeNpc('npc_rook_prospector', 810, groundY, undefined, [{ type: 'level', min: 5 }]),
+      // Juniper's story role (mq_04) needs her present by the same level its own reqs already
+      // guarantee (mq_04 requires mq_03 completed AND level >= 6) — matching on level alone keeps
+      // her visible whenever that quest can be offered, without duplicating the quest chain here.
+      placeNpc('npc_juniper', 960, groundY, undefined, [{ type: 'level', min: 6 }]),
+      // Brina arrives just ahead of the profession unlock level, so her presence teases crafting
+      // without immediately dropping a profession quest on a level-1 character.
+      placeNpc('npc_brina', 1110, groundY, undefined, [{ type: 'level', min: 8 }]),
+      // Skyferry only matters once Kelpwood is open to reach by other means too.
+      placeNpc('npc_ferry_tamsin', 1260, groundY, undefined, [{ type: 'quest', questId: 'mq_05_king_barnacle', state: 'completed' }]),
+      // Faction reps arrive once mq_08 ("Two Currents") can actually ask the player to meet them —
+      // mq_08 itself requires mq_07 completed, so gating on that keeps them visible in time.
+      placeNpc('npc_grell', 1410, groundY, undefined, [{ type: 'quest', questId: 'mq_07_kelp_sickness', state: 'completed' }]),
+      placeNpc('npc_aolani', 1560, groundY, true, [{ type: 'quest', questId: 'mq_07_kelp_sickness', state: 'completed' }]),
     ],
     spawns: [],
     gather: [],

@@ -4,10 +4,10 @@
  * and all engine <-> UI event-bus wiring described in DESIGN.md §10/§12.
  */
 import Phaser from 'phaser';
-import type { DerivedStats, MonsterDef, Rarity, StatMods } from '@shared/types';
+import type { DerivedStats, MapNpcPlacement, MonsterDef, NpcDef, Rarity, StatMods } from '@shared/types';
 import type { GameEvent } from '@shared/protocol';
 import { HOTBAR_SIZE } from '@shared/constants';
-import { npcQuestMarker } from '@shared/logic';
+import { npcQuestMarker, checkConditions } from '@shared/logic';
 import { ITEMS, MONSTERS } from '@shared/data';
 import { createParallax, createWeather, spawnVfx, type Parallax, type Weather } from '../gfx';
 import { audio } from '../audio';
@@ -58,6 +58,11 @@ export class WorldScene extends Phaser.Scene {
   private player!: Player;
   private spawner!: Spawner;
   private npcs: NpcEntity[] = [];
+  /** Every placement declared on this map, resolved to its NpcDef (missing ids warned + dropped
+   *  once at map load, same as before) — the source list `syncNpcPresence` re-evaluates against
+   *  reqs on every 'state' event to spawn/despawn conditional NPCs. */
+  private npcPlacements: { placement: MapNpcPlacement; def: NpcDef }[] = [];
+  private npcByPlacement = new Map<MapNpcPlacement, NpcEntity>();
   private gatherMgr!: GatherManager;
   private portalMgr!: PortalManager;
   private drops!: DropManager;
@@ -107,6 +112,7 @@ export class WorldScene extends Phaser.Scene {
     const spawnPos = this.resolveSpawnPos(data);
     this.player = new Player(this, spawnPos.x, spawnPos.y, {
       ropeAt: (x, y) => this.terrain.ropeAt(x, y),
+      platformSurfaceNear: (x, y, tolerance) => this.terrain.platformSurfaceNear(x, y, tolerance),
       inTown: () => !!this.map.town,
       cameraShake: (ms, i) => this.cameraShake(ms, i),
       damageText: this.damageText,
@@ -153,11 +159,14 @@ export class WorldScene extends Phaser.Scene {
     }), (m) => this.onMonsterDeath(m));
     this.spawner.init();
 
-    this.npcs = this.map.npcs.map((p) => {
-      const def = getNpcDef(p.npcId);
-      if (!def) { console.warn(`[WorldScene] unknown npc id "${p.npcId}"`); return null; }
-      return new NpcEntity(this, def, p.x, p.y, p.flip, this.lighting);
-    }).filter((n): n is NpcEntity => !!n);
+    this.npcs = [];
+    this.npcByPlacement = new Map();
+    this.npcPlacements = this.map.npcs.map((placement) => {
+      const def = getNpcDef(placement.npcId);
+      if (!def) { console.warn(`[WorldScene] unknown npc id "${placement.npcId}"`); return null; }
+      return { placement, def };
+    }).filter((n): n is { placement: MapNpcPlacement; def: NpcDef } => !!n);
+    this.syncNpcPresence(false);
     this.refreshNpcMarkers();
 
     this.gatherMgr = new GatherManager(this, this.map, this.lighting);
@@ -187,7 +196,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.busOffs.push(
       bus.on('game', (ev) => this.onGameEvent(ev)),
-      bus.on('state', () => { this.player.syncLook(); this.recomputePassives(); this.refreshNpcMarkers(); this.syncPet(); }),
+      bus.on('state', () => { this.player.syncLook(); this.recomputePassives(); this.syncNpcPresence(true); this.refreshNpcMarkers(); this.syncPet(); }),
       bus.on('player:respawn', () => session.dispatch({ type: 'respawn' })),
       bus.on('hotbar:activate', ({ index }) => this.tryActivateHotbar(index, false)),
       onSettingsChanged(() => this.onSettingsChanged()),
@@ -430,6 +439,31 @@ export class WorldScene extends Phaser.Scene {
 
   private refreshNpcMarkers(): void {
     for (const n of this.npcs) n.setMarker(npcQuestMarker(session.state, n.id));
+  }
+
+  /**
+   * NPC presence by progress (MapNpcPlacement.reqs): spawns a placement's NpcEntity only while
+   * `checkConditions` passes, and tears it down the moment it stops passing, so an absent NPC can
+   * never be talked to, quest-marked or shown on the minimap — those all iterate `this.npcs`,
+   * which only ever holds currently-present entities.
+   * @param animate false on initial map load (npcs simply "are" there or not); true on every later
+   *   'state' re-evaluation, where a placement turning on/off is treated as an actual arrival/departure.
+   */
+  private syncNpcPresence(animate: boolean): void {
+    for (const entry of this.npcPlacements) {
+      const present = checkConditions(session.state, entry.placement.reqs);
+      const existing = this.npcByPlacement.get(entry.placement);
+      if (present && !existing) {
+        const n = new NpcEntity(this, entry.def, entry.placement.x, entry.placement.y, entry.placement.flip, this.lighting);
+        this.npcByPlacement.set(entry.placement, n);
+        this.npcs.push(n);
+        if (animate) n.playArrival();
+      } else if (!present && existing) {
+        this.npcByPlacement.delete(entry.placement);
+        this.npcs = this.npcs.filter((n) => n !== existing);
+        if (animate) existing.quietDespawn(); else existing.destroy();
+      }
+    }
   }
 
   private onGameEvent(ev: GameEvent): void {

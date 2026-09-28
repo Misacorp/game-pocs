@@ -4,6 +4,7 @@ import { getItemStats, rarityOf } from '@shared/logic';
 import { RARITY_COLORS } from '@shared/constants';
 import { el } from './dom';
 import { statLabel, formatStatValue } from './statsFormat';
+import { showTooltipAt, hideTooltip, showCompareTooltip, hideCompareTooltip, isCompareEnabled, setCompareRefreshHook, repositionTooltips } from './tooltip';
 
 const CATEGORY_LABEL: Record<string, string> = { equip: 'Equipment', use: 'Consumable', etc: 'Material / Quest Item' };
 
@@ -42,14 +43,15 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
   }
   if (reqBits.length) { nodes.push(el('hr')); nodes.push(...reqBits); }
 
-  // Stats (with comparison to currently equipped item in the same slot)
+  // Stats (with comparison to currently equipped item in the same slot — nothing equipped counts
+  // as all-zero stats, so every one of this item's stats shows as a full "▲ gain", per spec).
   if (def.equip) {
     const mine = getItemStats(inst);
     const keys = Object.keys(mine) as DerivedStatKey[];
     let equippedStats: Partial<Record<DerivedStatKey, number>> | null = null;
     if (opts.compareEquipped !== false) {
       const equippedInst = state.equipment[def.equip.slot];
-      if (equippedInst && equippedInst.uid !== inst.uid) equippedStats = getItemStats(equippedInst) as any;
+      equippedStats = (equippedInst && equippedInst.uid !== inst.uid) ? (getItemStats(equippedInst) as any) : {};
     }
     if (keys.length) {
       nodes.push(el('hr'));
@@ -61,7 +63,8 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
           const ev = equippedStats[k] ?? 0;
           const delta = v - ev;
           if (Math.abs(delta) > 1e-9) {
-            row.appendChild(el('span', { class: delta > 0 ? 'dw-tt-delta-pos' : 'dw-tt-delta-neg' }, ` (${delta > 0 ? '+' : ''}${formatStatValue(k, delta)})`));
+            const arrow = delta > 0 ? '▲' : '▼';
+            row.appendChild(el('span', { class: delta > 0 ? 'dw-tt-delta-pos' : 'dw-tt-delta-neg' }, ` ${arrow} ${formatStatValue(k, Math.abs(delta))}`));
           }
         }
         nodes.push(row);
@@ -128,6 +131,55 @@ export function buildItemTooltip(state: CharacterState, inst: ItemInstance, opts
   if (stackBits.length) nodes.push(el('div', { class: 'dw-tt-sub', style: { marginTop: '4px' } }, stackBits.join(' · ')));
 
   return nodes;
+}
+
+/** Content for the side-by-side "EQUIPPED" panel: the item currently in `slot`, or a plain
+ *  "Nothing equipped" line. `excludeUid` skips the case where the hovered item IS the equipped
+ *  one (character sheet's own equip slots) — comparing an item against itself is never useful. */
+export function buildEquippedCompareTooltip(state: CharacterState, slot: EquipSlot, excludeUid?: string): (Node | string)[] {
+  const nodes: (Node | string)[] = [el('div', { class: 'dw-tt-sub', style: { color: 'var(--dw-lantern)' } }, 'EQUIPPED')];
+  const equippedInst = state.equipment[slot];
+  if (!equippedInst || equippedInst.uid === excludeUid) {
+    nodes.push(el('div', { class: 'dw-tt-desc' }, 'Nothing equipped'));
+    return nodes;
+  }
+  nodes.push(...buildItemTooltip(state, equippedInst, { compareEquipped: false }));
+  return nodes;
+}
+
+/**
+ * Full item tooltip + (for equipment) a side-by-side "EQUIPPED" comparison panel showing what's
+ * currently worn in that slot, with per-stat deltas on the hovered item. Holding Shift toggles
+ * the comparison panel off (default on) — see tooltip.ts's isCompareEnabled/setCompareRefreshHook.
+ * Use this (instead of plain `attachTooltip(node, () => buildItemTooltip(...))`) anywhere the
+ * player can hover a piece of equipment they might want to compare to what they're wearing:
+ * inventory, shop, quest reward chips. Skip it (keep plain attachTooltip) when the hovered item
+ * IS the equipped one already (the character sheet's own equip slots) — there's nothing to compare.
+ */
+export function attachItemTooltip(node: HTMLElement, state: CharacterState, inst: ItemInstance): void {
+  const def = ITEMS[inst.itemId];
+  let active = false;
+
+  function showCompareIfEnabled() {
+    if (def?.equip && isCompareEnabled()) showCompareTooltip(buildEquippedCompareTooltip(state, def.equip.slot, inst.uid));
+    else hideCompareTooltip();
+  }
+
+  node.addEventListener('mouseenter', (e) => {
+    active = true;
+    showTooltipAt((e as MouseEvent).clientX, (e as MouseEvent).clientY, buildItemTooltip(state, inst));
+    showCompareIfEnabled();
+    setCompareRefreshHook(() => { if (active) showCompareIfEnabled(); });
+  });
+  node.addEventListener('mousemove', (e) => {
+    if (!active) return;
+    repositionTooltips((e as MouseEvent).clientX, (e as MouseEvent).clientY);
+  });
+  node.addEventListener('mouseleave', () => {
+    active = false;
+    setCompareRefreshHook(null);
+    hideTooltip();
+  });
 }
 
 function countSetPiecesOwned(state: CharacterState, pieces: string[]): number {

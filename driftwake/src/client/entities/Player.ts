@@ -21,6 +21,9 @@ import { ContactShadow } from '../render/ContactShadow';
 
 export interface PlayerWorldCtx {
   ropeAt: (x: number, y: number) => RopeDef | null;
+  /** Nearest platform surface y at (x,y) within tolerance px (above or below), or null — used to
+   *  let the player step off a rope/ladder onto a platform instead of needing to jump off it. */
+  platformSurfaceNear?: (x: number, y: number, tolerance?: number) => number | null;
   inTown: () => boolean;
   cameraShake: (ms: number, intensity: number) => void;
   damageText: DamageTextPool;
@@ -35,8 +38,11 @@ export interface PlayerInputState {
   dashPressed: boolean;
 }
 
-const DASH_DISTANCE = 120, DASH_DURATION_MS = 280, DASH_COOLDOWN_MS = 900, DASH_INVULN_MS = 280;
+const DASH_DISTANCE = 95, DASH_DURATION_MS = 140, DASH_COOLDOWN_MS = 900, DASH_INVULN_MS = 160;
 const COYOTE_MS = 110, JUMP_BUFFER_MS = 120, CLIMB_SPEED = 95;
+/** How close (px) a platform surface must be to a rope/ladder's authored top for the player to be
+ *  able to step off onto it there, instead of needing to jump — see Player.tryMountAtRopeTop(). */
+const ROPE_MOUNT_TOLERANCE = 16;
 
 export class Player implements PlayerHandle {
   sprite: Phaser.Physics.Arcade.Sprite;
@@ -72,11 +78,17 @@ export class Player implements PlayerHandle {
     worldCtx.lighting?.lit(this.sprite, this.info.key);
     // The player always carries a soft warm light with them — priority guarantees it always wins
     // a slot in the light budget over decor/vfx, however many of those are nearby.
-    // The player must always pop against the scene — a bit brighter/wider than a "realistic" torch
-    // glow would be, deliberately, so the character reads clearly even against a dim ambient.
+    // LIGHTING FIX: this used to sit right on top of the sprite (y - 0.6*height, i.e. roughly chest
+    // height) at intensity 1.1 — attenuation is ~1 at zero distance regardless of radius, so the
+    // light's own owner sat at its peak and (pre tone-mapping) blew out to flat white. Now offset
+    // well above the head and slightly ahead of facing (so its peak lands past the character, not
+    // on it), wider and dimmer — DriftwakeLightPipeline's rolloff (see pipelines/LightingPipeline.ts)
+    // handles the rest, but not sitting in your own hotspot is most of the fix.
     worldCtx.lighting?.addLight({
-      id: Player.LIGHT_ID, x: () => this.sprite.x, y: () => this.sprite.y - this.sprite.displayHeight * 0.6,
-      color: 0xffe9c2, radius: 150, intensity: 1.1, flicker: 0.06, priority: 3,
+      id: Player.LIGHT_ID,
+      x: () => this.sprite.x + this.facing * this.sprite.displayWidth * 0.4,
+      y: () => this.sprite.y - this.sprite.displayHeight * 1.25,
+      color: 0xffe9c2, radius: 190, intensity: 0.6, flicker: 0.06, priority: 3,
     });
     this.shadow = new ContactShadow(scene, this.info.bodyWidth * 1.5, 8);
   }
@@ -122,6 +134,25 @@ export class Player implements PlayerHandle {
     playAnim(this.sprite, this.info, 'idle');
   }
 
+  /**
+   * Attempts to step off a rope/ladder onto a platform whose surface sits within
+   * ROPE_MOUNT_TOLERANCE px of the rope's authored top (above or below — some maps' tops land a
+   * few px shy of, or past, the platform surface). No-ops if nothing is close enough, leaving the
+   * player clamped at the rope top as before (still free to jump off).
+   */
+  private tryMountAtRopeTop(rope: RopeDef): void {
+    const surfaceY = this.worldCtx.platformSurfaceNear?.(rope.x, rope.top, ROPE_MOUNT_TOLERANCE);
+    if (surfaceY == null) return;
+    this.climbing = false;
+    this.currentRope = null;
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(true);
+    // A small hop up-and-onto the ledge (settles via normal gravity/collision, same as a landing)
+    // rather than teleporting flat onto it — reads as a deliberate step, not a snap.
+    this.sprite.y = surfaceY - 5;
+    body.setVelocity(this.facing * 30, -70);
+  }
+
   private isDashing(now: number): boolean { return now < this.dashUntil; }
   isCasting(now = performance.now()): boolean { return now < this.castLockUntil; }
 
@@ -139,7 +170,19 @@ export class Player implements PlayerHandle {
       body.setVelocity(this.dashVX, this.dashVY);
       this.wasDashing = true;
     } else {
-      if (this.wasDashing) { body.setAllowGravity(true); this.wasDashing = false; }
+      if (this.wasDashing) {
+        body.setAllowGravity(true);
+        this.wasDashing = false;
+        // The dash sets velocity directly every frame at (well) above run speed — left alone, that
+        // carries over into normal movement afterward: held-direction movement re-clamps to run
+        // speed within one frame anyway, but with no direction held the old decel ramp bled off the
+        // leftover dash speed gradually, "sliding" the player much further than intended (this hit
+        // the universal dash and every skill dash routed through performDash alike). Clamp/zero it
+        // the instant the dash ends instead of letting normal deceleration do it over time.
+        const maxSpeed = PLAYER_BASE_SPEED * (1 + stats.speed / 100);
+        if (input.left || input.right) body.setVelocityX(Phaser.Math.Clamp(body.velocity.x, -maxSpeed, maxSpeed));
+        else body.setVelocityX(0);
+      }
 
       const rope = this.worldCtx.ropeAt(this.sprite.x, this.sprite.y);
       if (rope && (input.up || input.down)) { this.climbing = true; this.currentRope = rope; }
@@ -156,6 +199,10 @@ export class Player implements PlayerHandle {
           body.setAllowGravity(true);
           body.setVelocityY(-PLAYER_JUMP_VELOCITY * (1 + stats.jump / 100) * 0.8);
           body.setVelocityX(this.facing * 160);
+        } else if (input.up && this.sprite.y <= this.currentRope.top + 6 + 0.5) {
+          // Reached the top while climbing up (or the player is holding ↑ after arriving there) —
+          // Maplestory-style: step off onto the platform right there instead of forcing a jump.
+          this.tryMountAtRopeTop(this.currentRope);
         }
       } else {
         body.setAllowGravity(true);

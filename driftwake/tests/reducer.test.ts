@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { CharacterState, ItemInstance } from '@shared/types';
-import { JOBS, ITEMS, MONSTERS, MAPS, QUESTS, RECIPES, SHOPS, SKILLS, PROFESSIONS, GATHER_NODES } from '@shared/data';
-import { createCharacter, handleAction, createSession, computeStats, type ServerContext } from '@shared/logic';
+import { JOBS, ITEMS, MONSTERS, MAPS, QUESTS, RECIPES, SHOPS, SKILLS, PROFESSIONS, GATHER_NODES, NPCS, DIALOGUES } from '@shared/data';
+import { createCharacter, handleAction, createSession, computeStats, questsOfferedBy, type ServerContext } from '@shared/logic';
 import { mulberry32 } from '@shared/rng';
+import { PROFESSION_UNLOCK_LEVEL } from '@shared/constants';
 
 function ctx(seed = 1): ServerContext {
   const rng = mulberry32(seed);
@@ -506,6 +507,55 @@ describe('professions: crafting-only learn/unlearn', () => {
     const res = handleAction(c, { type: 'unlearnProfession', professionId: craftingId as any }, ctx());
     expect(res.ok).toBe(true);
     expect(res.state.professions[craftingId]).toBeUndefined();
+  });
+
+  // PACING: crafting professions are level-gated (DESIGN.md §7 / playtest feedback: a fresh
+  // character shouldn't be able to pick up a crafting trade before ever leaving Driftmoor).
+  it(`rejects learning a crafting profession below level ${PROFESSION_UNLOCK_LEVEL}, with a friendly message`, () => {
+    const c = newChar();
+    expect(c.level).toBeLessThan(PROFESSION_UNLOCK_LEVEL);
+    const craftingId = Object.values(PROFESSIONS).find((p) => p.kind === 'crafting')!.id;
+    const res = handleAction(c, { type: 'learnProfession', professionId: craftingId as any }, ctx());
+    expect(res.ok).toBe(false);
+    expect(res.error).toBeTruthy();
+    expect(res.error).toMatch(new RegExp(`level ${PROFESSION_UNLOCK_LEVEL}`));
+    expect(res.state.professions[craftingId]).toBeUndefined();
+  });
+
+  it(`allows learning every crafting profession at level ${PROFESSION_UNLOCK_LEVEL}+`, () => {
+    for (const craftingId of Object.values(PROFESSIONS).filter((p) => p.kind === 'crafting').map((p) => p.id)) {
+      const c = newChar();
+      c.level = PROFESSION_UNLOCK_LEVEL;
+      const res = handleAction(c, { type: 'learnProfession', professionId: craftingId as any }, ctx());
+      expect(res.ok).toBe(true);
+      expect(res.state.professions[craftingId]).toBeDefined();
+    }
+  });
+
+  it('the same level gate applies via a dialogueAction learnProfession (NPC trainer path)', () => {
+    const c = newChar();
+    const craftingId = Object.values(PROFESSIONS).find((p) => p.kind === 'crafting')!.id;
+    // Find an NPC actually wired to teach this profession, so the dialogue-action lookup succeeds.
+    const npc = Object.values(NPCS).find((n) => n.profession === craftingId && n.dialogue);
+    if (!npc?.dialogue) return; // graceful skip if content isn't authored this way
+    const dlg = DIALOGUES[npc.dialogue];
+    const action = Object.values(dlg.nodes)
+      .flatMap((n) => [...(n.actions ?? []), ...(n.options ?? []).flatMap((o) => o.actions ?? [])])
+      .find((a) => a.type === 'learnProfession');
+    if (!action) return;
+    const res = handleAction(c, { type: 'dialogueAction', npcId: npc.id, action }, ctx());
+    expect(res.ok).toBe(true); // dialogueAction itself always "succeeds" (anti-cheat check only)
+    expect(res.state.professions[craftingId]).toBeUndefined(); // but the level gate still blocks it
+  });
+});
+
+describe('pacing: onboarding curve (DESIGN.md "Onboarding curve")', () => {
+  it('a level-1 character sees at most 3 offered quests in driftmoor_town', () => {
+    const c = newChar();
+    expect(c.level).toBe(1);
+    const npcsHere = MAPS['driftmoor_town'].npcs.map((n) => n.npcId);
+    const offered = npcsHere.flatMap((npcId) => questsOfferedBy(c, npcId));
+    expect(offered.length).toBeLessThanOrEqual(3);
   });
 });
 

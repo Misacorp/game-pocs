@@ -35,8 +35,10 @@ export function decor(kind: DecorKind, x: number, y: number, opts?: { scale?: nu
   return { kind, x, y, ...opts };
 }
 
-export function placeNpc(npcId: string, x: number, y: number, flip?: boolean): MapNpcPlacement {
-  return { npcId, x, y, flip };
+/** `reqs`: NPC is only present on the map while these pass (e.g. crafters arriving later; see
+ * DESIGN.md "Onboarding curve"). Omit for an NPC that is always present. */
+export function placeNpc(npcId: string, x: number, y: number, flip?: boolean, reqs?: Condition[]): MapNpcPlacement {
+  return { npcId, x, y, flip, reqs };
 }
 
 export function portal(id: string, x: number, y: number, to: string, toPortal: string, opts?: { label?: string; reqs?: Condition[]; lockedText?: string }): PortalDef {

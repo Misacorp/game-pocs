@@ -37,6 +37,10 @@ export interface Terrain {
   groundYAt(x: number, fromY: number): number;
   /** Rope/ladder overlapping (x,y), or null. */
   ropeAt(x: number, y: number): RopeDef | null;
+  /** Nearest platform surface y at x within `tolerance` px of `y` (above or below), or null — used
+   *  to let the player step off a rope/ladder onto the platform at its top (or bottom) instead of
+   *  needing to jump off. */
+  platformSurfaceNear(x: number, y: number, tolerance?: number): number | null;
   /** The x-range of the platform under x (for monster patrol bounds), padded inward a little. */
   platformSegmentAt(x: number): { minX: number; maxX: number };
   destroy(): void;
@@ -127,6 +131,16 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
     return null;
   }
 
+  function platformSurfaceNear(x: number, y: number, tolerance = 16): number | null {
+    let best: number | null = null;
+    let bestDist = Infinity;
+    for (const r of platformsAtX(x)) {
+      const dist = Math.abs(r.y - y);
+      if (dist <= tolerance && dist < bestDist) { bestDist = dist; best = r.y; }
+    }
+    return best;
+  }
+
   function platformSegmentAt(x: number): { minX: number; maxX: number } {
     const here = platformsAtX(x).sort((a, b) => a.y - b.y)[0];
     if (!here) return { minX: x - 70, maxX: x + 70 };
@@ -134,7 +148,7 @@ export function buildTerrain(scene: Phaser.Scene, map: MapDef, lighting?: WorldL
   }
 
   return {
-    solidGroup, onewayGroup, ropes: map.ropes, groundYAt, ropeAt, platformSegmentAt,
+    solidGroup, onewayGroup, ropes: map.ropes, groundYAt, ropeAt, platformSurfaceNear, platformSegmentAt,
     destroy() {
       for (const v of visuals) { try { v.destroy(); } catch { /* already gone */ } }
       // Arcade's own scene/world shutdown may have already torn these groups down (e.g. on a

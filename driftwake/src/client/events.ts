@@ -1,7 +1,7 @@
 /**
  * Client-side typed event bus connecting engine (Phaser scenes), UI (DOM) and session.
  */
-import type { CharacterState, DerivedStats } from '@shared/types';
+import type { CharacterState, DerivedStats, StatMods } from '@shared/types';
 import type { GameEvent, ChatMessage, NotifyKind } from '@shared/protocol';
 
 export type PanelId =
@@ -17,8 +17,11 @@ export interface ClientEventMap {
   vitals: { hp: number; mp: number; maxHp: number; maxMp: number };
   /** Skill/item cooldowns: key -> readyAt timestamp (performance.now()-based ms) */
   cooldowns: Record<string, { readyAt: number; duration: number }>;
-  /** Buffs currently running on the player (engine-side skill buffs + state buffs). */
-  buffs: { id: string; name: string; expiresAt: number; icon?: { shape: string; colors: string[] } }[];
+  /** Engine-side skill buffs (war cries etc). `expiresAt` is performance.now()-based ms — distinct
+   *  from CharacterState.buffs (food/elixirs), whose `expiresAt` is Date.now()-based; the top buff
+   *  bar (buffbar.ts) merges both, converting each to its own clock. `stats` lets the buff bar's
+   *  tooltip show what the buff actually does (see combat/Buffs.ts's emit). */
+  buffs: { id: string; name: string; expiresAt: number; icon?: { shape: string; colors: string[] }; stats?: StatMods }[];
 
   // --- engine -> UI
   'ui:dialogue': { npcId: string };
@@ -52,6 +55,10 @@ export interface ClientEventMap {
   'settings:changed': void;
   /** Quit to title */
   'game:quit': void;
+  /** UI-only: which quests are pinned to the right-side tracker changed (Quest Log pin toggle).
+   *  Not part of CharacterState — purely a per-client display preference (see ui/state.ts). The
+   *  quest tracker listens for this to re-render without waiting for the next 'state' event. */
+  'ui:questPinsChanged': void;
 }
 
 type Handler<T> = (payload: T) => void;

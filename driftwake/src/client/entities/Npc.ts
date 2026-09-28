@@ -4,7 +4,7 @@
  */
 import Phaser from 'phaser';
 import type { NpcDef } from '@shared/types';
-import { getNpcSprite } from '../gfx';
+import { getNpcSprite, spawnVfx } from '../gfx';
 import { bus } from '../events';
 import { makeCrispLabel } from './spriteUtil';
 import type { WorldLighting } from '../render/lighting';
@@ -44,8 +44,11 @@ export class NpcEntity {
     if (lighting) {
       // A small personal fill light so NPCs always read clearly against the scene's ambient,
       // regardless of whether they happen to be standing near a decor light.
+      // LIGHTING FIX: moved further above the head (was 0.6*frameHeight, i.e. roughly chest
+      // height — sitting inside the sprite itself) and detuned, so its peak doesn't land on the
+      // NPC's own pixels; see Player.ts / pipelines/LightingPipeline.ts for the full root cause.
       this.lightId = `npc_${this.id}_${x}_${y}`;
-      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - info.frameHeight * 0.6, color: 0xfff0d8, radius: 95, intensity: 0.68 });
+      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - info.frameHeight * 1.1, color: 0xfff0d8, radius: 130, intensity: 0.4 });
     }
 
     // Stack (top -> bottom, closest to the head last): marker, title (near-only), name.
@@ -114,6 +117,30 @@ export class NpcEntity {
       targets, alpha: 0, duration: 220,
       onComplete: () => { this.barkText?.destroy(); this.barkBg?.destroy(); this.barkText = undefined; this.barkBg = undefined; },
     });
+  }
+
+  /** Fade parts (sprite/labels/marker) to `alpha`, used by arrival/departure presence transitions. */
+  private fadeParts(): (Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Alpha)[] {
+    return [this.sprite, this.nameTag, this.titleTag, this.marker].filter(Boolean) as (Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Alpha)[];
+  }
+
+  /** Presence just turned on for a conditional NPC (MapNpcPlacement.reqs newly satisfied): a soft
+   *  fade-in plus a small sparkle so the arrival reads as intentional, not a texture pop-in. */
+  playArrival(): void {
+    const parts = this.fadeParts();
+    for (const p of parts) p.setAlpha(0);
+    this.shadow.setVisible(false);
+    this.scene.tweens.add({ targets: parts, alpha: 1, duration: 420, ease: 'Sine.easeOut' });
+    this.scene.time.delayedCall(420, () => this.shadow.setVisible(true));
+    spawnVfx(this.scene, 'holy', this.x, this.y - 22, { color: '#fff3c6', color2: '#ffe066', width: 26, height: 30, durationMs: 480 });
+  }
+
+  /** Presence just turned off (reqs no longer satisfied): despawn quietly — a quick fade, no sfx/flash. */
+  quietDespawn(): void {
+    this.clearBark();
+    const parts = this.fadeParts();
+    this.shadow.setVisible(false);
+    this.scene.tweens.add({ targets: parts, alpha: 0, duration: 220, onComplete: () => this.destroy() });
   }
 
   destroy(): void {

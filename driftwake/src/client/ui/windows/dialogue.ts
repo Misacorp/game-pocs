@@ -2,8 +2,9 @@ import { el, fmtNum } from '../dom';
 import { bus } from '../../events';
 import type { GameSession } from '../../session';
 import { WindowManager, createWindow } from '../manager';
-import { confirmDialog } from '../widgets';
+import { confirmDialog, createListNav, keyHintFooter } from '../widgets';
 import { safeNpcPortrait, safeItemIcon, goldIconUrl } from '../icons';
+import { attachItemTooltip } from '../itemTooltip';
 import { NPCS, DIALOGUES, QUESTS, ITEMS } from '@shared/data';
 import { checkConditions, questsOfferedBy, questsReadyAt, questsInProgressAt, questObjectiveProgress, describeObjectiveBase } from '@shared/logic';
 import type { DialogueAction, DialogueNode, DialogueDef, QuestDef } from '@shared/types';
@@ -12,14 +13,23 @@ import { audio } from '../../audio';
 
 const LOCAL_ACTIONS = new Set(['openShop', 'openCrafting', 'close']);
 
+/** Keys that either advance the keyboard-only quest UI (nav/select/back) or should, while the
+ *  typewriter is still revealing text, just finish that reveal instead (first press completes
+ *  the text, next press acts — see PLAYTEST_NOTES on the dialogue window). */
+function isAdvanceKey(e: KeyboardEvent): boolean {
+  if (['Enter', 'Space', 'KeyZ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'Escape', 'Backspace'].includes(e.code)) return true;
+  return /^Digit[1-9]$/.test(e.code);
+}
+
 export function createDialogueWindow(wm: WindowManager, session: GameSession, openWindow: (panel: string) => void) {
   const portrait = el('img', { class: 'dw-dlg-portrait' });
   const nameEl = el('div', { class: 'dw-dlg-name' });
   const titleEl = el('div', { class: 'dw-dlg-title' });
   const textEl = el('div', { class: 'dw-dlg-text' });
   const optionsEl = el('div', { class: 'dw-dlg-options' });
+  const footerEl = keyHintFooter('');
   const top = el('div', { class: 'dw-dlg-top' }, portrait, el('div', { style: { flex: '1' } }, nameEl, titleEl, textEl));
-  const body = el('div', {}, top, optionsEl);
+  const body = el('div', {}, top, optionsEl, footerEl);
 
   const ctrl = createWindow(wm, {
     panel: 'dialogue', title: 'Conversation', width: 560, className: 'dw-dialogue-window',
@@ -35,6 +45,21 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
   let npcId = '';
   let typingCancel: (() => void) | null = null;
 
+  // ---- Keyboard nav plumbing ----------------------------------------------------------------
+  // One persistent window-level listener (registered once, at module/window creation time, so it
+  // runs before the WindowManager's own Escape-closes-topmost listener registered later in
+  // ui/index.ts — see that file's onKeydown). Each screen (root/tree/offer/progress/turn-in)
+  // installs its own `keyHandler` via setKeyHandler(); typeText() installs a "complete the
+  // typewriter" one first and hands off to the screen's real handler once text finishes revealing.
+  let keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  function setKeyHandler(fn: ((e: KeyboardEvent) => void) | null) { keyHandler = fn; }
+  const onWindowKeyDown = (e: KeyboardEvent) => {
+    if (!ctrl.isOpen()) return;
+    keyHandler?.(e);
+  };
+  window.addEventListener('keydown', onWindowKeyDown, true);
+  wm.track(() => window.removeEventListener('keydown', onWindowKeyDown, true));
+
   function currentDlgId(): string | undefined { return NPCS[npcId]?.dialogue; }
 
   const CHARS_PER_SEC = 55;
@@ -42,6 +67,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     typingCancel?.();
     textEl.textContent = '';
     optionsEl.innerHTML = ''; // clear the previous view's options immediately, don't let them linger mid-typing
+    footerEl.textContent = '';
     let done = false;
     const start = performance.now();
     const finish = () => { if (done) return; done = true; textEl.textContent = text; onDone(); };
@@ -54,6 +80,13 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     }, 16);
     typingCancel = () => { window.clearInterval(timer); finish(); };
     textEl.onclick = () => { if (!done) typingCancel?.(); };
+    // First press of any nav/select/back key just completes the reveal (matches the click-to-skip
+    // behavior above) — the screen's real key handler takes over once `onDone()` installs it.
+    setKeyHandler((e) => {
+      if (!isAdvanceKey(e)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      typingCancel?.();
+    });
   }
 
   function runActions(actions: DialogueAction[] | undefined) {
@@ -76,6 +109,15 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     if (marker) row.appendChild(el('span', { class: 'dw-dlg-marker' }, marker));
     row.appendChild(el('span', null, label));
     return row;
+  }
+
+  /** Wires ↑/↓ (+W/S) nav, Enter/Space/Z select, 1-9 direct pick and Esc/Backspace-back over every
+   *  `.dw-dlg-opt` row currently in optionsEl. Call once options are fully built for the screen. */
+  function navigateOptions(onBack: () => void, hint = '↑↓ choose · Enter select · 1-9 pick · Esc back'): void {
+    const items = Array.from(optionsEl.querySelectorAll<HTMLElement>('.dw-dlg-opt'));
+    const nav = createListNav(items, { numbered: true, onBack });
+    setKeyHandler((e) => nav.handleKey(e));
+    footerEl.textContent = hint;
   }
 
   function renderRoot() {
@@ -110,6 +152,8 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     if (npc?.shopId) optionsEl.appendChild(optionRow(`Shop`, '$', '', () => runActions([{ type: 'openShop', shopId: npc.shopId! }])));
     if (npc?.profession) optionsEl.appendChild(optionRow(`Crafting (${capitalize(npc.profession)})`, '⚒', '', () => runActions([{ type: 'openCrafting', professionId: npc.profession as any }])));
     optionsEl.appendChild(optionRow('Goodbye', null, 'dw-goodbye', () => ctrl.close()));
+    // Root has nowhere to "go back" to — Esc/Backspace closes the conversation instead.
+    navigateOptions(() => ctrl.close());
   }
 
   function showTreeNode(nodeId: string) {
@@ -134,6 +178,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
           if (node.next) showTreeNode(node.next); else ctrl.close();
         }));
       }
+      navigateOptions(() => renderRoot());
     });
   }
 
@@ -149,7 +194,14 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
       optionsEl.innerHTML = '';
       if (!isLast) {
         optionsEl.appendChild(optionRow('Continue ▸', null, '', () => renderOffer(questId, page + 1)));
-        optionsEl.appendChild(optionRow('Back', null, 'dw-goodbye', () => renderRoot()));
+        optionsEl.appendChild(optionRow('Back', null, 'dw-goodbye', () => (page > 0 ? renderOffer(questId, page - 1) : renderRoot())));
+        footerEl.textContent = '←→ page · Enter continue · Esc decline';
+        setKeyHandler((e) => {
+          const c = e.code;
+          if (c === 'ArrowRight' || c === 'Enter' || c === 'Space' || c === 'KeyZ') { e.preventDefault(); e.stopImmediatePropagation(); renderOffer(questId, page + 1); }
+          else if (c === 'ArrowLeft') { e.preventDefault(); e.stopImmediatePropagation(); if (page > 0) renderOffer(questId, page - 1); else renderRoot(); }
+          else if (c === 'Escape' || c === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); renderRoot(); }
+        });
         return;
       }
       for (const o of def.objectives) optionsEl.appendChild(el('div', { class: 'dw-dlg-obj' }, `• ${describeObjectiveBase(o)}`));
@@ -158,6 +210,15 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
         el('button', { class: 'dw-btn dw-btn-ghost', onclick: () => renderRoot() }, 'Decline'),
         el('button', { class: 'dw-btn dw-btn-primary', onclick: () => { session.dispatch({ type: 'acceptQuest', questId }); renderRoot(); } }, 'Accept'));
       optionsEl.appendChild(actions);
+      // Quest offer's final page: Enter always accepts, Esc always declines, ←/→ still page
+      // (there's nowhere for → to go here, but ← can revisit earlier paragraphs).
+      footerEl.textContent = paragraphs.length > 1 ? '← page back · Enter accept · Esc decline' : 'Enter accept · Esc decline';
+      setKeyHandler((e) => {
+        const c = e.code;
+        if (c === 'Enter' || c === 'Space' || c === 'KeyZ') { e.preventDefault(); e.stopImmediatePropagation(); session.dispatch({ type: 'acceptQuest', questId }); renderRoot(); }
+        else if (c === 'Escape' || c === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); renderRoot(); }
+        else if (c === 'ArrowLeft' && page > 0) { e.preventDefault(); e.stopImmediatePropagation(); renderOffer(questId, page - 1); }
+      });
     });
   }
 
@@ -172,6 +233,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
         optionsEl.appendChild(el('div', { class: `dw-dlg-obj ${o.done ? 'dw-done' : ''}` }, `${o.done ? '✓' : '•'} ${o.text} (${o.current}/${o.target})`));
       }
       optionsEl.appendChild(optionRow('Back', null, 'dw-goodbye', () => renderRoot()));
+      navigateOptions(() => renderRoot());
     });
   }
 
@@ -198,6 +260,7 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
             class: 'dw-choice-card', style: { flex: '1', textAlign: 'center' },
             onclick: () => { chooseIndex = idx; refreshChoiceCards(); updateCompleteBtn(); },
           }, el('img', { src: safeItemIcon(ITEMS[it.itemId]), style: { width: '28px', height: '28px' } }), el('div', { class: 'dw-choice-label', style: { fontSize: '11.5px' } }, ITEMS[it.itemId]?.name ?? it.itemId));
+          attachItemTooltip(card, session.state, { uid: '', itemId: it.itemId, qty: it.qty ?? 1 });
           chooseOneRow!.appendChild(card);
         });
         optionsEl.appendChild(chooseOneRow);
@@ -233,6 +296,8 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
       completeBtn.addEventListener('click', async () => {
         if (def.choices?.length) {
           const chosen = def.choices.find((c) => c.id === choiceId);
+          // The "weighty choice" confirm is confirmDialog (never native confirm()) — fully
+          // keyboard-operable (←/→, Enter, Esc) per widgets.ts.
           const ok = await confirmDialog(`Confirm: "${chosen?.label}"?\nThis choice is permanent.`, { okLabel: 'Confirm Choice' });
           if (!ok) return;
         }
@@ -241,6 +306,16 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
       });
       updateCompleteBtn();
       optionsEl.appendChild(el('div', { class: 'dw-dlg-actions' }, completeBtn));
+
+      // Keyboard nav across reward picks / choice cards (locked ones skipped) + Complete.
+      const navItems: HTMLElement[] = [
+        ...(chooseOneRow ? (Array.from(chooseOneRow.children) as HTMLElement[]) : []),
+        ...(choicesHost ? (Array.from(choicesHost.children).filter((c) => !c.classList.contains('dw-locked')) as HTMLElement[]) : []),
+        completeBtn,
+      ];
+      const nav = createListNav(navItems, { horizontal: true, onBack: () => renderRoot() });
+      setKeyHandler((e) => nav.handleKey(e));
+      footerEl.textContent = '↑↓←→ choose · Enter confirm · Esc back';
     });
   }
 
@@ -248,7 +323,11 @@ export function createDialogueWindow(wm: WindowManager, session: GameSession, op
     const row = el('div', { class: 'dw-dlg-reward-row' });
     if (def.rewards.xp) row.appendChild(el('div', { class: 'dw-dlg-reward' }, `${fmtNum(def.rewards.xp)} XP`));
     if (def.rewards.gold) row.appendChild(el('div', { class: 'dw-dlg-reward' }, el('img', { src: goldIconUrl(16) }), `${fmtNum(def.rewards.gold)}`));
-    for (const it of def.rewards.items ?? []) row.appendChild(el('div', { class: 'dw-dlg-reward' }, el('img', { src: safeItemIcon(ITEMS[it.itemId]) }), `${ITEMS[it.itemId]?.name ?? it.itemId}${it.qty && it.qty > 1 ? ` x${it.qty}` : ''}`));
+    for (const it of def.rewards.items ?? []) {
+      const chip = el('div', { class: 'dw-dlg-reward' }, el('img', { src: safeItemIcon(ITEMS[it.itemId]) }), `${ITEMS[it.itemId]?.name ?? it.itemId}${it.qty && it.qty > 1 ? ` x${it.qty}` : ''}`);
+      attachItemTooltip(chip, session.state, { uid: '', itemId: it.itemId, qty: it.qty ?? 1 });
+      row.appendChild(chip);
+    }
     return row;
   }
 

@@ -13,7 +13,14 @@ export const FACTION_QUESTS: QuestDef[] = [
     type: 'faction',
     giver: 'npc_grell',
     level: 13,
-    reqs: [{ type: 'flag', flag: 'faction', value: 'harpooners' }, { type: 'level', min: 13 }],
+    // The 'faction' flag can only be set at mq_08's turn-in, which itself requires mq_07 completed —
+    // spelling that out here too keeps Grell's Driftmoor placement reqs (mq_07 completed) provably
+    // no stricter than what's needed to offer this quest (see scripts/validate-data.ts "pacing").
+    reqs: [
+      { type: 'flag', flag: 'faction', value: 'harpooners' },
+      { type: 'level', min: 13 },
+      { type: 'quest', questId: 'mq_07_kelp_sickness', state: 'completed' },
+    ],
     summary: "Cull rustclaw crabs fouling the Guild's grotto harvest.",
     offer:
       "Harpoonmaster Grell doesn't waste time on pleasantries. \"You're wearing our colors now, good. Means you work. Rustclaw crabs have been fouling our harvest lines in the grotto depths, snapping at anything that gets near the good barnacle beds.\"\n\n\"Clear them out. Bring back shells — we melt them down for hull plating, waste not.\"\n\n\"Guild pays its own. Don't forget that.\"",
@@ -28,7 +35,11 @@ export const FACTION_QUESTS: QuestDef[] = [
     type: 'faction',
     giver: 'npc_grell',
     level: 15,
-    reqs: [{ type: 'flag', flag: 'faction', value: 'harpooners' }, { type: 'level', min: 15 }],
+    reqs: [
+      { type: 'flag', flag: 'faction', value: 'harpooners' },
+      { type: 'level', min: 15 },
+      { type: 'quest', questId: 'mq_07_kelp_sickness', state: 'completed' },
+    ],
     summary: 'Reclaim disputed kelp routes in Kelpwood Edge for the Guild.',
     offer:
       "\"Rival outfits are poaching our kelp routes in Kelpwood Edge,\" Grell growls, unrolling a chart with more red ink than blue. \"Tanglevines are guarding groves that used to be ours before some upstart crew moved in. Reclaim the territory.\"\n\n\"Bring back kelp essence — proof of the harvest, and product besides. Two birds.\"\n\n\"Kelpwood Edge. Go remind them whose banner flies there.\"",
@@ -83,7 +94,13 @@ export const FACTION_QUESTS: QuestDef[] = [
     type: 'faction',
     giver: 'npc_aolani',
     level: 13,
-    reqs: [{ type: 'flag', flag: 'faction', value: 'tidekeepers' }, { type: 'level', min: 13 }],
+    // See fq_h_1's comment: makes Aolani's Driftmoor placement reqs (mq_07 completed) provably
+    // no stricter than what's needed to offer this quest.
+    reqs: [
+      { type: 'flag', flag: 'faction', value: 'tidekeepers' },
+      { type: 'level', min: 13 },
+      { type: 'quest', questId: 'mq_07_kelp_sickness', state: 'completed' },
+    ],
     summary: 'Ease the suffering of the grotto’s ailing glowjellies.',
     offer:
       "Songkeeper Aolani speaks the way water moves — unhurried, certain of where it's going. \"The glowjellies in the grotto are suffering, their light gone dim and pained. A gentle ending, or a gentle harvest of what eases their pain — either is a mercy, if done with care.\"\n\n\"Bring me their essence. I'll weave it into something that soothes rather than merely treats.\"\n\n\"Go with a light hand, child.\"",
@@ -98,7 +115,11 @@ export const FACTION_QUESTS: QuestDef[] = [
     type: 'faction',
     giver: 'npc_aolani',
     level: 15,
-    reqs: [{ type: 'flag', flag: 'faction', value: 'tidekeepers' }, { type: 'level', min: 15 }],
+    reqs: [
+      { type: 'flag', flag: 'faction', value: 'tidekeepers' },
+      { type: 'level', min: 15 },
+      { type: 'quest', questId: 'mq_07_kelp_sickness', state: 'completed' },
+    ],
     summary: 'Gather meadow herbs and dewcap for a Tidekeeper ritual.',
     offer:
       "\"The meadow herbs carry old songs in their roots, older than either of us,\" Aolani says. \"I need meadow herb and dewcap both, gathered gently, roots left whole where you can manage it. They'll steady a ritual I've been preparing for some time now.\"\n\n\"Take your time with the gathering. Rushed hands bruise the song right out of a plant.\"\n\n\"The meadows will guide you, if you let them.\"",

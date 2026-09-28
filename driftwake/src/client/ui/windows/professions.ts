@@ -8,7 +8,7 @@ import { buildItemTooltip } from '../itemTooltip';
 import { safeItemIcon } from '../icons';
 import { PROFESSIONS, RECIPES, ITEMS } from '@shared/data';
 import { recipeAvailability, enhanceChance, rarityOf } from '@shared/logic';
-import { MAX_CRAFTING_PROFESSIONS, PROFESSION_MAX_LEVEL, professionXpToNext, RARITY_COLORS } from '@shared/constants';
+import { MAX_CRAFTING_PROFESSIONS, PROFESSION_MAX_LEVEL, PROFESSION_UNLOCK_LEVEL, professionXpToNext, RARITY_COLORS } from '@shared/constants';
 import type { CraftingProfessionId, GatheringProfessionId, ItemInstance } from '@shared/types';
 import { uiState } from '../state';
 
@@ -75,11 +75,19 @@ export function createProfessionsWindow(wm: WindowManager, session: GameSession)
         }
         row.appendChild(btnRow);
       } else {
+        // Crafting professions unlock at PROFESSION_UNLOCK_LEVEL (PLAYTEST feedback #5) — shown
+        // locked with an "Unlocks at level N" hint and a disabled Learn button below that level.
+        const locked = st.level < PROFESSION_UNLOCK_LEVEL;
+        row.classList.toggle('dw-prof-locked', locked);
         row.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-          el('div', null, el('div', null, def?.name ?? cid), el('div', { class: 'dw-tt-desc' }, def?.benefit ?? '')),
+          el('div', null,
+            el('div', null, def?.name ?? cid),
+            el('div', { class: 'dw-tt-desc' }, def?.benefit ?? ''),
+            locked ? el('div', { class: 'dw-prof-unlock-hint' }, `Unlocks at level ${PROFESSION_UNLOCK_LEVEL}`) : null),
           atTrainerFor(cid)
             ? el('button', {
-              class: 'dw-btn dw-btn-sm', disabled: CRAFTING_IDS.filter((c) => st.professions[c]).length >= MAX_CRAFTING_PROFESSIONS,
+              class: 'dw-btn dw-btn-sm', disabled: locked || CRAFTING_IDS.filter((c) => st.professions[c]).length >= MAX_CRAFTING_PROFESSIONS,
+              title: locked ? `Requires level ${PROFESSION_UNLOCK_LEVEL}` : undefined,
               onclick: () => session.dispatch({ type: 'learnProfession', professionId: cid }),
             }, 'Learn')
             : el('span', { class: 'dw-tt-sub' }, 'Visit a trainer to learn')));

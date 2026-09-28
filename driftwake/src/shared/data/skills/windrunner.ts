@@ -9,7 +9,7 @@ export const WINDRUNNER_SKILLS: SkillDef[] = [
   {
     id: 'wr_twin_shot',
     name: 'Twin Shot',
-    description: 'Loose two arrows in a rapid double-tap, punching through a target and whatever stands behind it.',
+    description: 'Loose two arrows in a rapid double-tap. Each arrow stops at the first foe it strikes.',
     job: 'windrunner',
     type: 'active',
     maxLevel: 10,
@@ -19,7 +19,7 @@ export const WINDRUNNER_SKILLS: SkillDef[] = [
     cooldownMs: 0,
     damagePct: { base: 34, perLevel: 2.5 },
     hits: 1,
-    effect: { kind: 'projectile', speed: 420, range: 300, count: 2, pierce: 1 },
+    effect: { kind: 'projectile', speed: 420, range: 300, count: 2 },
     vfx: { style: 'arrow', color: '#2e8b57' },
     sfx: 'shoot',
     channel: true,

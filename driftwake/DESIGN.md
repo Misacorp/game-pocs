@@ -36,7 +36,7 @@ Characters are ~20×32 px. Recommended map sizes: width 1600–3200, height 500�
 
 | Region | Map id | Name | Levels | Theme | Music | Notes |
 |---|---|---|---|---|---|---|
-| driftmoor | `driftmoor_town` | Driftmoor | town | driftmoor | town | Hub. Most NPCs. |
+| driftmoor | `driftmoor_town` | Driftmoor | town | driftmoor | town | Hub. NPCs arrive gradually — see §13 "Onboarding curve". |
 | driftmoor | `mossback_meadows` | Mossback Meadows | 1–4 | meadow | meadow | Tutorial field |
 | driftmoor | `mossback_hills` | Mossback Hills | 3–7 | meadow | meadow | Ropes & ladders introduced |
 | driftmoor | `barnacle_grotto` | Barnacle Grotto | 6–9 | grotto | cave | dark-ish cave |
@@ -141,23 +141,21 @@ Boss HP ≈ 60–200× a normal mob of its level, tuned with `scripts/balance-re
 
 ## 5. NPC registry (ids are binding)
 
-**Driftmoor (driftmoor_town):**
-- `npc_pell` — Old Pell, Retired Whalewatcher (tutorial guide, first quests)
-- `npc_maren` — Captain Maren Holt, Harbor Master (main quest giver, Act 1–2)
-- `npc_brina` — Brina Ashhammer, Blacksmith (smithing trainer, weapon/armor shop `shop_brina`)
-- `npc_juniper` — Juniper Vale, Alchemist (alchemy trainer, potion shop `shop_juniper`)
-- `npc_tobbin` — Tobbin Crumb, Cook (cooking trainer, food shop `shop_tobbin`)
-- `npc_sera` — Sera Glint, Jeweler (jewelcrafting trainer, `shop_sera`)
-- `npc_rook_prospector` — Dusty Fen, Prospector (mining/foraging tips, gathering quests, sells tools/`shop_dusty`)
-- `npc_pim` — Pim Pennywhistle, General Goods (general store `shop_pim`: potions, return scrolls)
-- `npc_wren` — Wren, Curious Kid (side quests)
-- `npc_grell` — Harpoonmaster Grell (Harpooners faction)
-- `npc_aolani` — Songkeeper Aolani (Tidekeepers faction)
-- `npc_ferry_tamsin` — Tamsin, Skyferry Pilot (travel; also placed in gale_outpost)
-- `npc_idris` — Scholar Idris (lore, Act 2) — placed in kelpwood_edge
+**Driftmoor (driftmoor_town)** — see "Onboarding curve" (§13) for exactly who is present when:
+- `npc_pell` — Old Pell, Retired Whalewatcher (tutorial guide, first quests) — **always present**
+- `npc_maren` — Captain Maren Holt, Harbor Master (main quest giver, Act 1–2) — **always present**
+- `npc_pim` — Pim Pennywhistle, General Goods (general store `shop_pim`: potions, return scrolls) — **always present**
+- `npc_wren` — Wren, Curious Kid (side quests) — **always present**
+- `npc_rook_prospector` — Dusty Fen, Prospector (mining/foraging tips, gathering quests, sells tools/`shop_dusty`) — arrives at **level 5**
+- `npc_juniper` — Juniper Vale, Alchemist (alchemy trainer, potion shop `shop_juniper`; also `mq_04` turn-in) — arrives at **level 6**
+- `npc_brina` — Brina Ashhammer, Blacksmith (smithing trainer, weapon/armor shop `shop_brina`) — arrives at **level 8**
+- `npc_ferry_tamsin` — Tamsin, Skyferry Pilot (travel; also placed in gale_outpost, always present there) — arrives once `mq_05_king_barnacle` is completed
+- `npc_grell` — Harpoonmaster Grell (Harpooners faction) — arrives once `mq_07_kelp_sickness` is completed
+- `npc_aolani` — Songkeeper Aolani (Tidekeepers faction) — arrives once `mq_07_kelp_sickness` is completed
+- `npc_idris` — Scholar Idris (lore, Act 2) — placed in kelpwood_edge (always present there)
 
-**Finreach:** `npc_fenna` — Kelp Warden Fenna (kelpwood_edge quests); `npc_poacher_defector` — Jory, Nervous Poacher (kelpwood_deep; moral choice)
-**Gale Outpost (gale_outpost):** `npc_borran` — Outpost Chief Borran (main quests Act 3); `npc_hale` — Commander Hale (vanguard instructor); `npc_ysolde` — Archmage Ysolde (stormcaller instructor); `npc_kestrel` — Ranger Kestrel (windrunner instructor); `npc_whisper` — Whisper (shade instructor); `npc_quill` — Quill, Outpost Trader (`shop_quill`).
+**Finreach:** `npc_fenna` — Kelp Warden Fenna (kelpwood_edge quests); `npc_poacher_defector` — Jory, Nervous Poacher (kelpwood_deep; moral choice); `npc_tobbin` — Tobbin Crumb, Cook (cooking trainer, food shop `shop_tobbin`) — **moved here from Driftmoor** (always present in kelpwood_edge).
+**Gale Outpost (gale_outpost):** `npc_borran` — Outpost Chief Borran (main quests Act 3); `npc_hale` — Commander Hale (vanguard instructor); `npc_ysolde` — Archmage Ysolde (stormcaller instructor); `npc_kestrel` — Ranger Kestrel (windrunner instructor); `npc_whisper` — Whisper (shade instructor); `npc_quill` — Quill, Outpost Trader (`shop_quill`); `npc_sera` — Sera Glint, Jeweler (jewelcrafting trainer, `shop_sera`) — **moved here from Driftmoor** (always present).
 **Windswept Ledges (faction camps, Act 3):** `npc_grell_camp` — Harpoonmaster Grell (Harpooner camp) and `npc_aolani_camp` — Songkeeper Aolani (Tidekeeper shrine). Separate NPC ids from the Driftmoor versions (same characters, travelled).
 **Lanternreef:** `npc_nell` — Diver Nell (glowtide_shallows; Act 4 quests, shop `shop_nell`); `npc_lamplighter` — The Lamplighter, a gentle ghost (lantern_deeps; lore)
 **Hollow:** `npc_first_singer` — Echo of the First Singer (hollow_mouth; Act 5 guide, spirit)
@@ -200,11 +198,19 @@ Also required: **job quests** `jq_vanguard`, `jq_stormcaller`, `jq_windrunner`, 
 ## 7. Professions
 
 Gathering (every character): **Mining** (ore/crystal nodes) and **Foraging** (herbs, kelp, coral, mushrooms).
-Crafting (choose up to **2** of 4; can unlearn to switch, losing progress):
-- **Smithing** (Brina): ores → ingots → weapons & armor for every class per region tier (often better than drops, guaranteed rarity); also **Whetstones** (temporary attack buff) and **Enhancement Stones** tier 1–3 (used to add stars to gear).
-- **Alchemy** (Juniper): herbs + monster parts → HP/MP potions (cheaper/stronger than shop), **Elixirs** (30-min stat buffs: +attack, +magic, +crit, +defense), **Stat/Skill Reset Tonics**.
-- **Cooking** (Tobbin): meat/fish/mushroom drops + herbs → **Food** (one active 'food' buff, 20–30 min: +XP %, +drop %, +HP regen, +speed; plus instant heal-over-time snacks). The XP/drop foods are the cooking hook.
-- **Jewelcrafting** (Sera): crystals/pearls/gems → **rings & amulets** (the best accessories come from here), **Gem Polish** (reroll bonus lines? — implemented as crafting "Polished" versions), and high-tier **Enhancement Stones**.
+Available from the start, but their intro quests (`pq_mining_1`, `pq_foraging_1`) begin around **level 5**,
+once Dusty Fen arrives in Driftmoor — see "Onboarding curve" (§13).
+
+Crafting (choose up to **2** of 4; can unlearn to switch, losing progress). **Crafting professions
+unlock at character level `PROFESSION_UNLOCK_LEVEL` (10, `constants.ts`)** — `learnProfession`
+below that level is rejected with a friendly in-character refusal ("Come back at level 10 — Brina
+doesn't train greenhorns."). Profession quests (`pq_*`) are reqs-gated to match (level ≥ 10 for the
+intro, ≥ 20 for the tier-3 batch), so no crafting quest can ever be offered before it's actually
+learnable:
+- **Smithing** (Brina, Driftmoor): ores → ingots → weapons & armor for every class per region tier (often better than drops, guaranteed rarity); also **Whetstones** (temporary attack buff) and **Enhancement Stones** tier 1–3 (used to add stars to gear).
+- **Alchemy** (Juniper, Driftmoor): herbs + monster parts → HP/MP potions (cheaper/stronger than shop), **Elixirs** (30-min stat buffs: +attack, +magic, +crit, +defense), **Stat/Skill Reset Tonics**.
+- **Cooking** (Tobbin, **Kelpwood Edge** — moved out of Driftmoor to give Finreach a trainer of its own): meat/fish/mushroom drops + herbs → **Food** (one active 'food' buff, 20–30 min: +XP %, +drop %, +HP regen, +speed; plus instant heal-over-time snacks). The XP/drop foods are the cooking hook.
+- **Jewelcrafting** (Sera, **Gale Outpost** — moved out of Driftmoor alongside the job instructors): crystals/pearls/gems → **rings & amulets** (the best accessories come from here), **Gem Polish** (reroll bonus lines? — implemented as crafting "Polished" versions), and high-tier **Enhancement Stones**.
 Profession levels 1–10. Recipes learned automatically at levels, bought from trainer, or from quest/drop recipe scrolls. Each region's materials feed the next tier of recipes: tier 1 (Driftmoor, prof L1–3), tier 2 (Finreach, L3–5), tier 3 (Stormbreak, L5–7), tier 4 (Lanternreef, L7–9), tier 5 (Hollow, L9–10).
 
 Salvage: any equipment can be salvaged into `mat_scrap_*` materials by any character (feeds smithing).
@@ -343,3 +349,48 @@ between stacked platforms must be ≤ 52 px (else add a rope/ladder). Base run s
 Ground platforms: `type:'ground'`, spanning the map bottom (y ≈ height − 48). One-way platforms: `type:'oneway'` (jump up through,
 ↓+Space to drop). Ropes: `{x, top, bottom}` where top is ~8 px above the upper platform and bottom touches the lower surface.
 Portals sit on a platform surface (y = platform top). Monster spawns need platforms ≥ 64 px wide inside the spawn x-range.
+
+## 13. Onboarding curve
+
+Playtest feedback: a new player immediately walked into a town with a dozen NPCs, a wall of quest
+markers and every crafting profession on offer at once. The fix has two parts: **who is in
+Driftmoor and when** (`MapNpcPlacement.reqs`), and **when a quest can be offered at all** (`QuestDef.reqs`) —
+kept consistent with each other by `scripts/validate-data.ts`'s "pacing" check, which fails the
+build if an NPC's placement reqs are ever stricter than the reqs of a quest that needs that NPC as
+giver or turn-in.
+
+**Driftmoor at level 1** is deliberately calm: only Old Pell (tutorial), Captain Maren (main story),
+Pim (general store/potions) and Wren (one small side quest) are present. Nobody else shows up until
+the character has a reason to meet them:
+
+| NPC | Arrives when | Why |
+|---|---|---|
+| `npc_pell`, `npc_maren`, `npc_pim`, `npc_wren` | always | the calm starting cast |
+| `npc_rook_prospector` (Dusty, gathering) | level ≥ 5 | gathering intro (`pq_mining_1`/`pq_foraging_1`) starts here |
+| `npc_juniper` (alchemy) | level ≥ 6 | matches `mq_04`'s own reqs exactly, so she's there the moment the main story needs her, and stays for her (much later) profession role |
+| `npc_brina` (smithing) | level ≥ 8 | teases crafting just ahead of the level-10 unlock, without dropping a profession quest on a level-1 character |
+| `npc_ferry_tamsin` | `mq_05_king_barnacle` completed | same moment the Kelpwood portal itself unlocks — travel options open together |
+| `npc_grell`, `npc_aolani` (faction reps) | `mq_07_kelp_sickness` completed | `mq_08` ("Two Currents") needs both of them, and itself requires `mq_07` completed |
+
+**Moved out of Driftmoor entirely** (see §5/§7), to give the regions players travel to a reason to
+be visited beyond the main quest, and to thin the starting town further:
+- **Tobbin** (cooking) → **Kelpwood Edge** (Finreach), alongside Idris and Fenna.
+- **Sera** (jewelcrafting) → **Gale Outpost** (Stormbreak), alongside the job instructors.
+
+**Crafting professions unlock at level `PROFESSION_UNLOCK_LEVEL` (10)**: `learnProfession` below
+that level is rejected by the reducer with a friendly in-character refusal, and every crafting
+profession quest (`pq_smithing_*`, `pq_alchemy_*`, `pq_cooking_*`, `pq_jewelcrafting_*`) is reqs-gated
+to match (level ≥ 10 for the intro tier, ≥ 20 for the tier-3 batch) so a crafting quest is never
+offered before it's actually learnable. Gathering (mining/foraging) stays available from the start —
+only its intro quest is pushed to level 5, alongside Dusty's arrival.
+
+**Quest density**: at level 1–3 a fresh character sees at most the main quest plus one or two light
+Driftmoor sides — `sq_driftmoor_pells_tea` and `sq_driftmoor_wren_kite` are gated behind `mq_01`/`mq_02`
+completion (instead of a flat level ≥ 1) so they arrive one at a time as the player returns to town,
+rather than all stacking up alongside the very first quest. Side/daily quests tied to an NPC that
+arrives later (e.g. Dusty's ore/herb bounties) are gated to match that NPC's arrival level, so a
+quest marker never appears over an empty spot in town.
+
+Verified by: `npm run validate` (0 errors/0 warnings, including the giver/turn-in "pacing" check),
+`npx vitest run` (level-gate + "≤ 3 offered quests at level 1" tests in `tests/reducer.test.ts`),
+and `npx tsx scripts/simulate-playthrough.ts <class>` for two classes (0 blockers, main story ~75–100 min).

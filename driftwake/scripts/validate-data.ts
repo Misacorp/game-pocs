@@ -9,7 +9,7 @@
  *  - balance sanity (monster xp/hp vs suggested curves, missing icons)
  *  - a summary of content counts
  */
-import type { Condition, MapDef, PlatformDef } from '../src/shared/types';
+import type { Condition, MapDef, PlatformDef, QuestDef } from '../src/shared/types';
 import {
   ITEMS, MONSTERS, SKILLS, JOBS, MAPS, NPCS, QUESTS, DIALOGUES, RECIPES, PROFESSIONS, GATHER_NODES, SHOPS, SETS,
   ACHIEVEMENTS,
@@ -226,6 +226,122 @@ for (const r of Object.values(RECIPES)) {
 for (const node of Object.values(GATHER_NODES)) {
   const where = `gather node '${node.id}'`;
   for (const d of node.drops) if (!ITEMS[d.itemId]) err('gathering', `${where}: drop references unknown item '${d.itemId}'`);
+}
+
+// ---------------------------------------------------------------------------
+// NPC presence vs. quest reqs (pacing — see DESIGN.md "Onboarding curve")
+//
+// A NPC can now be placed conditionally (`MapNpcPlacement.reqs`, e.g. crafters arriving after a
+// certain level or story beat). If a quest's own giver/turn-in NPC could be *stricter*-gated than
+// the quest itself, a player could have the quest offered/active with nobody to hand it to. We
+// check that every placement's reqs are implied by ("no stricter than") the facts guaranteed by
+// the quest's own reqs — including transitively through prerequisite quests.
+// ---------------------------------------------------------------------------
+
+interface NpcPlacementInfo { mapId: string; reqs?: Condition[] }
+const npcPlacements = new Map<string, NpcPlacementInfo[]>();
+for (const map of Object.values(MAPS)) {
+  for (const np of map.npcs) {
+    if (!npcPlacements.has(np.npcId)) npcPlacements.set(np.npcId, []);
+    npcPlacements.get(np.npcId)!.push({ mapId: map.id, reqs: np.reqs });
+  }
+}
+
+/** Conditions guaranteed to hold whenever this quest is offerable/active — its own reqs, plus
+ * (transitively) the reqs of any prerequisite quest it requires to be 'completed', since quest
+ * completion is monotonic (once true, stays true). */
+function guaranteedFactsForQuest(q: QuestDef, seen = new Set<string>()): Condition[] {
+  if (seen.has(q.id)) return [];
+  seen.add(q.id);
+  const facts = [...(q.reqs ?? [])];
+  for (const c of q.reqs ?? []) {
+    if (c.type === 'quest') {
+      const states = Array.isArray(c.state) ? c.state : [c.state];
+      if (states.length === 1 && states[0] === 'completed') {
+        const dep = QUESTS[c.questId];
+        if (dep) facts.push(...guaranteedFactsForQuest(dep, seen));
+      }
+    }
+  }
+  return facts;
+}
+
+/** Best-effort check that a guaranteed fact set implies (satisfies) a single required condition. */
+function factsImply(facts: Condition[], need: Condition): boolean {
+  for (const f of facts) {
+    if (f.type !== need.type) continue;
+    if (f.type === 'level' && need.type === 'level') {
+      if (need.min !== undefined && (f.min === undefined || f.min < need.min)) continue;
+      if (need.max !== undefined && (f.max === undefined || f.max > need.max)) continue;
+      return true;
+    }
+    if (f.type === 'quest' && need.type === 'quest') {
+      if (f.questId !== need.questId) continue;
+      const have = Array.isArray(f.state) ? f.state : [f.state];
+      const wanted = Array.isArray(need.state) ? need.state : [need.state];
+      if (have.length === 1 && have[0] === 'completed' && wanted.includes('completed')) return true;
+      continue;
+    }
+    if (f.type === 'flag' && need.type === 'flag') {
+      if (f.flag !== need.flag) continue;
+      if (f.value === need.value && !!f.not === !!need.not) return true;
+      continue;
+    }
+    if (f.type === 'class' && need.type === 'class') {
+      const have = Array.isArray(f.classId) ? f.classId : [f.classId];
+      const wanted = Array.isArray(need.classId) ? need.classId : [need.classId];
+      if (wanted.every((id) => have.includes(id))) return true;
+      continue;
+    }
+    if (f.type === 'job' && need.type === 'job') {
+      const have = Array.isArray(f.jobId) ? f.jobId : [f.jobId];
+      const wanted = Array.isArray(need.jobId) ? need.jobId : [need.jobId];
+      if (wanted.every((id) => have.includes(id))) return true;
+      continue;
+    }
+    if (f.type === 'jobTier' && need.type === 'jobTier') {
+      if (f.tier === need.tier) return true;
+      continue;
+    }
+    if (f.type === 'profession' && need.type === 'profession') {
+      if (f.professionId !== need.professionId) continue;
+      if ((f.minLevel ?? 0) >= (need.minLevel ?? 0)) return true;
+      continue;
+    }
+    if (f.type === 'reputation' && need.type === 'reputation') {
+      if (f.faction !== need.faction) continue;
+      if (f.min >= need.min) return true;
+      continue;
+    }
+    if (f.type === 'item' && need.type === 'item') {
+      if (f.itemId !== need.itemId) continue;
+      if ((f.qty ?? 1) >= (need.qty ?? 1)) return true;
+      continue;
+    }
+    if (f.type === 'questChoice' && need.type === 'questChoice') {
+      if (f.questId === need.questId && f.choiceId === need.choiceId) return true;
+      continue;
+    }
+  }
+  return false;
+}
+
+function npcGuaranteedPresent(npcId: string, facts: Condition[]): boolean {
+  const placements = npcPlacements.get(npcId);
+  if (!placements || placements.length === 0) return false;
+  return placements.some((p) => !p.reqs || p.reqs.every((need) => factsImply(facts, need)));
+}
+
+for (const q of Object.values(QUESTS)) {
+  const where = `quest '${q.id}'`;
+  const facts = guaranteedFactsForQuest(q);
+  if (NPCS[q.giver] && npcPlacements.has(q.giver) && !npcGuaranteedPresent(q.giver, facts)) {
+    err('pacing', `${where}: giver '${q.giver}' has no map placement guaranteed present whenever this quest is offerable — its placement reqs are stricter than the quest's own reqs`);
+  }
+  const turnIn = q.turnIn ?? q.giver;
+  if (NPCS[turnIn] && npcPlacements.has(turnIn) && !npcGuaranteedPresent(turnIn, facts)) {
+    err('pacing', `${where}: turn-in npc '${turnIn}' has no map placement guaranteed present whenever this quest can be active — its placement reqs are stricter than the quest's own reqs`);
+  }
 }
 
 // ---------------------------------------------------------------------------

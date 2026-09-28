@@ -24,7 +24,7 @@ Other scripts:
 | `npm test` | Vitest: reducer, balance and server smoke tests |
 | `npm run validate` | Content cross-reference validator (ids, portals, drops, quests, dialogue links, balance warnings) |
 | `npm run simulate -- [class]` | Headless bot plays the whole story through the authoritative reducer and reports pacing/blockers |
-| `npm run e2e` | Browser smoke test (Playwright): every class creates a character, travels, fights, quits — fails on page errors |
+| `npm run e2e` | Browser smoke test (Playwright): every class creates a character, travels, fights, quits — fails on page errors (`E2E_GFX=low\|medium\|high`, default medium) |
 | `npm run server` | Node WebSocket authoritative server on :7777 (see `server/README.md`) |
 
 Play online against the server: `npm run server`, then open `http://localhost:5173/?server=ws://localhost:7777`.
@@ -78,6 +78,17 @@ profession and daily content add several more hours. Global XP speed is one knob
   auto-loot nearby drops and grant small bonuses.
 - **Onboarding** — first-time contextual tutorial tips (toggle in Settings).
 - **MMO feel offline** — the local backend simulates other wandering players and chat.
+
+## Look & feel
+
+- **Visual brand — "Scrimshaw & Lanternlight"** (`BRAND.md`, `src/client/brand/`): whale-hide panels engraved
+  with scrimshaw bone line-work, amber lantern glass for actions, bioluminescent tideglow for magic; the wake
+  and whale-fluke marks; IM Fell English SC / Alegreya Sans / Alegreya Sans SC / Pixelify Sans (self-hosted).
+  A live brand board is at `/brand-board.html` on the dev server.
+- **Render pipeline** (`src/client/render/`): per-region GLSL shader skies, Light2D dynamic lighting with normal
+  maps generated from the procedural sprites, threshold bloom (only emissive pixels glow), per-region colour
+  grading, contact shadows, mist and weather that catch the light. **Settings → Graphics** offers
+  Low / Medium / High (Low is the plain look for weak GPUs).
 
 ## Architecture
 

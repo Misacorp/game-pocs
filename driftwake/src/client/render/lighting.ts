@@ -70,7 +70,9 @@ function drainQueue(): void {
       const tex = scene.textures.get(key);
       const src = tex.getSourceImage(0) as unknown;
       if (!(src instanceof HTMLCanvasElement)) continue;
-      const normal = buildNormalMapFromAlpha(src, { bevel: 2 });
+      // hi-res (illustrated rig) sheets ask for a proportionally wider bevel via customData
+      const bevel = Number((tex.customData as Record<string, unknown>)?.normalBevel ?? 2) || 2;
+      const normal = buildNormalMapFromAlpha(src, { bevel });
       tex.setDataSource(normal as unknown as HTMLCanvasElement);
     } catch (e) {
       console.warn(`[lighting] normal map generation failed for "${key}" (falls back to flat shading)`, e);

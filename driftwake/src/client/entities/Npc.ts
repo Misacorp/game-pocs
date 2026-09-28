@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 import type { NpcDef } from '@shared/types';
 import { getNpcSprite, spawnVfx } from '../gfx';
 import { bus } from '../events';
-import { makeCrispLabel } from './spriteUtil';
+import { makeCrispLabel, applySpriteScale, visualTop } from './spriteUtil';
 import type { WorldLighting } from '../render/lighting';
 import { ContactShadow } from '../render/ContactShadow';
 
@@ -35,6 +35,7 @@ export class NpcEntity {
     this.id = def.id;
     const info = getNpcSprite(scene, def);
     this.sprite = scene.add.sprite(x, y, info.key, 0).setOrigin(0.5, 1).setDepth(9).setFlipX(flip);
+    applySpriteScale(this.sprite, info);
     if (info.anims.idle) this.sprite.play(info.anims.idle);
     this.sprite.setInteractive({ useHandCursor: true });
     this.sprite.on('pointerdown', () => bus.emit('ui:dialogue', { npcId: this.id }));
@@ -48,11 +49,11 @@ export class NpcEntity {
       // height — sitting inside the sprite itself) and detuned, so its peak doesn't land on the
       // NPC's own pixels; see Player.ts / pipelines/LightingPipeline.ts for the full root cause.
       this.lightId = `npc_${this.id}_${x}_${y}`;
-      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - info.frameHeight * 1.1, color: 0xfff0d8, radius: 130, intensity: 0.4 });
+      lighting.addLight({ id: this.lightId, x: () => x, y: () => y - visualTop(info) * 1.1, color: 0xfff0d8, radius: 130, intensity: 0.4 });
     }
 
     // Stack (top -> bottom, closest to the head last): marker, title (near-only), name.
-    const nameY = y - info.frameHeight - 4;
+    const nameY = y - visualTop(info) - 4;
     const titleY = nameY - 9;
     this.nameTag = makeCrispLabel(scene, x, nameY, def.name).setOrigin(0.5, 1).setDepth(11);
     if (def.title) {

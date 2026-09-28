@@ -21,7 +21,7 @@ interface Pose { squash: number; lunge: number; flash: boolean; dead: boolean; t
  *  eyeDot() below treats it as an emissive light source instead of flat pigment. */
 const DEFAULT_EYE = '#181018';
 
-const BOX: Record<MonsterBase, [number, number]> = {
+export const BOX: Record<MonsterBase, [number, number]> = {
   slime: [22, 16], mushroom: [20, 22], snail: [26, 17], bird: [22, 20], crab: [27, 16],
   jelly: [20, 24], beetle: [22, 16], bat: [27, 15], wisp: [18, 18], plant: [18, 27],
   golem: [24, 28], eel: [32, 12], fish: [22, 14], humanoid: [18, 30], spider: [27, 18],

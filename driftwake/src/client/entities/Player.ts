@@ -60,6 +60,10 @@ export class Player implements PlayerHandle {
   private invulnUntil = 0;
   private castLockUntil = 0;
   private castAnimName: 'attack' | 'cast' | 'shoot' = 'attack';
+  /** bumps on every cast so back-to-back swings restart the anim instead of freezing on its last frame */
+  private castSeq = 0;
+  private castSeqShown = 0;
+  private castLockMs = 0;
   climbing = false;
   private currentRope: RopeDef | null = null;
   private lastDamageAt = 0;
@@ -312,7 +316,9 @@ export class Player implements PlayerHandle {
 
   playCastAnim(anim: 'attack' | 'cast' | 'shoot', lockMs: number): void {
     this.castAnimName = anim;
-    this.castLockUntil = performance.now() + Math.max(80, lockMs);
+    this.castLockMs = Math.max(80, lockMs);
+    this.castLockUntil = performance.now() + this.castLockMs;
+    this.castSeq++;
   }
 
   heal(amount: number): void {
@@ -377,7 +383,19 @@ export class Player implements PlayerHandle {
     else if (dashing) name = 'walk';
     else if (!this.grounded) name = body.velocity.y < 0 ? 'jump' : 'fall';
     else if (Math.abs(body.velocity.x) > 6) name = 'walk';
-    playAnim(this.sprite, this.info, name);
+    const casting = !this.dead && now < this.castLockUntil && name === this.castAnimName;
+    if (casting && this.castSeqShown !== this.castSeq) {
+      // restart the swing and fit its duration to the skill's lock time (clamped so very long
+      // casts don't crawl and very fast ones don't skip frames entirely)
+      this.castSeqShown = this.castSeq;
+      playAnim(this.sprite, this.info, name, { ignoreIfPlaying: false });
+      const anim = this.sprite.anims.currentAnim;
+      const animMs = anim ? (anim.frames.length / Math.max(1, anim.frameRate)) * 1000 : 0;
+      this.sprite.anims.timeScale = animMs > 0 ? Phaser.Math.Clamp(animMs / this.castLockMs, 0.7, 2.2) : 1;
+    } else {
+      if (!casting && this.sprite.anims.timeScale !== 1) this.sprite.anims.timeScale = 1;
+      playAnim(this.sprite, this.info, name);
+    }
     this.sprite.setAlpha(this.dead ? 1 : invulnAlpha(now, this.invulnUntil));
   }
 

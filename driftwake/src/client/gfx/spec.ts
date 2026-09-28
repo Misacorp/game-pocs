@@ -29,6 +29,11 @@ export interface SpriteInfo {
   /** anim name -> Phaser anim key; characters: idle, walk, jump, fall, attack, cast, shoot, climb, hurt, dead, crouch
    *  monsters: idle, move, attack, hurt, die; npcs: idle; nodes: idle, depleted; portal: idle */
   anims: Record<string, string>;
+  /** texture px per world px (illustrated rig sheets are baked at 2x). frame/body sizes above are
+   *  always WORLD px; entities apply 1/texScale via entities/spriteUtil.applySpriteInfo. */
+  texScale?: number;
+  /** approximate art height above the feet in WORLD px, when it differs from frameHeight */
+  visualHeight?: number;
 }
 
 export interface PlatformTextures { groundTop: string; groundFill: string; oneway: string; solid: string; rope: string; ladder: string; tile: number }

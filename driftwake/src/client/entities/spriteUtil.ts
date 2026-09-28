@@ -8,9 +8,25 @@ import { ensurePixelFontLoading, pixelFontFamily } from '../render/pixelFont';
 /** Size + offset the physics body so it's centered horizontally and flush with the bottom of the frame
  *  (sprites use origin 0.5,1 so x,y is the "feet" position). */
 export function applyBodyBottomAligned(sprite: Phaser.Physics.Arcade.Sprite, info: SpriteInfo): void {
+  applySpriteScale(sprite, info);
+  // Arcade body size/offset are in TEXTURE px (Phaser multiplies them by the sprite's scale), while
+  // SpriteInfo sizes are WORLD px — so hi-res (texScale 2) sheets need their numbers scaled up.
+  const ts = info.texScale ?? 1;
   const body = sprite.body as Phaser.Physics.Arcade.Body;
-  body.setSize(info.bodyWidth, info.bodyHeight);
-  body.setOffset((info.frameWidth - info.bodyWidth) / 2, info.frameHeight - info.bodyHeight);
+  body.setSize(info.bodyWidth * ts, info.bodyHeight * ts);
+  body.setOffset(((info.frameWidth - info.bodyWidth) / 2) * ts, (info.frameHeight - info.bodyHeight) * ts);
+}
+
+/** Displays a (possibly hi-res) sheet at its intended world size. Safe to call repeatedly, e.g.
+ *  when a sprite swaps between a 1x pixel sheet and a 2x illustrated one. */
+export function applySpriteScale(sprite: Phaser.GameObjects.Sprite, info: SpriteInfo): void {
+  const s = 1 / (info.texScale ?? 1);
+  if (sprite.scaleX !== s || sprite.scaleY !== s) sprite.setScale(s);
+}
+
+/** Top of the art above the feet in world px (name tags, markers, personal lights). */
+export function visualTop(info: SpriteInfo): number {
+  return info.visualHeight ?? info.frameHeight;
 }
 
 /** Play an anim by logical name if it exists on this sprite's sheet; no-op + warn-free otherwise. */

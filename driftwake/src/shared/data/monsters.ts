@@ -257,7 +257,7 @@ const STORMBREAK_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.2, respawnMs: 8500,
   },
   {
-    id: 'kraelith', name: 'Kraelith, the Storm Roc', level: 24, hp: 165800, attack: 85, defense: 40, xp: 6213, gold: [700, 1100],
+    id: 'kraelith', name: 'Kraelith, the Storm Roc', level: 24, hp: 215500, attack: 85, defense: 40, xp: 6213, gold: [700, 1100],
     speed: 45, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Storm Roc',
     attacks: [
       { id: 'kr_wing_slam', kind: 'slam', damageMult: 1.3, cooldownMs: 4000, range: 240, telegraphMs: 750, radius: 160, vfx: 'wind', color: '#c9d8f0' },
@@ -326,7 +326,7 @@ const LANTERNREEF_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.25, respawnMs: 8500,
   },
   {
-    id: 'captain_rook', name: 'Captain Vashti Rook', level: 30, hp: 247200, attack: 104, defense: 48, xp: 9000, gold: [1100, 1600],
+    id: 'captain_rook', name: 'Captain Vashti Rook', level: 30, hp: 370800, attack: 104, defense: 48, xp: 9000, gold: [1100, 1600],
     speed: 40, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Ghost of the Sunken Galleon',
     attacks: [
       { id: 'cr_cutlass_slam', kind: 'slam', damageMult: 1.3, cooldownMs: 3800, range: 220, telegraphMs: 700, radius: 140, vfx: 'heavySlash', color: '#8affea' },
@@ -405,7 +405,7 @@ const HOLLOW_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.4, respawnMs: 6000,
   },
   {
-    id: 'blight_heart', name: 'The Blight Heart', level: 36, hp: 363700, attack: 123, defense: 55, xp: 11680, gold: [1600, 2200],
+    id: 'blight_heart', name: 'The Blight Heart', level: 36, hp: 581900, attack: 123, defense: 55, xp: 11680, gold: [1600, 2200],
     speed: 0, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Ancient Wound',
     attacks: [
       { id: 'bh_pulse_shockwave', kind: 'shockwave', damageMult: 1.3, cooldownMs: 4500, range: 9999, telegraphMs: 800, vfx: 'poison', color: '#9a4ae0' },
@@ -478,7 +478,7 @@ const VESPER_MONSTERS: MonsterDef[] = [
     knockbackResist: 0.3, respawnMs: 9500,
   },
   {
-    id: 'vesper_heartsong', name: 'The Vesper Heartsong', level: 41, hp: 472810, attack: 148, defense: 62, xp: 14080, gold: [1900, 2600],
+    id: 'vesper_heartsong', name: 'The Vesper Heartsong', level: 41, hp: 803800, attack: 148, defense: 62, xp: 14080, gold: [1900, 2600],
     speed: 0, behavior: 'boss', aggressive: true, isBoss: true, title: 'The Leviathan\'s Old Wound',
     attacks: [
       { id: 'vh_starfall_rain', kind: 'rain', damageMult: 1.1, cooldownMs: 7000, range: 500, telegraphMs: 950, count: 9, vfx: 'ice', color: '#8ae0ff' },
